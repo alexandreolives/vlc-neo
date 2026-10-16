@@ -179,6 +179,8 @@ public:
     Q_INVOKABLE int linkSubtitleFolder(const QUrl &folder);
     Q_INVOKABLE void unlinkSubtitleFolder();
     Q_INVOKABLE QString linkedSubtitleFolder() const;
+    // File name of the subtitle attached from the linked folder to the current media.
+    Q_INVOKABLE QString linkedSubtitleFile() const { return m_linkedSubtitleFile; }
 
     // VLC core configuration (persisted in vlcrc)
     Q_INVOKABLE QVariant config(const QString &name) const;
@@ -260,6 +262,7 @@ private:
     bool m_presetActive = false;
     bool m_presetPending = false;
     bool m_subsLinkedApplied = false;
+    QString m_linkedSubtitleFile;
     qint64 m_lastSavedResume = 0;
     std::atomic<bool> m_timePosted{false};
 };

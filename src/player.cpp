@@ -224,6 +224,7 @@ void Player::attachInput()
             var_AddCallback(m_input, "intf-event", onInputEvent, this);
             m_presetPending = true;
             m_subsLinkedApplied = false;
+            m_linkedSubtitleFile.clear();
             m_lastSavedResume = 0;
         }
         m_presetActive = false;
@@ -1064,7 +1065,8 @@ void Player::applyLinkedSubtitles()
     if (best.isEmpty())
         return;
     const QByteArray mrl = QUrl::fromLocalFile(QDir(dir).filePath(best)).toString(QUrl::FullyEncoded).toUtf8();
-    input_AddSlave(m_input, SLAVE_TYPE_SPU, mrl.constData(), true, false, true);
+    if (input_AddSlave(m_input, SLAVE_TYPE_SPU, mrl.constData(), true, false, true) == VLC_SUCCESS)
+        m_linkedSubtitleFile = best;
 }
 
 // -------------------------------------------------------- core config

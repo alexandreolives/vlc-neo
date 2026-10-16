@@ -35,8 +35,9 @@ check "duration known" "$out" "len=40"
 echo "== folder subtitles + show preset"
 out=$(run "1500:'matched=' + player.linkSubtitleFolder(platform.fileUrl('$WORK/subs'))|2500:player.setSubtitleDelay(-400); player.setSubtitleScale(160)|2800:player.savePresetForFolder()|3000:quit" "$E1" "$E2")
 check "folder link matches both episodes" "$out" "matched=2"
-out=$(run "3000:'spu=' + player.tracks('spu').filter(t => t.selected).map(t => t.name).join() + ' delay=' + player.subtitleDelay + ' scale=' + player.subtitleScale()|3200:quit" "$E2")
-check "episode 2 gets its own subtitle" "$out" "myshow_1x02_ar"
+out=$(run "3500:'sub=' + player.linkedSubtitleFile() + ' shown=' + player.tracks('spu').some(t => t.selected && t.id >= 0) + ' delay=' + player.subtitleDelay + ' scale=' + player.subtitleScale()|+200:quit" "$E2")
+check "episode 2 gets its own subtitle file" "$out" "sub=myshow_1x02_ar.srt"
+check "that subtitle is the active track" "$out" "shown=true"
 check "preset restores subtitle delay" "$out" "delay=-400"
 check "preset restores subtitle size" "$out" "scale=160"
 
