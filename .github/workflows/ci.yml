@@ -19,7 +19,7 @@ jobs:
             vlc libvlc vlc-plugins-all \
             qt6-base qt6-declarative qt6-svg \
             ffmpeg ttf-dejavu imagemagick
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
