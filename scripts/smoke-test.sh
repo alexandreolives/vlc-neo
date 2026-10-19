@@ -140,11 +140,13 @@ out=$(run "1200:win.rightPanel='settings'|+100:'opened=' + (win.rightPanel === '
 check "clicking the video closes the audio/subtitle panel" "$out" "closed=true"
 
 echo "== primary navigation"
-out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video')|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent')|+100:quit" "$E1")
+out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video') + ' expanded=' + (navigationRail.expanded && navigationRail.width === 112) + ' label=' + navigationRail.labelForPage('folder')|+150:grab:$WORK/navigation-videos.png|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent' && navigationRail.expanded)|+100:quit" "$E1")
 check "navigation buttons accept keyboard focus" "$out" "focusVideos=true"
-check "Space opens the video library view" "$out" "videos=true"
+check "Space opens the video library and expands the labeled navigation rail" "$out" "videos=true expanded=true label=Browse"
 check "recent navigation accepts keyboard focus" "$out" "focusRecent=true"
-check "recent navigation opens the recent-media view" "$out" "recent=true"
+check "recent navigation opens the recent-media view with the expanded rail" "$out" "recent=true"
+if [ -s "$WORK/navigation-videos.png" ]; then echo "PASS  expanded navigation screenshot written"; pass=$((pass + 1))
+else echo "FAIL  expanded navigation screenshot missing"; fail=$((fail + 1)); fi
 
 echo
 echo "passed $pass, failed $fail"

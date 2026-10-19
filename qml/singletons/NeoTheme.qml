@@ -68,6 +68,7 @@ QtObject {
     readonly property color accentSoft: Qt.rgba(accent.r, accent.g, accent.b, 0.16)
 
     readonly property color window: dark ? "#0E0E0E" : "#EDEDED"
+    readonly property color rail: dark ? "#191919" : "#E5E5E5"
     readonly property color bar: dark ? "#1B1B1B" : "#DDDDDD"
     readonly property color panel: dark ? "#151515" : "#E7E7E7"
     readonly property color surface: dark ? "#1F1F1F" : "#EDEDED"

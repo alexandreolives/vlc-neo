@@ -401,6 +401,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             currentPage: win.navigationPage
+            expanded: win.libraryOpen
             visible: !win.overlayMode || win.chromeShown
             onNavigate: (page) => win.navigate(page)
         }
