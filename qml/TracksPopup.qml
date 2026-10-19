@@ -7,6 +7,7 @@ import Neo 1.0
 Popup {
     id: root
     property string tab: "spu"
+    property Item currentAnchor: null
     signal showPreferences(string tab)
     signal addSubtitles()
 
@@ -15,16 +16,22 @@ Popup {
     padding: 0
     modal: false
     focus: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    function openFor(tabName, anchorItem) {
+    function openFor(tabName, triggerItem) {
+        if (visible && tab === tabName && currentAnchor === triggerItem) {
+            close()
+            return
+        }
+        currentAnchor = triggerItem
         tab = tabName
         refresh()
-        const p = anchorItem.mapToItem(parent, anchorItem.width / 2, 0)
+        const p = triggerItem.mapToItem(parent, triggerItem.width / 2, 0)
         x = Math.min(Math.max(8, p.x - width / 2), parent.width - width - 8)
         y = p.y - height - 10
         open()
     }
+    onClosed: currentAnchor = null
     function refresh() {
         trackList.model = player.tracks(tab)
         deviceList.model = tab === "audio" ? player.audioDevices() : []

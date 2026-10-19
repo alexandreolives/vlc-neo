@@ -88,6 +88,12 @@ check "focused timeline consumes Home and End" "$out" "key End delivered (1)"
 if [ -s "$WORK/timeline-focus.png" ]; then echo "PASS  focused timeline screenshot written"; pass=$((pass + 1))
 else echo "FAIL  focused timeline screenshot missing"; fail=$((fail + 1)); fi
 
+echo "== track popup dismissal"
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+check "track popup opens" "$out" "opened=true"
+check "clicking the same track control closes its popup" "$out" "toggleClosed=true"
+check "clicking another track control switches the popup" "$out" "switched=true"
+
 echo
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

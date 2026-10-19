@@ -20,7 +20,11 @@ Rectangle {
     }
     NText { text: root.labelFor(root.current); x: 10; width: parent.width - 34; anchors.verticalCenter: parent.verticalCenter }
     Icon { name: "chevron-right"; size: 14; rotation: 90; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter }
-    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: menu.open() }
+    MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: menu.visible ? menu.close() : menu.open()
+    }
 
     NMenu {
         id: menu
