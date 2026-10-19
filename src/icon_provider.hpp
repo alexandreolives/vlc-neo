@@ -28,7 +28,6 @@ public:
             {QStringLiteral("circle-dot"), QStringLiteral("record")},
             {QStringLiteral("cone"), QStringLiteral("vlc")},
             {QStringLiteral("fast-forward"), QStringLiteral("forward-10-sec")},
-            {QStringLiteral("file-video"), QStringLiteral("file")},
             {QStringLiteral("film"), QStringLiteral("video")},
             {QStringLiteral("gauge"), QStringLiteral("speed")},
             {QStringLiteral("history"), QStringLiteral("recent")},
