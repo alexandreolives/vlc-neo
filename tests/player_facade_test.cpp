@@ -75,6 +75,11 @@ public:
         emit inputChanged();
     }
 
+    void publishVolumeState()
+    {
+        emit volumeStateChanged();
+    }
+
     int togglePauseCalls = 0;
     int playCalls = 0;
     int pauseCalls = 0;
@@ -111,6 +116,16 @@ int main(int argc, char **argv)
     ok &= expect(fake->rate == 0.25, "rate clamps to supported minimum");
     player.setVolume(2.0);
     ok &= expect(fake->volume == 1.25, "volume clamps to supported maximum");
+    player.toggleMute();
+    fake->publishVolumeState();
+    ok &= expect(fake->muted && player.muted(), "mute command and state are delegated to the backend");
+    player.setVolume(0.5);
+    ok &= expect(fake->volume == 0.5 && !fake->muted,
+                 "setting a positive volume restores audio after mute");
+    fake->muted = false;
+    fake->publishVolumeState();
+    player.toggleMute();
+    ok &= expect(fake->muted, "unmute toggle is delegated to the backend");
     player.play();
     ok &= expect(fake->playCalls == 1, "play is delegated to the backend");
     player.togglePause();
