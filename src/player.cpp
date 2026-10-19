@@ -191,11 +191,7 @@ void Player::attachInput()
             emit resumeAvailable(point);
     }
 
-    playlist_Lock(m_pl);
-    playlist_item_t *current = playlist_CurrentPlayingItem(m_pl);
-    const int currentId = current ? current->i_id : -1;
-    playlist_Unlock(m_pl);
-    m_queue.setCurrentId(currentId);
+    m_queue.setCurrentId(m_backend->currentQueueItemId());
 }
 
 void Player::detachInput()
@@ -233,7 +229,7 @@ void Player::refreshState()
 {
     int state = 0;
     bool recording = false;
-    double rate = var_GetFloat(m_pl, "rate");
+    double rate = m_backend->playlistState().rate;
     if (m_input) {
         switch (var_GetInteger(m_input, "state")) {
         case INIT_S:
@@ -319,19 +315,18 @@ void Player::refreshDelays()
 
 void Player::refreshVolume()
 {
-    float vol = playlist_VolumeGet(m_pl);
-    if (vol < 0.f)
-        vol = var_GetFloat(m_pl, "volume");
-    m_volume = vol;
-    m_muted = playlist_MuteGet(m_pl) > 0;
+    const BackendPlaylistState state = m_backend->playlistState();
+    m_volume = state.volume;
+    m_muted = state.muted;
     emit volumeChanged();
 }
 
 void Player::refreshModes()
 {
-    m_loop = var_GetBool(m_pl, "loop");
-    m_repeatOne = var_GetBool(m_pl, "repeat");
-    m_random = var_GetBool(m_pl, "random");
+    const BackendPlaylistState state = m_backend->playlistState();
+    m_loop = state.loop;
+    m_repeatOne = state.repeatOne;
+    m_random = state.random;
     emit playbackModeChanged();
 }
 

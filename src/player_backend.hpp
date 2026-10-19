@@ -12,6 +12,15 @@ struct QueueSnapshot {
     int currentId = -1;
 };
 
+struct BackendPlaylistState {
+    double rate = 1.0;
+    double volume = 1.0;
+    bool muted = false;
+    bool loop = false;
+    bool repeatOne = false;
+    bool random = false;
+};
+
 class PlayerBackend
 {
 public:
@@ -33,7 +42,9 @@ public:
     virtual void removeItem(int id) = 0;
     virtual void clearQueue() = 0;
     virtual QueueSnapshot queueSnapshot() const = 0;
+    virtual int currentQueueItemId() const = 0;
     virtual bool exportQueue(const QString &path) = 0;
+    virtual BackendPlaylistState playlistState() const = 0;
 
     virtual void setLoop(bool enabled) = 0;
     virtual void setRepeatOne(bool enabled) = 0;

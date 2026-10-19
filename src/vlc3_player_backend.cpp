@@ -71,6 +71,30 @@ public:
         return snapshot;
     }
 
+    int currentQueueItemId() const override
+    {
+        playlist_Lock(m_playlist);
+        playlist_item_t *current = playlist_CurrentPlayingItem(m_playlist);
+        const int currentId = current ? current->i_id : -1;
+        playlist_Unlock(m_playlist);
+        return currentId;
+    }
+
+    BackendPlaylistState playlistState() const override
+    {
+        BackendPlaylistState state;
+        float volume = playlist_VolumeGet(m_playlist);
+        if (volume < 0.f)
+            volume = var_GetFloat(m_playlist, "volume");
+        state.rate = var_GetFloat(m_playlist, "rate");
+        state.volume = volume;
+        state.muted = playlist_MuteGet(m_playlist) > 0;
+        state.loop = var_GetBool(m_playlist, "loop");
+        state.repeatOne = var_GetBool(m_playlist, "repeat");
+        state.random = var_GetBool(m_playlist, "random");
+        return state;
+    }
+
     bool exportQueue(const QString &path) override
     {
         return playlist_Export(m_playlist, path.toUtf8().constData(), true, "export-m3u8") == VLC_SUCCESS;
