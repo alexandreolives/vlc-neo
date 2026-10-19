@@ -49,8 +49,7 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
             QKeyEvent event(QEvent::KeyPress, keys.value(keyName), Qt::NoModifier);
             event.setAccepted(false);
             QCoreApplication::sendEvent(focusItem, &event);
-            qInfo("neo test: key %s delivered to %s (accepted=%d)", qPrintable(keyName),
-                  focusItem->metaObject()->className(), event.isAccepted());
+            qInfo("neo test: key %s delivered (%d)", qPrintable(keyName), event.isAccepted());
         } else {
             qWarning("neo test: key %s not delivered (no focus item or unknown key)", qPrintable(keyName));
         }
