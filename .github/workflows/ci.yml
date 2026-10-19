@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-test:
     name: Build and smoke test (Arch Linux, VLC 3 + Qt 6)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: archlinux:latest
     steps:
       - name: Install dependencies
