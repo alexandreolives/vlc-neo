@@ -13,7 +13,8 @@ BIN="$HOME/.local/bin"
 APPS="$HOME/.local/share/applications"
 SYSTEM_VLC="${SYSTEM_VLC:-/usr/bin/vlc}"
 QT_ROOT="${QT_ROOT:-}"
-SYSTEM_DESKTOP="/usr/share/applications/vlc.desktop"
+SYSTEM_DESKTOP="${SYSTEM_DESKTOP:-/usr/share/applications/vlc.desktop}"
+BUILD_DIR="${BUILD_DIR:-$HERE/build}"
 MARK="# vlc-neo-managed"
 
 mode="install"
@@ -28,7 +29,7 @@ for arg in "$@"; do
             echo "  --default  Make Neo the default interface for VLC."
             echo "  --yes      Install missing packages and Qt without prompting."
             echo "  --uninstall Remove VLC Neo."
-            echo "Environment: QT_ROOT, VLC_NEO_QT_VERSION, VLC_NEO_QT_MIRROR."
+            echo "Environment: QT_ROOT, VLC_NEO_QT_VERSION, VLC_NEO_QT_MIRROR, BUILD_DIR."
             exit 0
             ;;
         *) echo "Unknown option: $arg" >&2; exit 2 ;;
@@ -242,10 +243,10 @@ QT_CMAKE_ARGS=(-DQt6_DIR=)
 if [ -n "$QT_ROOT" ]; then
     QT_CMAKE_ARGS=(-DQt6_DIR="$QT_ROOT/lib/cmake/Qt6")
 fi
-cmake -S "$HERE" -B "$HERE/build" -G Ninja -DCMAKE_MAKE_PROGRAM="$NINJA_BIN" \
+cmake -S "$HERE" -B "$BUILD_DIR" -G Ninja -DCMAKE_MAKE_PROGRAM="$NINJA_BIN" \
     -DCMAKE_BUILD_TYPE=Release "${QT_CMAKE_ARGS[@]}" >/dev/null
-cmake --build "$HERE/build"
-install -Dm755 "$HERE/build/libneo_plugin.so" "$PLUGIN_ROOT/gui/libneo_plugin.so"
+cmake --build "$BUILD_DIR"
+install -Dm755 "$BUILD_DIR/libneo_plugin.so" "$PLUGIN_ROOT/gui/libneo_plugin.so"
 
 # `vlc-neo`: always the Neo interface.
 install -Dm755 /dev/stdin "$BIN/vlc-neo" <<SH
@@ -262,6 +263,7 @@ exec "$SYSTEM_VLC" -I neo "\$@"
 SH
 
 if [ "$mode" = "--default" ]; then
+    mkdir -p "$APPS"
     # `vlc` in ~/.local/bin (ahead of /usr/bin in PATH): Neo unless an interface is
     # requested explicitly (`vlc -I qt`, `vlc --intf dummy`, --help, ...).
     install -Dm755 /dev/stdin "$BIN/vlc" <<SH

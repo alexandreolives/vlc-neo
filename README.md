@@ -35,6 +35,7 @@ in `vlcrc` are still handled by VLC itself.
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Install](#install)
+- [Linux Mint compatibility](docs/linux-mint.md)
 - [Usage and shortcuts](#usage-and-shortcuts)
 - [How it works](#how-it-works)
 - [Updating VLC](#updating-vlc)
@@ -211,6 +212,9 @@ Qt 6.8.3 in `~/Qt` and tries the Berkeley, FAU, and dotsrc mirrors in turn.
 Override the Qt version or the first mirror with `VLC_NEO_QT_VERSION` and
 `VLC_NEO_QT_MIRROR`.
 
+See [Linux Mint build and install notes](docs/linux-mint.md) for a reproducible
+Qt setup and checks for default install, uninstall, and classic VLC restore.
+
 ### Build and install
 
 ```bash
@@ -303,6 +307,7 @@ decoding, and converts to RGB. Qt uploads each frame as a texture.
 ```bash
 scripts/smoke-test.sh     # end-to-end checks against the real VLC core, headless
 scripts/screenshots.sh ~/Videos   # regenerate docs/screenshots (needs the Sintel demo folder)
+scripts/test-installer.sh # default install/uninstall lifecycle in a disposable HOME
 ```
 
 The smoke test runs `vlc -I neo` on Qt's offscreen platform and generates its
