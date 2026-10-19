@@ -24,6 +24,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
+          ctest --test-dir build --output-on-failure
           test -f build/libneo_plugin.so
       # VLC refuses to run as root, and the container runs as root.
       - name: Create test user
@@ -59,6 +60,7 @@ jobs:
       - name: Smoke test playback, UI captures and persisted settings
         run: |
           export NEO_QT_ROOT="$HOME/Qt/6.8.3/gcc_64"
+          ctest --test-dir build --output-on-failure
           scripts/smoke-test.sh
       - name: Uninstall and verify system Qt remains unchanged
         if: always()

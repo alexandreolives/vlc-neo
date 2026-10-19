@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(vlc_neo VERSION 0.1.0 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -47,6 +49,16 @@ target_link_libraries(neo_plugin PRIVATE
   Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
 )
 set_target_properties(neo_plugin PROPERTIES PREFIX "lib" OUTPUT_NAME "neo_plugin")
+
+if(BUILD_TESTING)
+  add_executable(subtitle_matcher_test
+    tests/subtitle_matcher_test.cpp
+    src/subtitle_matcher.cpp
+    src/subtitle_matcher.hpp
+  )
+  target_link_libraries(subtitle_matcher_test PRIVATE Qt6::Core)
+  add_test(NAME subtitle_matcher COMMAND subtitle_matcher_test)
+endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")
 install(TARGETS neo_plugin LIBRARY DESTINATION ${NEO_PLUGIN_DIR})

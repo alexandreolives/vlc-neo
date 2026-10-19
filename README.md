@@ -309,6 +309,7 @@ decoding, and converts to RGB. Qt uploads each frame as a texture.
 
 ```bash
 scripts/smoke-test.sh     # end-to-end checks against the real VLC core, headless
+ctest --test-dir build --output-on-failure  # focused C++ logic tests
 scripts/screenshots.sh ~/Videos   # regenerate docs/screenshots (needs the Sintel demo folder)
 scripts/test-installer.sh # default install/uninstall lifecycle in a disposable HOME
 ```
@@ -322,6 +323,7 @@ own media. It checks:
 - resume
 - hotkeys, bookmarks and speed
 - `vlcrc` writes and persistence across launches
+- subtitle filename matching rules (CTest)
 - dark/light and compact-window screenshots
 - theme and accent persistence across launches
 

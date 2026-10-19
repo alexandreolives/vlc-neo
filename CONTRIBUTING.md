@@ -34,6 +34,7 @@ Run the checks relevant to your change before opening a pull request:
 
 ```bash
 scripts/smoke-test.sh
+ctest --test-dir build --output-on-failure
 scripts/screenshots.sh /path/to/media
 ```
 
