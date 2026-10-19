@@ -20,6 +20,8 @@ jobs:
             qt6-base qt6-declarative qt6-svg \
             ffmpeg ttf-dejavu imagemagick
       - uses: actions/checkout@v5
+      - name: Verify Figma export file identities
+        run: sha256sum --check --quiet assets/figma-icons/SHA256SUMS
       - name: Build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -50,6 +52,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - name: Verify Figma export file identities
+        run: sha256sum --check --quiet assets/figma-icons/SHA256SUMS
       - name: Install the distribution Qt and VLC packages
         run: |
           sudo apt-get update
