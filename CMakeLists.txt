@@ -62,6 +62,22 @@ if(BUILD_TESTING)
   )
   target_link_libraries(subtitle_matcher_test PRIVATE Qt6::Core)
   add_test(NAME subtitle_matcher COMMAND subtitle_matcher_test)
+
+  add_executable(player_facade_test
+    tests/player_facade_test.cpp
+    src/player.cpp
+    src/queue_model.cpp
+    src/subtitle_matcher.cpp
+    src/player.hpp
+    src/player_backend.hpp
+    src/queue_model.hpp
+    src/subtitle_matcher.hpp
+  )
+  target_include_directories(player_facade_test PRIVATE src)
+  target_link_libraries(player_facade_test PRIVATE Qt6::Core)
+  add_test(NAME player_facade COMMAND player_facade_test)
+  set_tests_properties(player_facade PROPERTIES
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/player-facade-test-config")
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")

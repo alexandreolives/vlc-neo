@@ -132,8 +132,6 @@ public:
         return state;
     }
 
-    ~Vlc3PlayerBackend() override { clearCurrentInput(); }
-
     bool syncCurrentInput() override
     {
         input_thread_t *input = playlist_CurrentInput(m_playlist);
@@ -377,7 +375,6 @@ public:
     }
     void setSubtitleScale(int percent) override
     {
-        percent = qBound(10, percent, 500);
         if (var_Type(m_playlist, "sub-text-scale") == 0)
             var_Create(m_playlist, "sub-text-scale", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
         var_SetInteger(m_playlist, "sub-text-scale", percent);

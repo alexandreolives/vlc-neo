@@ -245,7 +245,7 @@ void Player::previous() { m_backend->previous(); }
 
 void Player::seek(double position)
 {
-    m_backend->seek(position);
+    m_backend->seek(qBound(0.0, position, 1.0));
 }
 
 void Player::seekBy(int ms)
@@ -373,7 +373,7 @@ void Player::setSubtitleDelay(int ms)
 
 void Player::setSubtitleScale(int percent)
 {
-    m_backend->setSubtitleScale(percent);
+    m_backend->setSubtitleScale(qBound(10, percent, 500));
 }
 
 int Player::subtitleScale() const { return m_backend->subtitleScale(); }
