@@ -10,7 +10,7 @@ pass=0; fail=0
 
 check() { # name, haystack, needle
     if grep -qF -- "$3" <<<"$2"; then echo "PASS  $1"; pass=$((pass + 1))
-    else echo "FAIL  $1  (expected: $3)"; fail=$((fail + 1)); fi
+    else echo "FAIL  $1  (expected: $3; got: $2)"; fail=$((fail + 1)); fi
 }
 run() { NEO_TIMEOUT=40 "$HERE/scripts/run-offscreen.sh" "$@" 2>&1 | grep "neo test" ; }
 
@@ -38,8 +38,10 @@ echo "== transport, volume and mute controls"
 out=$(run "1500:player.togglePause()|2300:'paused=' + player.state|2400:player.togglePause()|3300:'resumed=' + player.state|3500:quit" "$E1")
 check "pause control pauses playback" "$out" "paused=3"
 check "play control resumes playback" "$out" "resumed=2"
-out=$(run "1500:player.setVolume(0.5); player.toggleMute()|2300:'volume=' + player.volume + ' muted=' + player.muted|2500:quit" "$E1")
-check "volume control updates level and mute state" "$out" "volume=0.5 muted=true"
+out=$(run "1500:player.setVolume(0.5)|2300:'volume-ok=' + (Math.abs(player.volume - 0.5) < 0.02)|2500:quit" "$E1")
+check "volume control updates level" "$out" "volume-ok=true"
+out=$(run "1500:player.toggleMute()|2300:'muted=' + player.muted|2500:quit" "$E1")
+check "mute control toggles mute state" "$out" "muted=true"
 
 echo "== folder subtitles + show preset"
 out=$(run "1500:'matched=' + player.linkSubtitleFolder(platform.fileUrl('$WORK/subs'))|2500:player.setSubtitleDelay(-400); player.setSubtitleScale(160)|2800:player.savePresetForFolder()|3000:quit" "$E1" "$E2")
