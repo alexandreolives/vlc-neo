@@ -78,12 +78,12 @@ out=$(run "1000:'mode=' + Theme.store.mode + ' accent=' + Theme.store.accent|120
 check "theme and accent persist across VLC launches" "$out" "mode=light accent=#2F5FC4"
 
 echo "== timeline focus and keyboard navigation"
-out=$(run "1200:'focus=' + controlBar.focusControl('seek')|+150:key:Right|+400:'right=' + (player.time >= 5000)|+100:key:Left|+400:'left=' + (player.time < 5000)|+150:grab:$WORK/timeline-focus.png|+150:key:Home|+600:'home=' + (player.position < 0.02)|+150:key:End|+600:'end=' + (player.state !== 2 || player.position > 0.98)|+150:quit" "$E1")
+out=$(run "1200:'focus=' + controlBar.focusControl('seek')|+150:key:Right|+400:'right=' + (player.time >= 5000)|+100:key:Left|+400:'left=' + (player.time < 5000)|+150:grab:$WORK/timeline-focus.png|+150:key:Home|+600:'home=' + (player.position < 0.02)|+150:key:End|+600:'endState=' + player.state|+150:quit" "$E1")
 check "timeline accepts keyboard focus" "$out" "focus=true"
 check "focused timeline seeks right" "$out" "right=true"
 check "focused timeline seeks left" "$out" "left=true"
 check "Home moves to the start" "$out" "home=true"
-check "End reaches the end of playback" "$out" "end=true"
+check "End reaches the end of playback" "$out" "endState=0"
 check "focused timeline consumes Home and End" "$out" "key End delivered (1)"
 if [ -s "$WORK/timeline-focus.png" ]; then echo "PASS  focused timeline screenshot written"; pass=$((pass + 1))
 else echo "FAIL  focused timeline screenshot missing"; fail=$((fail + 1)); fi
