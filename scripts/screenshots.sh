@@ -37,7 +37,7 @@ steps+="$(do_ "settingsDialog.page = 'performance'")$(shot settings-performance)
 steps+="$(do_ "settingsDialog.close(); customizeDialog.open()")$(shot customize)"
 steps+="$(do_ "customizeDialog.close(); subtitleDialog.target = 'folder'; subtitleDialog.open()")$(shot add-subtitles)"
 steps+="$(do_ "subtitleDialog.close(); shortcutsDialog.open()")$(shot shortcuts)"
-steps+="$(do_ "shortcutsDialog.close(); win.uiHidden = true; win.toast('Ctrl H', 'UI hidden - move to the edges to show controls')")|+150:win.topHot = false; win.bottomHot = false$(shot hidden-ui)"
+steps+="$(do_ "shortcutsDialog.close(); win.uiHidden = true; toastItem.opacity = 0")|+100:move:560,340|+100:win.topHot = false; win.bottomHot = false; videoArea.cursorHidden = true$(shot hidden-ui)"
 steps+="$(do_ "win.uiHidden = false; toastItem.opacity = 0; Theme.store.mode = 'light'; Theme.store.accent = '#2F5FC4'; sidePanel.tab = 'spu'; win.rightPanel = 'settings'")$(shot light-theme)"
 steps+="$(do_ "Theme.store.mode = 'dark'; Theme.store.accent = '#D9822B'; win.rightPanel = ''; player.openLocation('$SONG', true)")|+1500:grab:$OUT/music.png"
 steps+="|+300:quit"

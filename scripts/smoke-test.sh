@@ -113,6 +113,9 @@ check "always auto-hide applies in a normal window" "$out" "alwaysHides=true"
 check "never auto-hide keeps controls visible in a normal window" "$out" "neverShows=true"
 if [ -s "$WORK/settings-interface.png" ]; then echo "PASS  interface settings screenshot written"; pass=$((pass + 1))
 else echo "FAIL  interface settings screenshot missing"; fail=$((fail + 1)); fi
+out=$(run "1000:Theme.store.autoHideMode='always'; Theme.store.hideDelay=500; win.uiHidden=true; win.topHot=false; win.bottomHot=false|+100:move:560,20|+100:'edgeReveals=' + (win.topHot && win.chromeShown)|+100:move:560,340|+50:win.topHot=false; win.bottomHot=false|+100:'centerHides=' + !win.chromeShown|+100:win.uiHidden=false; Theme.store.hideDelay=5100|+100:quit")
+check "moving to the top edge reveals hidden controls" "$out" "edgeReveals=true"
+check "moving to the center hides the controls again" "$out" "centerHides=true"
 out=$(run "1000:'interfacePreferencesPersist=' + (Theme.store.hideDelay === 5100 && Theme.store.autoHideMode === 'always' && Theme.store.showControlsFullscreen && Theme.store.compactAtStart)|+100:'compactStart=' + (win.width === 560 && win.height === 340)|+100:Theme.store.compactAtStart=false; Theme.store.showControlsFullscreen=false; Theme.store.autoHideMode='fullscreen'; win.width=1120; win.height=680|+100:quit")
 check "interface preferences persist across launches" "$out" "interfacePreferencesPersist=true"
 check "compact mode changes the next launch size" "$out" "compactStart=true"

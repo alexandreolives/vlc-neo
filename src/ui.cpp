@@ -39,6 +39,20 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
 {
     if (action == QLatin1String("quit")) {
         window->close();
+    } else if (action.startsWith(QLatin1String("move:"))) {
+        if (!window)
+            return;
+        const QStringList coordinates = action.mid(5).split(QLatin1Char(','));
+        if (coordinates.size() != 2) {
+            qWarning("neo test: invalid move target: %s", qPrintable(action));
+            return;
+        }
+        const QPointF local(coordinates.at(0).toDouble(), coordinates.at(1).toDouble());
+        const QPointF global(window->mapToGlobal(local.toPoint()));
+        QMouseEvent move(QEvent::MouseMove, local, local, global,
+                         Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(window, &move);
+        qInfo("neo test: moved pointer to %d,%d", int(local.x()), int(local.y()));
     } else if (action.startsWith(QLatin1String("click:")) || action.startsWith(QLatin1String("click-item:"))) {
         QPointF local;
         bool validTarget = false;
