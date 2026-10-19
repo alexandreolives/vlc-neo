@@ -19,6 +19,7 @@
 #include "platform.hpp"
 #include "player.hpp"
 #include "video_item.hpp"
+#include "vlc3_player_backend.hpp"
 
 namespace {
 QMutex g_appLock;
@@ -111,7 +112,7 @@ void NeoRunUi(intf_thread_t *intf, void (*ready)(void *), void *readyData)
     qmlRegisterType<VideoItem>("Neo", 1, 0, "VideoOutput");
     qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/neo/qml/singletons/NeoTheme.qml")), "Neo", 1, 0, "Theme");
 
-    Player player(intf);
+    Player player(makeVlc3PlayerBackend(intf, pl_Get(intf)));
     Platform platform;
 
     QQmlApplicationEngine engine;

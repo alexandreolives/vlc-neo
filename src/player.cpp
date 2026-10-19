@@ -1,10 +1,11 @@
 #include "player.hpp"
 #include "subtitle_matcher.hpp"
-#include "vlc3_player_backend.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
+
+#include <utility>
 
 namespace {
 
@@ -14,10 +15,11 @@ constexpr int kRecentMax = 15;
 
 // -------------------------------------------------------------------- Player
 
-Player::Player(intf_thread_t *intf, QObject *parent)
-    : QObject(parent), m_backend(makeVlc3PlayerBackend(intf, pl_Get(intf))),
+Player::Player(std::unique_ptr<PlayerBackend> backend, QObject *parent)
+    : QObject(parent), m_backend(std::move(backend)),
       m_settings(QStringLiteral("vlc-neo"), QStringLiteral("neo"))
 {
+    Q_ASSERT(m_backend);
     m_queueTimer.setSingleShot(true);
     m_queueTimer.setInterval(120);
     connect(&m_queueTimer, &QTimer::timeout, this, &Player::rebuildQueue);

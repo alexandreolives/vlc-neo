@@ -13,8 +13,6 @@
 #include "queue_model.hpp"
 #include "player_backend.hpp"
 
-struct intf_thread_t;
-
 class Player : public QObject
 {
     Q_OBJECT
@@ -46,7 +44,7 @@ class Player : public QObject
     Q_PROPERTY(QObject *queue READ queue CONSTANT)
 
 public:
-    explicit Player(intf_thread_t *intf, QObject *parent = nullptr);
+    explicit Player(std::unique_ptr<PlayerBackend> backend, QObject *parent = nullptr);
     ~Player() override;
 
     int state() const { return m_state; }
