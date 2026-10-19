@@ -15,6 +15,15 @@ QString takeString(char *raw)
     return out;
 }
 
+QByteArray esVarName(const QString &category)
+{
+    if (category == QLatin1String("spu"))
+        return "spu-es";
+    if (category == QLatin1String("audio"))
+        return "audio-es";
+    return "video-es";
+}
+
 class Vlc3PlayerBackend final : public PlayerBackend
 {
 public:
@@ -152,6 +161,132 @@ public:
         if (vout)
             vlc_object_release(vout);
         return state;
+    }
+
+    bool hasInput() const override { return m_input != nullptr; }
+    void seek(double position) override
+    {
+        if (m_input)
+            var_SetFloat(m_input, "position", float(qBound(0.0, position, 1.0)));
+    }
+    void seekBy(int ms) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, "time-offset", vlc_tick_t(ms) * 1000);
+    }
+    void frameStep() override
+    {
+        if (m_input)
+            var_TriggerCallback(m_input, "frame-next");
+    }
+    void jumpTo(qint64 ms) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, "time", vlc_tick_t(ms) * 1000);
+    }
+    void toggleRecord() override
+    {
+        if (m_input)
+            var_ToggleBool(m_input, "record");
+    }
+
+    QList<BackendTrack> tracks(const QString &category) const override
+    {
+        QList<BackendTrack> out;
+        if (!m_input)
+            return out;
+        const QByteArray name = esVarName(category);
+        vlc_value_t val, text;
+        if (var_Change(m_input, name.constData(), VLC_VAR_GETCHOICES, &val, &text) != VLC_SUCCESS)
+            return out;
+        const int64_t current = var_GetInteger(m_input, name.constData());
+        for (int i = 0; i < val.p_list->i_count; ++i) {
+            BackendTrack track;
+            track.id = val.p_list->p_values[i].i_int;
+            const char *label = text.p_list->p_values[i].psz_string;
+            track.name = label ? QString::fromUtf8(label) : QString::number(track.id);
+            track.selected = track.id == current;
+            out.append(track);
+        }
+        var_FreeList(&val, &text);
+        return out;
+    }
+    void selectTrack(const QString &category, int id) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, esVarName(category).constData(), id);
+    }
+    bool addSubtitleFile(const QUrl &url, bool selectImmediately) override
+    {
+        if (!m_input)
+            return false;
+        const QByteArray mrl = url.toString(QUrl::FullyEncoded).toUtf8();
+        return input_AddSlave(m_input, SLAVE_TYPE_SPU, mrl.constData(), true, selectImmediately, true) == VLC_SUCCESS;
+    }
+    QList<BackendAudioDevice> audioDevices() const override
+    {
+        QList<BackendAudioDevice> out;
+        audio_output_t *aout = playlist_GetAout(m_playlist);
+        if (!aout)
+            return out;
+        char **ids = nullptr, **names = nullptr;
+        const int count = aout_DevicesList(aout, &ids, &names);
+        const QString current = takeString(aout_DeviceGet(aout));
+        for (int i = 0; i < count; ++i) {
+            BackendAudioDevice device;
+            device.id = QString::fromUtf8(ids[i]);
+            device.name = QString::fromUtf8(names[i]);
+            device.selected = device.id == current;
+            out.append(device);
+            free(ids[i]);
+            free(names[i]);
+        }
+        free(ids);
+        free(names);
+        vlc_object_release(aout);
+        return out;
+    }
+    void setAudioDevice(const QString &id) override
+    {
+        if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+            aout_DeviceSet(aout, id.toUtf8().constData());
+            vlc_object_release(aout);
+        }
+    }
+    void setAudioDelay(int ms) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, "audio-delay", vlc_tick_t(ms) * 1000);
+    }
+    void setSubtitleDelay(int ms) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, "spu-delay", vlc_tick_t(ms) * 1000);
+    }
+    QList<BackendChapter> chapters() const override
+    {
+        QList<BackendChapter> out;
+        if (!m_input)
+            return out;
+        vlc_value_t val, text;
+        if (var_Change(m_input, "chapter", VLC_VAR_GETCHOICES, &val, &text) != VLC_SUCCESS)
+            return out;
+        const int64_t current = var_GetInteger(m_input, "chapter");
+        for (int i = 0; i < val.p_list->i_count; ++i) {
+            BackendChapter chapter;
+            chapter.index = int(val.p_list->p_values[i].i_int);
+            const char *label = text.p_list->p_values[i].psz_string;
+            chapter.name = label ? QString::fromUtf8(label) : QStringLiteral("Chapter %1").arg(i + 1);
+            chapter.selected = val.p_list->p_values[i].i_int == current;
+            out.append(chapter);
+        }
+        var_FreeList(&val, &text);
+        return out;
+    }
+    void selectChapter(int index) override
+    {
+        if (m_input)
+            var_SetInteger(m_input, "chapter", index);
     }
 
     bool exportQueue(const QString &path) override

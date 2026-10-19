@@ -50,7 +50,7 @@ public:
 
     int state() const { return m_state; }
     bool playing() const { return m_state == 2; }
-    bool hasMedia() const { return m_input != nullptr; }
+    bool hasMedia() const { return m_backend->hasInput(); }
     double position() const { return m_position; }
     qint64 time() const { return m_timeMs; }
     qint64 length() const { return m_lengthMs; }

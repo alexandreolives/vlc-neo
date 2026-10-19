@@ -9,22 +9,12 @@
 namespace {
 
 constexpr int kRecentMax = 15;
-constexpr qint64 kUsPerMs = 1000;
 
 QString takeString(char *raw)
 {
     QString out = raw ? QString::fromUtf8(raw) : QString();
     free(raw);
     return out;
-}
-
-QByteArray esVarName(const QString &category)
-{
-    if (category == QLatin1String("spu"))
-        return "spu-es";
-    if (category == QLatin1String("audio"))
-        return "audio-es";
-    return "video-es";
 }
 
 template <typename Fn>
@@ -318,7 +308,7 @@ void Player::rebuildQueue()
 
 void Player::togglePause()
 {
-    if (!m_input) {
+    if (!m_backend->hasInput()) {
         m_backend->play();
         return;
     }
@@ -332,14 +322,12 @@ void Player::previous() { m_backend->previous(); }
 
 void Player::seek(double position)
 {
-    if (m_input)
-        var_SetFloat(m_input, "position", float(qBound(0.0, position, 1.0)));
+    m_backend->seek(position);
 }
 
 void Player::seekBy(int ms)
 {
-    if (m_input)
-        var_SetInteger(m_input, "time-offset", vlc_tick_t(ms) * kUsPerMs);
+    m_backend->seekBy(ms);
 }
 
 void Player::setRate(double rate)
@@ -358,8 +346,7 @@ void Player::toggleMute() { m_backend->toggleMute(); }
 
 void Player::frameStep()
 {
-    if (m_input)
-        var_TriggerCallback(m_input, "frame-next");
+    m_backend->frameStep();
 }
 
 // -------------------------------------------------------------------- media
@@ -412,38 +399,24 @@ void Player::clearRecentMedia() { m_settings.remove(QStringLiteral("recent")); }
 QVariantList Player::tracks(const QString &category) const
 {
     QVariantList out;
-    if (!m_input)
-        return out;
-    const QByteArray name = esVarName(category);
-    vlc_value_t val, text;
-    if (var_Change(m_input, name.constData(), VLC_VAR_GETCHOICES, &val, &text) != VLC_SUCCESS)
-        return out;
-    const int64_t current = var_GetInteger(m_input, name.constData());
-    for (int i = 0; i < val.p_list->i_count; ++i) {
-        const int64_t id = val.p_list->p_values[i].i_int;
-        const char *label = text.p_list->p_values[i].psz_string;
-        QVariantMap track;
-        track.insert(QStringLiteral("id"), qint64(id));
-        track.insert(QStringLiteral("name"), label ? QString::fromUtf8(label) : QString::number(id));
-        track.insert(QStringLiteral("selected"), id == current);
-        out.append(track);
+    for (const BackendTrack &track : m_backend->tracks(category)) {
+        QVariantMap row;
+        row.insert(QStringLiteral("id"), track.id);
+        row.insert(QStringLiteral("name"), track.name);
+        row.insert(QStringLiteral("selected"), track.selected);
+        out.append(row);
     }
-    var_FreeList(&val, &text);
     return out;
 }
 
 void Player::selectTrack(const QString &category, int id)
 {
-    if (m_input)
-        var_SetInteger(m_input, esVarName(category).constData(), id);
+    m_backend->selectTrack(category, id);
 }
 
 bool Player::addSubtitleFile(const QUrl &url)
 {
-    if (!m_input)
-        return false;
-    const QByteArray mrl = url.toString(QUrl::FullyEncoded).toUtf8();
-    const bool ok = input_AddSlave(m_input, SLAVE_TYPE_SPU, mrl.constData(), true, true, true) == VLC_SUCCESS;
+    const bool ok = m_backend->addSubtitleFile(url, true);
     emit notify(ok ? tr("Subtitle added") : tr("Could not load subtitle"));
     return ok;
 }
@@ -451,36 +424,17 @@ bool Player::addSubtitleFile(const QUrl &url)
 QVariantList Player::audioDevices() const
 {
     QVariantList out;
-    audio_output_t *aout = playlist_GetAout(m_pl);
-    if (!aout)
-        return out;
-    char **ids = nullptr, **names = nullptr;
-    const int count = aout_DevicesList(aout, &ids, &names);
-    const QString current = takeString(aout_DeviceGet(aout));
-    for (int i = 0; i < count; ++i) {
+    for (const BackendAudioDevice &device : m_backend->audioDevices()) {
         QVariantMap dev;
-        const QString id = QString::fromUtf8(ids[i]);
-        dev.insert(QStringLiteral("id"), id);
-        dev.insert(QStringLiteral("name"), QString::fromUtf8(names[i]));
-        dev.insert(QStringLiteral("selected"), id == current);
+        dev.insert(QStringLiteral("id"), device.id);
+        dev.insert(QStringLiteral("name"), device.name);
+        dev.insert(QStringLiteral("selected"), device.selected);
         out.append(dev);
-        free(ids[i]);
-        free(names[i]);
     }
-    free(ids);
-    free(names);
-    vlc_object_release(aout);
     return out;
 }
 
-void Player::setAudioDevice(const QString &id)
-{
-    audio_output_t *aout = playlist_GetAout(m_pl);
-    if (!aout)
-        return;
-    aout_DeviceSet(aout, id.toUtf8().constData());
-    vlc_object_release(aout);
-}
+void Player::setAudioDevice(const QString &id) { m_backend->setAudioDevice(id); }
 
 // --------------------------------------------------------------- live tuning
 
@@ -491,14 +445,12 @@ vout_thread_t *Player::currentVout() const
 
 void Player::setAudioDelay(int ms)
 {
-    if (m_input)
-        var_SetInteger(m_input, "audio-delay", vlc_tick_t(ms) * kUsPerMs);
+    m_backend->setAudioDelay(ms);
 }
 
 void Player::setSubtitleDelay(int ms)
 {
-    if (m_input)
-        var_SetInteger(m_input, "spu-delay", vlc_tick_t(ms) * kUsPerMs);
+    m_backend->setSubtitleDelay(ms);
 }
 
 void Player::setSubtitleScale(int percent)
@@ -625,8 +577,7 @@ void Player::snapshot()
 
 void Player::toggleRecord()
 {
-    if (m_input)
-        var_ToggleBool(m_input, "record");
+    m_backend->toggleRecord();
 }
 
 void Player::setFullscreenState(bool fs)
@@ -689,7 +640,7 @@ void Player::forgetPresetForFolder()
 void Player::applyPendingPreset()
 {
     // Input must be fully started, otherwise it resets delays from vlcrc.
-    if (!m_presetPending || !m_input || m_state != 2)
+    if (!m_presetPending || !m_backend->hasInput() || m_state != 2)
         return;
     m_presetPending = false;
 
@@ -767,8 +718,7 @@ void Player::resume()
 
 void Player::jumpTo(qint64 ms)
 {
-    if (m_input)
-        var_SetInteger(m_input, "time", vlc_tick_t(ms) * kUsPerMs);
+    m_backend->jumpTo(ms);
 }
 
 QVariantList Player::bookmarks() const
@@ -789,7 +739,7 @@ QVariantList Player::bookmarks() const
 void Player::addBookmark()
 {
     const QString key = mediaKey(QStringLiteral("bookmarks"));
-    if (key.isEmpty() || !m_input)
+    if (key.isEmpty() || !m_backend->hasInput())
         return;
     QVariantList list = m_settings.value(key).toList();
     list.append(m_timeMs);
@@ -814,27 +764,18 @@ void Player::removeBookmark(qint64 ms)
 QVariantList Player::chapters() const
 {
     QVariantList out;
-    if (!m_input)
-        return out;
-    vlc_value_t val, text;
-    if (var_Change(m_input, "chapter", VLC_VAR_GETCHOICES, &val, &text) != VLC_SUCCESS)
-        return out;
-    const int64_t current = var_GetInteger(m_input, "chapter");
-    for (int i = 0; i < val.p_list->i_count; ++i) {
-        const char *label = text.p_list->p_values[i].psz_string;
+    for (const BackendChapter &chapter : m_backend->chapters()) {
         out.append(QVariantMap{
-            {QStringLiteral("index"), int(val.p_list->p_values[i].i_int)},
-            {QStringLiteral("name"), label ? QString::fromUtf8(label) : tr("Chapter %1").arg(i + 1)},
-            {QStringLiteral("selected"), val.p_list->p_values[i].i_int == current}});
+            {QStringLiteral("index"), chapter.index},
+            {QStringLiteral("name"), chapter.name},
+            {QStringLiteral("selected"), chapter.selected}});
     }
-    var_FreeList(&val, &text);
     return out;
 }
 
 void Player::selectChapter(int index)
 {
-    if (m_input)
-        var_SetInteger(m_input, "chapter", index);
+    m_backend->selectChapter(index);
 }
 
 // ------------------------------------------------------ folder subtitles
@@ -887,7 +828,7 @@ QString Player::linkedSubtitleFolder() const
 
 void Player::applyLinkedSubtitles()
 {
-    if (m_subsLinkedApplied || !m_input || !m_mediaUrl.isLocalFile())
+    if (m_subsLinkedApplied || !m_backend->hasInput() || !m_mediaUrl.isLocalFile())
         return;
     const QString dir = linkedSubtitleFolder();
     if (dir.isEmpty())
@@ -899,8 +840,8 @@ void Player::applyLinkedSubtitles()
     const QString best = SubtitleMatcher::bestMatch(mediaFile, files);
     if (best.isEmpty())
         return;
-    const QByteArray mrl = QUrl::fromLocalFile(QDir(dir).filePath(best)).toString(QUrl::FullyEncoded).toUtf8();
-    if (input_AddSlave(m_input, SLAVE_TYPE_SPU, mrl.constData(), true, false, true) == VLC_SUCCESS)
+    const QUrl subtitleUrl = QUrl::fromLocalFile(QDir(dir).filePath(best));
+    if (m_backend->addSubtitleFile(subtitleUrl, false))
         m_linkedSubtitleFile = best;
 }
 

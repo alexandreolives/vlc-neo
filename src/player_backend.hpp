@@ -40,6 +40,24 @@ struct BackendInputState {
     QUrl mediaUrl;
 };
 
+struct BackendTrack {
+    qint64 id = -1;
+    QString name;
+    bool selected = false;
+};
+
+struct BackendAudioDevice {
+    QString id;
+    QString name;
+    bool selected = false;
+};
+
+struct BackendChapter {
+    int index = -1;
+    QString name;
+    bool selected = false;
+};
+
 class PlayerBackend
 {
 public:
@@ -67,6 +85,21 @@ public:
     virtual void syncCurrentInput() = 0;
     virtual void clearCurrentInput() = 0;
     virtual BackendInputState inputState() const = 0;
+    virtual bool hasInput() const = 0;
+    virtual void seek(double position) = 0;
+    virtual void seekBy(int ms) = 0;
+    virtual void frameStep() = 0;
+    virtual void jumpTo(qint64 ms) = 0;
+    virtual void toggleRecord() = 0;
+    virtual QList<BackendTrack> tracks(const QString &category) const = 0;
+    virtual void selectTrack(const QString &category, int id) = 0;
+    virtual bool addSubtitleFile(const QUrl &url, bool selectImmediately) = 0;
+    virtual QList<BackendAudioDevice> audioDevices() const = 0;
+    virtual void setAudioDevice(const QString &id) = 0;
+    virtual void setAudioDelay(int ms) = 0;
+    virtual void setSubtitleDelay(int ms) = 0;
+    virtual QList<BackendChapter> chapters() const = 0;
+    virtual void selectChapter(int index) = 0;
 
     virtual void setLoop(bool enabled) = 0;
     virtual void setRepeatOne(bool enabled) = 0;

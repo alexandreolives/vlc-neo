@@ -279,7 +279,7 @@ working.
 VLC 3 core (system package, unchanged)
  ├─ interface "neo"        Qt Quick UI thread (QML)
  │                          └─ Player facade ─ PlayerBackend ─ Vlc3PlayerBackend
- │                             (transport, playlist and input-state snapshots)
+ │                             (transport, playlist, input snapshots and track/audio controls)
  └─ vout display "neo_vout" RGB32 frames with subtitles and OSD already blended by VLC
                             └─ FrameStore ─► VideoOutput (Qt scene-graph texture)
 ```
@@ -289,9 +289,9 @@ VLC 3 core (system package, unchanged)
 | `src/module.cpp` | Module descriptor; routes the playlist's video to `neo_vout` |
 | `src/vout_display.cpp` | Receives decoded pictures from the VLC core |
 | `src/video_item.cpp` | Draws them in QML (fit or fill) |
-| `src/player.cpp` | QML-facing player facade, UI state and preferences; input lifecycle callbacks and track operations remain VLC 3-specific |
-| `src/player_backend.hpp` | Backend interface for transport, playlist operations, and generic input and playlist state snapshots |
-| `src/vlc3_player_backend.cpp` | VLC 3 adapter that owns the current input reference and translates VLC input state into generic snapshots; track and live tuning operations remain to migrate |
+| `src/player.cpp` | QML-facing player facade, UI state and preferences; input lifecycle callbacks and live video tuning remain VLC 3-specific |
+| `src/player_backend.hpp` | Backend interface for transport, playlist operations, generic state snapshots, tracks, chapters and audio controls |
+| `src/vlc3_player_backend.cpp` | VLC 3 adapter that owns the current input reference and translates VLC state, tracks and audio controls into generic operations; live video tuning remains to migrate |
 | `src/queue_model.cpp` | QML-facing playlist model, separate from the adapter |
 | `qml/` | The interface. Design tokens live in `qml/singletons/NeoTheme.qml` |
 
