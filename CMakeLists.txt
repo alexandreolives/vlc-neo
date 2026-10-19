@@ -16,6 +16,7 @@ find_package(Qt6 6.6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Svg)
 
 file(GLOB NEO_QML RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
 file(GLOB NEO_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} icons/*.svg)
+file(GLOB NEO_FIGMA_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} assets/figma-icons/*.svg)
 
 add_library(neo_plugin MODULE
   src/module.cpp
@@ -43,7 +44,7 @@ add_library(neo_plugin MODULE
 
 qt_add_resources(neo_plugin neo_assets
   PREFIX /neo
-  FILES ${NEO_QML} ${NEO_ICONS}
+  FILES ${NEO_QML} ${NEO_ICONS} ${NEO_FIGMA_ICONS}
 )
 
 target_compile_definitions(neo_plugin PRIVATE
@@ -95,6 +96,17 @@ if(BUILD_TESTING)
   add_test(NAME player_state_store COMMAND player_state_store_test)
   set_tests_properties(player_state_store PROPERTIES
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/player-state-store-test-config")
+
+  add_executable(icon_provider_test tests/icon_provider_test.cpp)
+  qt_add_resources(icon_provider_test icon_provider_test_assets
+    PREFIX /neo
+    BASE ${CMAKE_CURRENT_SOURCE_DIR}
+    FILES ${NEO_ICONS} ${NEO_FIGMA_ICONS}
+  )
+  target_include_directories(icon_provider_test PRIVATE src)
+  target_link_libraries(icon_provider_test PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Svg)
+  add_test(NAME icon_provider COMMAND icon_provider_test)
+  set_tests_properties(icon_provider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")

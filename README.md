@@ -365,8 +365,9 @@ These parts of the redesign are not implemented yet:
 ## License and trademarks
 
 - **Code:** [GPL-3.0-or-later](LICENSE).
-- **Icons:** [Lucide](https://lucide.dev), ISC license (see `icons/LICENSE.lucide`).
+- **Icons:** Figma exports from Juxtopposed's VLC Redesign (CC BY 4.0) and
+  [Lucide](https://lucide.dev) (ISC); see [`assets/ATTRIBUTION.md`](assets/ATTRIBUTION.md).
 - **Design:** VLC Redesign by [Juxtopposed](https://www.youtube.com/@juxtopposed),
-  shared by its author as an open, free-to-use community design.
+  shared through Figma Community under CC BY 4.0.
 - **Trademarks:** VLC and the VLC cone are trademarks of VideoLAN. This project
   is not affiliated with or endorsed by VideoLAN.

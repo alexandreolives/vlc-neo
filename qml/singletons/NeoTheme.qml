@@ -6,7 +6,7 @@ import QtCore
 QtObject {
     id: theme
 
-    readonly property var accents: ["#D9822B", "#B9443B", "#A08E32", "#2E9E4A", "#2AA3B3",
+    readonly property var accents: ["#D37918", "#B9443B", "#A08E32", "#2E9E4A", "#2AA3B3",
                                     "#2F5FC4", "#8A3FD1", "#C64AA4", "#9A9A9A"]
     readonly property var defaultLayout: ["prev", "play", "next", "time", "seek", "length",
                                           "volume", "audio", "subtitle", "settings", "queue"]
@@ -43,7 +43,7 @@ QtObject {
     property Settings store: Settings {
         category: "appearance"
         property string mode: "dark"          // dark | light | system
-        property string accent: "#D9822B"
+        property string accent: "#D37918"
         property bool onboarded: false
         property string layout: ""
         property int hideDelay: 1200
@@ -63,22 +63,22 @@ QtObject {
                                             : Qt.rgba(accent.r * 0.45 + 0.55, accent.g * 0.45 + 0.55, accent.b * 0.45 + 0.55, 1)
     readonly property color accentSoft: Qt.rgba(accent.r, accent.g, accent.b, 0.16)
 
-    readonly property color window: dark ? "#0E0E0E" : "#DADADA"
-    readonly property color bar: dark ? "#1B1B1B" : "#EDEDED"
-    readonly property color panel: dark ? "#151515" : "#F6F6F6"
-    readonly property color surface: dark ? "#202020" : "#FFFFFF"
-    readonly property color raised: dark ? "#2A2A2A" : "#E4E4E4"
-    readonly property color hover: dark ? "#2C2C2C" : "#E0E0E0"
-    readonly property color border: dark ? "#2B2B2B" : "#D2D2D2"
-    readonly property color field: dark ? "#0C0C0C" : "#FFFFFF"
-    readonly property color text: dark ? "#E4E4E4" : "#1C1C1C"
-    readonly property color textDim: dark ? "#8F8F8F" : "#6A6A6A"
-    readonly property color textFaint: dark ? "#5E5E5E" : "#9C9C9C"
-    readonly property color icon: dark ? "#B4B4B4" : "#4A4A4A"
-    readonly property color seekTrack: dark ? "#0A0A0A" : "#C9C9C9"
+    readonly property color window: dark ? "#0E0E0E" : "#EDEDED"
+    readonly property color bar: dark ? "#1B1B1B" : "#DDDDDD"
+    readonly property color panel: dark ? "#151515" : "#E7E7E7"
+    readonly property color surface: dark ? "#1F1F1F" : "#EDEDED"
+    readonly property color raised: dark ? "#222222" : "#D5D5D5"
+    readonly property color hover: dark ? "#222222" : "#D5D5D5"
+    readonly property color border: dark ? "#373737" : "#ACACAC"
+    readonly property color field: dark ? "#090909" : "#FFFFFF"
+    readonly property color text: dark ? "#EAEAEA" : "#2E2E2E"
+    readonly property color textDim: dark ? "#C6C6C6" : "#6B6B6B"
+    readonly property color textFaint: dark ? "#6B6B6B" : "#888888"
+    readonly property color icon: dark ? "#8F8F8F" : "#3C3C3C"
+    readonly property color seekTrack: dark ? "#090909" : "#B3B3B3"
     readonly property color videoBg: "#000000"
     readonly property color volumeLow: "#7BAF14"
-    readonly property color volumeHigh: "#D9822B"
+    readonly property color volumeHigh: "#D37918"
 
     readonly property int radius: 6
     readonly property int radiusSmall: 4

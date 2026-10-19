@@ -6,6 +6,8 @@ Node IDs are exact Figma IDs. Open the linked file and append `?node-id=<ID with
 
 “In code” means the view or behavior exists in QML or the C++ bridge; it does not certify visual parity or runtime correctness. The smoke test verifies playback and video output, queue contents and next-item playback, pause/resume, subtitle folder matching and active subtitle selection, saved subtitle delay and scale, resume availability, keyboard seeking, bookmarks, playback rate, VLC config persistence, dark and light theme captures, compact-window size, screenshot creation, and theme/accent persistence. The `player_facade` CTest verifies volume clamping, mute/unmute delegation, exposed mute state, and restoring audio when setting a positive volume after mute. CI uploads dark, light and compact-window captures; it does not compare pixels. [`scripts/screenshots.sh`](../scripts/screenshots.sh) generates additional Sintel captures and requires the Sintel sample folder.
 
+Core controls use SVGs exported from the Figma icon set, and the theme's base colors follow the exported Figma paint styles. The icon provider keeps Lucide icons as a fallback for controls that do not have a direct Figma equivalent. Sources and attribution are recorded in [`assets/ATTRIBUTION.md`](../assets/ATTRIBUTION.md).
+
 ## Screen inventory
 
 | Figma frame(s) and node IDs | Intent and shown states | VLC Neo components and current state | Automated evidence | Manual acceptance check |
