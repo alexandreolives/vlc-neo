@@ -8,6 +8,7 @@ Popup {
     property string title
     property string subtitle
     property bool closable: true
+    property int bodyMargin: 18
     default property alias body: bodyHolder.data
     property alias footer: footerHolder.data
 
@@ -44,7 +45,7 @@ Popup {
             id: bodyHolder
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.margins: 18
+            Layout.margins: root.bodyMargin
             implicitWidth: childrenRect.width
             implicitHeight: childrenRect.height
         }

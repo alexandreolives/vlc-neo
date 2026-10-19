@@ -6,6 +6,7 @@ Flow {
     id: root
     property var model: []
     property var current
+    property int chipWidth: 0
     signal picked(var value)
     spacing: 4
 
@@ -16,7 +17,7 @@ Flow {
             readonly property var val: typeof modelData === "object" ? modelData.value : modelData
             readonly property string label: typeof modelData === "object" ? modelData.label : String(modelData)
             readonly property bool active: String(val) === String(root.current)
-            width: Math.max(44, chipText.implicitWidth + 18)
+            width: root.chipWidth > 0 ? root.chipWidth : Math.max(44, chipText.implicitWidth + 18)
             height: 28
             radius: Theme.radiusSmall
             color: active ? Theme.accentSoft : (chipMouse.containsMouse ? Theme.hover : Theme.raised)

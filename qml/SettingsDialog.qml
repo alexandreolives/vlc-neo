@@ -9,6 +9,7 @@ import Neo 1.0
 // advanced ones further down the same page — no separate "All" maze.
 Modal {
     id: root
+    bodyMargin: 8
     width: Math.min(parent ? parent.width - 40 : 1000, 1000)
     height: Math.min(parent ? parent.height - 40 : 820, 820)
     property string page: "general"
@@ -51,7 +52,7 @@ Modal {
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 34
-            spacing: 26
+            spacing: 30
             Item {
                 Layout.preferredWidth: 190
                 Layout.fillHeight: true
@@ -126,7 +127,7 @@ Modal {
             id: scroll
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.leftMargin: 20
+            Layout.leftMargin: 30
             contentWidth: availableWidth
             clip: true
 
@@ -141,6 +142,7 @@ Modal {
                     SettingRow {
                         label: "Theme"
                         Chips {
+                            chipWidth: 100
                             model: [{ label: "Dark", value: "dark" }, { label: "Light", value: "light" }, { label: "System", value: "system" }]
                             current: Theme.store.mode
                             onPicked: (v) => Theme.store.mode = v
@@ -149,7 +151,7 @@ Modal {
                     SettingRow {
                         label: "Accent color"
                         info: "Replaces VLC orange everywhere in the interface."
-                        AccentPicker {}
+                        AccentPicker { spacing: 10 }
                     }
                     SectionTitle { text: "Startup" }
                     VlcOption { option: "one-instance"; label: "Allow only one instance"; info: "Opening a file from the file manager reuses the running player." }
