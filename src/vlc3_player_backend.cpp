@@ -2,6 +2,7 @@
 
 #include <QFileInfo>
 #include <QHash>
+#include <QUrl>
 
 #include <vlc_configuration.h>
 
@@ -92,6 +93,64 @@ public:
         state.loop = var_GetBool(m_playlist, "loop");
         state.repeatOne = var_GetBool(m_playlist, "repeat");
         state.random = var_GetBool(m_playlist, "random");
+        return state;
+    }
+
+    ~Vlc3PlayerBackend() override { clearCurrentInput(); }
+
+    void syncCurrentInput() override
+    {
+        input_thread_t *input = playlist_CurrentInput(m_playlist);
+        if (input == m_input) {
+            if (input)
+                vlc_object_release(input);
+            return;
+        }
+        clearCurrentInput();
+        m_input = input;
+    }
+
+    void clearCurrentInput() override
+    {
+        if (!m_input)
+            return;
+        vlc_object_release(m_input);
+        m_input = nullptr;
+    }
+
+    BackendInputState inputState() const override
+    {
+        BackendInputState state;
+        if (!m_input)
+            return state;
+        state.hasInput = true;
+        switch (var_GetInteger(m_input, "state")) {
+        case INIT_S:
+        case OPENING_S: state.state = 1; break;
+        case PLAYING_S: state.state = 2; break;
+        case PAUSE_S: state.state = 3; break;
+        default: state.state = 0; break;
+        }
+        state.position = var_GetFloat(m_input, "position");
+        state.timeMs = var_GetInteger(m_input, "time") / 1000;
+        state.lengthMs = var_GetInteger(m_input, "length") / 1000;
+        state.seekable = var_GetBool(m_input, "can-seek");
+        state.recording = var_GetBool(m_input, "record");
+        state.rate = var_GetFloat(m_input, "rate");
+        state.audioDelayMs = int(var_GetInteger(m_input, "audio-delay") / 1000);
+        state.subtitleDelayMs = int(var_GetInteger(m_input, "spu-delay") / 1000);
+
+        input_item_t *item = input_GetItem(m_input);
+        if (item) {
+            state.title = takeString(input_item_GetTitleFbName(item));
+            state.artist = takeString(input_item_GetArtist(item));
+            state.artworkUrl = takeString(input_item_GetArtworkURL(item));
+            state.mediaUrl = QUrl(takeString(input_item_GetURI(item)));
+        }
+        vout_thread_t *vout = input_GetVout(m_input);
+        state.hasVideo = vout != nullptr;
+        if (vout)
+            vlc_object_release(vout);
         return state;
     }
 
@@ -197,6 +256,7 @@ private:
 
     intf_thread_t *m_intf;
     playlist_t *m_playlist;
+    input_thread_t *m_input = nullptr; // owns the reference returned by playlist_CurrentInput
 };
 
 } // namespace

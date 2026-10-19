@@ -4,6 +4,7 @@
 #include <QList>
 #include <QUrl>
 #include <QVariant>
+#include <QString>
 
 #include "media_queue_entry.hpp"
 
@@ -19,6 +20,24 @@ struct BackendPlaylistState {
     bool loop = false;
     bool repeatOne = false;
     bool random = false;
+};
+
+struct BackendInputState {
+    int state = 0; // 0 stopped, 1 opening, 2 playing, 3 paused
+    bool hasInput = false;
+    bool seekable = false;
+    bool hasVideo = false;
+    bool recording = false;
+    double position = 0.0;
+    qint64 timeMs = 0;
+    qint64 lengthMs = 0;
+    double rate = 1.0;
+    int audioDelayMs = 0;
+    int subtitleDelayMs = 0;
+    QString title;
+    QString artist;
+    QString artworkUrl;
+    QUrl mediaUrl;
 };
 
 class PlayerBackend
@@ -45,6 +64,9 @@ public:
     virtual int currentQueueItemId() const = 0;
     virtual bool exportQueue(const QString &path) = 0;
     virtual BackendPlaylistState playlistState() const = 0;
+    virtual void syncCurrentInput() = 0;
+    virtual void clearCurrentInput() = 0;
+    virtual BackendInputState inputState() const = 0;
 
     virtual void setLoop(bool enabled) = 0;
     virtual void setRepeatOne(bool enabled) = 0;

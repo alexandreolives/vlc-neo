@@ -177,6 +177,8 @@ void Player::attachInput()
         emit presetChanged();
     }
 
+    m_backend->syncCurrentInput();
+
     const QUrl previousUrl = m_mediaUrl;
     refreshMeta();
     refreshState();
@@ -200,6 +202,7 @@ void Player::detachInput()
         return;
     saveResumePoint();
     var_DelCallback(m_input, "intf-event", onInputEvent, this);
+    m_backend->clearCurrentInput();
     vlc_object_release(m_input);
     m_input = nullptr;
 }
@@ -207,15 +210,15 @@ void Player::detachInput()
 void Player::refreshTime()
 {
     m_timePosted = false;
-    if (m_input) {
-        m_position = var_GetFloat(m_input, "position");
-        m_timeMs = var_GetInteger(m_input, "time") / kUsPerMs;
-        m_lengthMs = var_GetInteger(m_input, "length") / kUsPerMs;
+    const BackendInputState state = m_backend->inputState();
+    if (state.hasInput) {
+        m_position = state.position;
+        m_timeMs = state.timeMs;
+        m_lengthMs = state.lengthMs;
         if (qAbs(m_timeMs - m_lastSavedResume) > 5000)
             saveResumePoint();
-        const bool seekable = var_GetBool(m_input, "can-seek");
-        if (seekable != m_seekable) {
-            m_seekable = seekable;
+        if (state.seekable != m_seekable) {
+            m_seekable = state.seekable;
             emit mediaChanged();
         }
     } else {
@@ -227,20 +230,10 @@ void Player::refreshTime()
 
 void Player::refreshState()
 {
-    int state = 0;
-    bool recording = false;
-    double rate = m_backend->playlistState().rate;
-    if (m_input) {
-        switch (var_GetInteger(m_input, "state")) {
-        case INIT_S:
-        case OPENING_S: state = 1; break;
-        case PLAYING_S: state = 2; break;
-        case PAUSE_S: state = 3; break;
-        default: state = 0; break;
-        }
-        recording = var_GetBool(m_input, "record");
-        rate = var_GetFloat(m_input, "rate");
-    }
+    const BackendInputState input = m_backend->inputState();
+    const int state = input.state;
+    const bool recording = input.recording;
+    const double rate = input.hasInput ? input.rate : m_backend->playlistState().rate;
     if (state != m_state) {
         m_state = state;
         emit stateChanged();
@@ -259,17 +252,12 @@ void Player::refreshState()
 
 void Player::refreshMeta()
 {
-    QString title, artist, artwork, folderPath;
-    QUrl url;
-    if (m_input) {
-        input_item_t *item = input_GetItem(m_input);
-        title = takeString(input_item_GetTitleFbName(item));
-        artist = takeString(input_item_GetArtist(item));
-        artwork = takeString(input_item_GetArtworkURL(item));
-        url = QUrl(takeString(input_item_GetURI(item)));
-        if (url.isLocalFile())
-            folderPath = QFileInfo(url.toLocalFile()).absolutePath();
-    }
+    const BackendInputState state = m_backend->inputState();
+    const QString title = state.title;
+    const QString artist = state.artist;
+    const QString artwork = state.artworkUrl;
+    const QUrl url = state.mediaUrl;
+    const QString folderPath = url.isLocalFile() ? QFileInfo(url.toLocalFile()).absolutePath() : QString();
     const bool newMedia = url != m_mediaUrl;
     m_title = title;
     m_artist = artist;
@@ -284,15 +272,7 @@ void Player::refreshMeta()
 
 void Player::refreshTracks()
 {
-    bool hasVideo = false;
-    if (m_input) {
-        vout_thread_t *vout = input_GetVout(m_input);
-        if (vout) {
-            hasVideo = true;
-            vlc_object_release(vout);
-        }
-    }
-    m_hasVideo = hasVideo;
+    m_hasVideo = m_backend->inputState().hasVideo;
     emit tracksChanged();
     emit chaptersChanged();
     applyLinkedSubtitles();
@@ -301,11 +281,9 @@ void Player::refreshTracks()
 
 void Player::refreshDelays()
 {
-    int audio = 0, spu = 0;
-    if (m_input) {
-        audio = int(var_GetInteger(m_input, "audio-delay") / kUsPerMs);
-        spu = int(var_GetInteger(m_input, "spu-delay") / kUsPerMs);
-    }
+    const BackendInputState state = m_backend->inputState();
+    const int audio = state.audioDelayMs;
+    const int spu = state.subtitleDelayMs;
     if (audio != m_audioDelayMs || spu != m_subtitleDelayMs) {
         m_audioDelayMs = audio;
         m_subtitleDelayMs = spu;
