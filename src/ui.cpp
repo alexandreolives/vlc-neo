@@ -3,6 +3,7 @@
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QHash>
+#include <QMouseEvent>
 #include <QKeyEvent>
 #include <QMutex>
 #include <QPointer>
@@ -38,17 +39,36 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
 {
     if (action == QLatin1String("quit")) {
         window->close();
+    } else if (action.startsWith(QLatin1String("click:"))) {
+        const QStringList coordinates = action.mid(6).split(QLatin1Char(','));
+        if (window && coordinates.size() == 2) {
+            const QPointF local(coordinates.at(0).toDouble(), coordinates.at(1).toDouble());
+            const QPointF global(window->mapToGlobal(local.toPoint()));
+            QMouseEvent press(QEvent::MouseButtonPress, local, local, global,
+                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(window, &press);
+            QMouseEvent release(QEvent::MouseButtonRelease, local, local, global,
+                                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(window, &release);
+            qInfo("neo test: click %d,%d delivered", int(local.x()), int(local.y()));
+        } else {
+            qWarning("neo test: invalid click coordinates: %s", qPrintable(action));
+        }
     } else if (action.startsWith(QLatin1String("key:"))) {
         const QString keyName = action.mid(4);
         const QHash<QString, int> keys = {
             {QStringLiteral("Left"), Qt::Key_Left}, {QStringLiteral("Right"), Qt::Key_Right},
-            {QStringLiteral("Home"), Qt::Key_Home}, {QStringLiteral("End"), Qt::Key_End}
+            {QStringLiteral("Home"), Qt::Key_Home}, {QStringLiteral("End"), Qt::Key_End},
+            {QStringLiteral("Space"), Qt::Key_Space}, {QStringLiteral("Return"), Qt::Key_Return}
         };
         QQuickItem *focusItem = window ? window->activeFocusItem() : nullptr;
         if (keys.contains(keyName) && focusItem) {
             QKeyEvent event(QEvent::KeyPress, keys.value(keyName), Qt::NoModifier);
             event.setAccepted(false);
             QCoreApplication::sendEvent(focusItem, &event);
+            QKeyEvent releaseEvent(QEvent::KeyRelease, keys.value(keyName), Qt::NoModifier);
+            releaseEvent.setAccepted(false);
+            QCoreApplication::sendEvent(focusItem, &releaseEvent);
             qInfo("neo test: key %s delivered (%d)", qPrintable(keyName), event.isAccepted());
         } else {
             qWarning("neo test: key %s not delivered (no focus item or unknown key)", qPrintable(keyName));

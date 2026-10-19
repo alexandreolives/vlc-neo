@@ -23,6 +23,7 @@ ApplicationWindow {
     property bool uiHidden: false
     property bool pip: false
     property bool libraryOpen: false
+    property string navigationPage: "home"
     property string rightPanel: ""          // "" | queue | settings
     property bool videoFill: false
     property bool wasMaximized: false
@@ -49,6 +50,45 @@ ApplicationWindow {
         player.setFullscreenState(on)
     }
     function togglePanel(name) { rightPanel = rightPanel === name ? "" : name }
+    function navigate(page) {
+        navigationPage = page
+        switch (page) {
+        case "home":
+            libraryPanel.section = "home"
+            libraryPanel.mediaType = "all"
+            libraryOpen = true
+            rightPanel = ""
+            break
+        case "videos":
+            libraryPanel.folder = StandardPaths.writableLocation(StandardPaths.MoviesLocation)
+            libraryPanel.section = "folder"
+            libraryPanel.mediaType = "video"
+            libraryOpen = true
+            rightPanel = ""
+            break
+        case "folder":
+            libraryPanel.section = "folder"
+            libraryPanel.mediaType = "all"
+            libraryOpen = true
+            rightPanel = ""
+            break
+        case "streaming":
+            networkDialog.open()
+            break
+        case "playlist":
+            togglePanel("queue")
+            break
+        case "recent":
+            libraryPanel.section = "recent"
+            libraryPanel.mediaType = "all"
+            libraryOpen = true
+            rightPanel = ""
+            break
+        case "add":
+            openFilesDialog.open()
+            break
+        }
+    }
     function setPip(on) {
         if (on === pip) return
         if (on && fullscreen) setFullscreen(false)
@@ -205,7 +245,7 @@ ApplicationWindow {
         // Middle: library | video | side panel
         Item {
             id: middle
-            anchors.left: parent.left
+            anchors.left: navigationRail.visible ? navigationRail.right : parent.left
             anchors.right: parent.right
             anchors.top: win.overlayMode ? parent.top : topBar.bottom
             anchors.bottom: win.overlayMode ? parent.bottom : controlBar.top
@@ -218,7 +258,7 @@ ApplicationWindow {
                     id: libraryPanel
                     visible: win.libraryOpen
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 300
+                    Layout.preferredWidth: 220
                 }
                 Rectangle { visible: win.libraryOpen; Layout.fillHeight: true; implicitWidth: 1; color: Theme.border }
 
@@ -319,7 +359,7 @@ ApplicationWindow {
 
         TopBar {
             id: topBar
-            anchors.left: parent.left
+            anchors.left: navigationRail.visible ? navigationRail.right : parent.left
             anchors.right: parent.right
             y: win.topShown ? 0 : -height
             opacity: win.topShown ? (win.overlayMode ? 0.96 : 1) : 0
@@ -334,13 +374,23 @@ ApplicationWindow {
 
         ControlBar {
             id: controlBar
-            anchors.left: parent.left
+            anchors.left: navigationRail.visible ? navigationRail.right : parent.left
             anchors.right: parent.right
             y: win.bottomShown ? parent.height - height : parent.height
             opacity: win.bottomShown ? (win.overlayMode ? 0.96 : 1) : 0
             Behavior on y { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             Behavior on opacity { NumberAnimation { duration: 140 } }
             onAction: (id, source) => win.run(id, source)
+        }
+
+        NavigationRail {
+            id: navigationRail
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            currentPage: win.navigationPage
+            visible: !win.overlayMode || win.chromeShown
+            onNavigate: (page) => win.navigate(page)
         }
 
         ResumePill {

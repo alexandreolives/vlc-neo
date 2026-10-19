@@ -13,5 +13,5 @@ if [ -n "$NEO_QT_ROOT" ]; then
     export LD_LIBRARY_PATH="$NEO_QT_ROOT/lib:$NEO_QT_ROOT/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export QML_IMPORT_PATH="$NEO_QT_ROOT/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
 fi
-export VLC_PLUGIN_PATH="$HERE/build"
+export VLC_PLUGIN_PATH="${NEO_BUILD_DIR:-$HERE/build}"
 exec timeout "${NEO_TIMEOUT:-40}" "${SYSTEM_VLC:-/usr/bin/vlc}" --no-plugins-cache -I neo --no-qt-privacy-ask --aout=dummy "$@"

@@ -98,10 +98,18 @@ if [ -s "$WORK/timeline-focus.png" ]; then echo "PASS  focused timeline screensh
 else echo "FAIL  focused timeline screenshot missing"; fail=$((fail + 1)); fi
 
 echo "== track popup dismissal"
-out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:click:900,300|+100:'outsideClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
 check "track popup opens" "$out" "opened=true"
+check "clicking the video outside the track popup closes it" "$out" "outsideClosed=true"
 check "clicking the same track control closes its popup" "$out" "toggleClosed=true"
 check "clicking another track control switches the popup" "$out" "switched=true"
+
+echo "== primary navigation"
+out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video')|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent')|+100:quit" "$E1")
+check "navigation buttons accept keyboard focus" "$out" "focusVideos=true"
+check "Space opens the video library view" "$out" "videos=true"
+check "recent navigation accepts keyboard focus" "$out" "focusRecent=true"
+check "recent navigation opens the recent-media view" "$out" "recent=true"
 
 echo
 echo "passed $pass, failed $fail"

@@ -11,12 +11,16 @@ Rectangle {
     color: Theme.panel
     property url folder: player.folderPath.length ? platform.fileUrl(player.folderPath)
                                                   : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
-    property string section: "folder"   // home | folder
+    property string section: "folder"   // home | folder | recent
     property string sortBy: "name"
+    property string mediaType: "all"   // all | video | audio
 
     readonly property var mediaFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav",
         "*.wma", "*.alac", "*.ape", "*.m3u", "*.m3u8", "*.pls", "*.xspf", "*.iso"]
+    readonly property var videoFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
+        "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.iso"]
+    readonly property var audioFilters: ["*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav", "*.wma", "*.alac", "*.ape"]
     readonly property var audioExt: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "wav", "wma", "alac", "ape"]
 
     function pinnedList() { return Theme.store.pinned.length ? Theme.store.pinned.split("\n") : [] }
@@ -26,7 +30,7 @@ Rectangle {
         if (i >= 0) list.splice(i, 1); else list.push(path)
         Theme.store.pinned = list.join("\n")
     }
-    function openFolder(url) { root.folder = url; root.section = "folder" }
+    function openFolder(url) { root.folder = url; root.section = "folder"; root.mediaType = "all" }
     function crumbs() {
         const path = platform.localPath(root.folder)
         const home = platform.homePath()
@@ -44,7 +48,8 @@ Rectangle {
     FolderListModel {
         id: files
         folder: root.folder
-        nameFilters: root.mediaFilters
+        nameFilters: root.mediaType === "video" ? root.videoFilters
+                   : (root.mediaType === "audio" ? root.audioFilters : root.mediaFilters)
         showDirsFirst: true
         showDotAndDotDot: false
         caseSensitive: false
@@ -65,7 +70,7 @@ Rectangle {
             spacing: 2
             IconButton { icon: "chevron-left"; tip: "Up"; onClicked: root.openFolder(files.parentFolder) }
             Chips {
-                model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }]
+                model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
                 current: root.section
                 onPicked: (v) => root.section = v
             }
@@ -192,6 +197,36 @@ Rectangle {
                         required property string modelData
                         label: decodeURIComponent(modelData.split("/").pop()); iconName: "history"; url: modelData; isDir: false
                     }
+                }
+            }
+        }
+
+        ScrollView {
+            visible: root.section === "recent"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: availableWidth
+            clip: true
+            ColumnLayout {
+                width: parent.width
+                spacing: 2
+                NText { text: "Recently played"; dim: true; font.pixelSize: 11; Layout.leftMargin: 14; Layout.topMargin: 10; Layout.bottomMargin: 4 }
+                Repeater {
+                    model: root.visible && root.section === "recent" ? player.recentMedia() : []
+                    delegate: LibraryRow {
+                        required property string modelData
+                        label: decodeURIComponent(modelData.split("/").pop())
+                        iconName: "recent"
+                        url: modelData
+                        isDir: false
+                    }
+                }
+                NText {
+                    visible: root.visible && root.section === "recent" && player.recentMedia().length === 0
+                    text: "No recent media"
+                    dim: true
+                    Layout.leftMargin: 14
+                    Layout.topMargin: 8
                 }
             }
         }
