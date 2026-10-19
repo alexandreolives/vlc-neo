@@ -43,6 +43,10 @@ Modal {
         const query = categorySearch.trim().toLowerCase()
         return pages.filter(p => ids.indexOf(p.id) >= 0 && p.label.toLowerCase().includes(query))
     }
+    onClosed: {
+        categorySearch = ""
+        categoryField.clear()
+    }
 
     ColumnLayout {
         width: root.width - 36
