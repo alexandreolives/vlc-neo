@@ -252,7 +252,7 @@ ApplicationWindow {
         Timer { id: bottomHide; interval: Theme.store.hideDelay; onTriggered: win.bottomHot = false }
         Timer { id: cursorTimer; interval: Theme.store.hideDelay + 800; onTriggered: if (win.overlayMode && !win.chromeShown) videoArea.cursorHidden = true }
 
-        // Middle: library | video | side panel
+        // Main content: either the library browser or the video surface.
         Item {
             id: middle
             anchors.left: navigationRail.visible ? navigationRail.right : parent.left
@@ -267,30 +267,28 @@ ApplicationWindow {
                 LibraryPanel {
                     id: libraryPanel
                     visible: win.libraryOpen
+                    wide: true
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 220
+                    Layout.fillWidth: true
+                    onOpenFiles: openFilesDialog.open()
                 }
-                Rectangle { visible: win.libraryOpen; Layout.fillHeight: true; implicitWidth: 1; color: Theme.border }
 
                 Rectangle {
                     id: videoArea
+                    visible: !win.libraryOpen
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: Theme.videoBg
                     property bool cursorHidden: false
 
-                    VideoOutput {
-                        id: video
-                        anchors.fill: parent
-                        fill: win.videoFill
-                        visible: player.hasVideo
-                    }
                     MusicView {
                         anchors.fill: parent
+                        z: 1
                         visible: player.hasMedia && !player.hasVideo && player.state > 1
                     }
                     HomeView {
                         anchors.fill: parent
+                        z: 1
                         visible: !player.hasMedia
                         onOpenFile: openFilesDialog.open()
                         onOpenFolder: openFolderDialog.open()
@@ -300,15 +298,20 @@ ApplicationWindow {
                     MouseArea {
                         objectName: "video-click-area"
                         anchors.fill: parent
+                        z: 2
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
                         cursorShape: videoArea.cursorHidden ? Qt.BlankCursor : Qt.ArrowCursor
-                        enabled: player.hasMedia
+                        // Keep this hit target active even when playback stops:
+                        // clicks on the empty video surface must still dismiss
+                        // transient track/settings popups.
+                        enabled: true
                         onClicked: (e) => {
                             // The video MouseArea consumes clicks before Popup's
                             // outside-press handler can dismiss the track picker.
                             if (tracksPopup.visible) tracksPopup.close()
                             if (win.rightPanel.length) win.rightPanel = ""
+                            if (!player.hasMedia) return
                             win.focusKeys()
                             if (e.button === Qt.RightButton) { contextMenu.popup(); return }
                             if (Theme.store.clickToPause) clickTimer.restart()
@@ -329,6 +332,7 @@ ApplicationWindow {
                     DropArea {
                         id: fileDrop
                         anchors.fill: parent
+                        z: 3
                         keys: ["text/uri-list"]
                         onDropped: (e) => {
                             if (!e.hasUrls) return
@@ -367,6 +371,15 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+
+        VideoOutput {
+            id: video
+            parent: win.libraryOpen ? libraryPanel.miniVideoHost : videoArea
+            anchors.fill: parent
+            fill: win.videoFill
+            visible: player.hasVideo
+            z: 0
         }
 
         TopBar {

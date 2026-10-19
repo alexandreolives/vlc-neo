@@ -5,15 +5,20 @@ import QtCore
 import Qt.labs.folderlistmodel
 import Neo 1.0
 
-// Compact library next to the video: browse folders, play or drag to the queue.
+// Local media browser with a full-window mode and a compact embedded mode.
 Rectangle {
     id: root
-    color: Theme.panel
+    color: root.wide ? Theme.window : Theme.panel
+    property bool wide: false
     property url folder: player.folderPath.length ? platform.fileUrl(player.folderPath)
                                                   : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
     property string section: "folder"   // home | folder | recent
     property string sortBy: "name"
     property string mediaType: "all"   // all | video | audio
+    property string searchText: ""
+    property int filteredCount: 0
+    property alias miniVideoHost: miniVideoSurface
+    signal openFiles()
 
     readonly property var mediaFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav",
@@ -31,6 +36,19 @@ Rectangle {
         Theme.store.pinned = list.join("\n")
     }
     function openFolder(url) { root.folder = url; root.section = "folder"; root.mediaType = "all" }
+    function matches(name) { return searchText.length === 0 || name.toLowerCase().includes(searchText.trim().toLowerCase()) }
+    function refreshFilteredCount() {
+        if (searchText.trim().length === 0) {
+            filteredCount = files.count
+            return
+        }
+        let count = 0
+        for (let i = 0; i < files.count; ++i)
+            if (matches(files.get(i, "fileName"))) ++count
+        filteredCount = count
+    }
+    function matchingFiles() { return filteredCount }
+    function fileCount() { return files.count }
     function crumbs() {
         const path = platform.localPath(root.folder)
         const home = platform.homePath()
@@ -55,36 +73,63 @@ Rectangle {
         caseSensitive: false
         sortField: root.sortBy === "date" ? FolderListModel.Time : (root.sortBy === "size" ? FolderListModel.Size : FolderListModel.Name)
         sortReversed: root.sortBy === "date"
+        onStatusChanged: if (status === FolderListModel.Ready) filteredCountTimer.restart()
+        onCountChanged: if (status === FolderListModel.Ready) filteredCountTimer.restart()
+    }
+    onSearchTextChanged: filteredCountTimer.restart()
+    Timer {
+        id: filteredCountTimer
+        interval: 180
+        onTriggered: root.refreshFilteredCount()
     }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // Header: back/up + sections
+        // Header: navigation, breadcrumbs and local search.
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 8
             Layout.rightMargin: 8
-            implicitHeight: 44
+            implicitHeight: 42
             spacing: 2
-            IconButton { icon: "chevron-left"; tip: "Up"; onClicked: root.openFolder(files.parentFolder) }
+            IconButton { icon: "chevron-left"; tip: "Up"; visible: root.section === "folder"; onClicked: root.openFolder(files.parentFolder) }
             Chips {
+                visible: !root.wide
                 model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
                 current: root.section
                 onPicked: (v) => root.section = v
             }
+            NText {
+                visible: root.wide
+                text: root.section === "folder" ? root.crumbs().map(c => c.name).join("  ›  ")
+                      : (root.section === "recent" ? "Recent media" : "Home")
+                font.pixelSize: 12
+                Layout.leftMargin: 8
+                Layout.fillWidth: true
+            }
             Item { Layout.fillWidth: true }
+            NText { visible: root.wide; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
             IconButton {
                 icon: "arrow-up"; tip: "Sort: " + root.sortBy
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
+            NField {
+                visible: root.wide
+                objectName: "library-search"
+                Layout.preferredWidth: 190
+                text: root.searchText
+                placeholderText: "Search"
+                onTextEdited: root.searchText = text
+            }
+            IconButton { visible: root.wide; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
             IconButton { icon: "x"; tip: "Close"; onClicked: win.libraryOpen = false }
         }
 
         // Address line (clickable segments)
         Flickable {
-            visible: root.section === "folder"
+            visible: root.section === "folder" && !root.wide
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
@@ -114,7 +159,7 @@ Rectangle {
             }
         }
         RowLayout {
-            visible: root.section === "folder"
+            visible: root.section === "folder" && !root.wide
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
@@ -131,30 +176,66 @@ Rectangle {
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
         // Folder listing
-        ListView {
+        GridView {
             id: listing
             visible: root.section === "folder"
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.leftMargin: root.wide ? 12 : 0
+            Layout.rightMargin: root.wide ? 12 : 0
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds
+            cellWidth: root.wide ? Math.max(180, Math.floor(width / 4)) : width
+            cellHeight: root.wide ? 36 : 34
             ScrollBar.vertical: ScrollBar {}
-            delegate: LibraryRow {
+            delegate: Rectangle {
+                id: mediaCell
                 required property string fileName
                 required property url fileUrl
                 required property bool fileIsDir
                 required property string fileSuffix
-                label: fileName
-                url: fileUrl
-                isDir: fileIsDir
-                iconName: fileIsDir ? "folder" : (root.audioExt.indexOf(fileSuffix.toLowerCase()) >= 0 ? "music" : "file-video")
-                playing: !fileIsDir && player.mediaUrl.toString() === fileUrl.toString()
+                width: listing.cellWidth - (root.wide ? 8 : 0)
+                height: listing.cellHeight - 2
+                visible: root.matches(fileName)
+                radius: Theme.radiusSmall
+                property bool playing: !fileIsDir && player.mediaUrl.toString() === fileUrl.toString()
+                color: playing ? Theme.accentSoft : (cellMouse.containsMouse ? Theme.hover : "transparent")
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: root.wide ? 8 : 12
+                    anchors.rightMargin: 5
+                    spacing: root.wide ? 7 : 10
+                    Icon { name: mediaCell.fileIsDir ? "folder" : (root.audioExt.indexOf(mediaCell.fileSuffix.toLowerCase()) >= 0 ? "music" : "file-video"); size: root.wide ? 15 : 16; color: mediaCell.playing ? Theme.accent : Theme.icon }
+                    NText { text: mediaCell.fileName; Layout.fillWidth: true; font.pixelSize: root.wide ? 11 : Theme.fontBody; color: mediaCell.playing ? Theme.accent : Theme.text }
+                    IconButton {
+                        visible: cellMouse.containsMouse || hovered
+                        icon: "plus"; iconSize: 13; tip: "Add to queue"
+                        onClicked: player.openUrls([mediaCell.fileUrl], false)
+                    }
+                }
+                MouseArea {
+                    id: cellMouse
+                    anchors.fill: parent
+                    anchors.rightMargin: 34
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    drag.target: dragProxy
+                    onClicked: mediaCell.fileIsDir ? root.openFolder(mediaCell.fileUrl) : player.openUrls([mediaCell.fileUrl], true)
+                }
+                Item {
+                    id: dragProxy
+                    Drag.active: cellMouse.drag.active
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.CopyAction
+                    Drag.mimeData: { "text/uri-list": mediaCell.fileUrl.toString() }
+                }
             }
             NText {
                 anchors.centerIn: parent
-                visible: listing.count === 0
-                text: "No media in this folder"
+                visible: root.matchingFiles() === 0
+                text: root.searchText.length ? "No matching media" : "No media in this folder"
                 dim: true
             }
         }
@@ -229,6 +310,76 @@ Rectangle {
                     Layout.topMargin: 8
                 }
             }
+        }
+    }
+
+    Rectangle {
+        id: miniPlayer
+        visible: root.wide && player.hasVideo
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 12
+        anchors.bottomMargin: 12
+        width: Math.min(270, root.width * 0.34)
+        height: 220
+        radius: 12
+        color: Theme.bar
+        border.color: Theme.border
+        z: 2
+
+        Item {
+            id: miniVideoSurface
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 8
+            height: width * 9 / 16
+            clip: true
+
+            MouseArea {
+                anchors.fill: parent
+                z: 1
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: (event) => {
+                    if (tracksPopup.visible) tracksPopup.close()
+                    if (event.button === Qt.LeftButton) win.libraryOpen = false
+                    else {
+                        const point = miniVideoSurface.mapToItem(keyCatcher, event.x, event.y)
+                        contextMenu.popup(point.x, point.y)
+                    }
+                }
+            }
+        }
+        Rectangle {
+            anchors.left: miniVideoHost.left
+            anchors.right: miniVideoHost.right
+            anchors.top: miniVideoHost.bottom
+            height: 6
+            radius: 3
+            color: Theme.field
+            Rectangle { width: parent.width * player.position; height: parent.height; radius: 3; color: Theme.accentDim }
+        }
+        NText {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.top: miniVideoHost.bottom
+            anchors.topMargin: 14
+            text: player.title.length ? player.title : "Now playing"
+            font.pixelSize: 11
+        }
+        RowLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 6
+            anchors.bottomMargin: 4
+            spacing: 6
+            Icon { name: "folder"; size: 13; color: Theme.textDim }
+            NText { text: player.folderName; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
+            IconButton { icon: "maximize"; tip: "Return to player"; onClicked: win.libraryOpen = false }
         }
     }
 

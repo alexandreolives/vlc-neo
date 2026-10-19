@@ -129,20 +129,25 @@ if [ -s "$WORK/timeline-focus.png" ]; then echo "PASS  focused timeline screensh
 else echo "FAIL  focused timeline screenshot missing"; fail=$((fail + 1)); fi
 
 echo "== track popup dismissal"
-out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:click:900,300|+100:'outsideClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:click:900,300|+100:'outsideClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:win.libraryOpen=true; tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:click:900,500|+100:'miniCloses=' + (!tracksPopup.visible && !libraryOpen)|+100:tracksPopup.close()|+100:quit" "$E1")
 check "track popup opens" "$out" "opened=true"
 check "clicking the video outside the track popup closes it" "$out" "outsideClosed=true"
 check "clicking the same track control closes its popup" "$out" "toggleClosed=true"
 check "clicking another track control switches the popup" "$out" "switched=true"
+check "clicking the mini-player video dismisses tracks and restores playback" "$out" "miniCloses=true"
 
 echo "== side panel dismissal"
 out=$(run "1200:win.rightPanel='settings'|+100:'opened=' + (win.rightPanel === 'settings')|+100:click-item:video-click-area|+100:'closed=' + (win.rightPanel === '')|+100:quit" "$E1")
 check "clicking the video closes the audio/subtitle panel" "$out" "closed=true"
 
 echo "== primary navigation"
-out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video') + ' expanded=' + (navigationRail.expanded && navigationRail.width === 112) + ' label=' + navigationRail.labelForPage('folder')|+150:grab:$WORK/navigation-videos.png|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent' && navigationRail.expanded)|+100:quit" "$E1")
+out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:libraryPanel.folder = platform.fileUrl(player.folderPath)|+350:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video') + ' expanded=' + (navigationRail.expanded && navigationRail.width === 112) + ' label=' + navigationRail.labelForPage('folder') + ' wide=' + (libraryPanel.visible && libraryPanel.width > win.width * 0.7 && !videoArea.visible) + ' mini=' + (video.parent === libraryPanel.miniVideoHost) + ' files=' + libraryPanel.fileCount()|+100:libraryPanel.searchText = 'S01E02'|+250:'searchMatches=' + libraryPanel.matchingFiles()|+100:libraryPanel.searchText = ''|+150:grab:$WORK/navigation-videos.png|+100:click:1092,596|+150:'miniRestore=' + (!libraryOpen && videoArea.visible && video.parent === videoArea)|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent' && navigationRail.expanded)|+100:quit" "$E1")
 check "navigation buttons accept keyboard focus" "$out" "focusVideos=true"
 check "Space opens the video library and expands the labeled navigation rail" "$out" "videos=true expanded=true label=Browse"
+check "the library replaces the video area and keeps a live mini-player" "$out" "wide=true mini=true"
+check "the full library lists the current folder media" "$out" "files=2"
+check "library search filters filenames" "$out" "searchMatches=1"
+check "the mini-player restore control returns to full playback" "$out" "miniRestore=true"
 check "recent navigation accepts keyboard focus" "$out" "focusRecent=true"
 check "recent navigation opens the recent-media view with the expanded rail" "$out" "recent=true"
 if [ -s "$WORK/navigation-videos.png" ]; then echo "PASS  expanded navigation screenshot written"; pass=$((pass + 1))
