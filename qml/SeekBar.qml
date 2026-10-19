@@ -115,7 +115,9 @@ FocusScope {
             player.seek(0)
             event.accepted = true
         } else if (event.key === Qt.Key_End) {
-            player.seek(1)
+            // VLC rejects position 1.0 as outside the valid seek range.
+            // Seek just before EOF and let playback finish naturally.
+            player.seek(0.99)
             event.accepted = true
         }
     }
