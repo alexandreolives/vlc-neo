@@ -13,6 +13,7 @@ Modal {
     height: Math.min(parent ? parent.height - 40 : 820, 820)
     property string page: "general"
     property string categorySearch: ""
+    property bool advancedOpen: false
     signal showShortcuts()
     signal showOnboarding()
 
@@ -153,8 +154,36 @@ Modal {
                     SectionTitle { text: "Startup" }
                     VlcOption { option: "one-instance"; label: "Allow only one instance"; info: "Opening a file from the file manager reuses the running player." }
                     VlcOption { option: "playlist-enqueue"; label: "Enqueue items into the queue in one instance mode" }
-                    SectionTitle { text: "Onboarding" }
-                    SettingRow { label: "Show the welcome screens again"; NButton { text: "Show"; onClicked: { root.close(); root.showOnboarding() } } }
+                    SectionTitle { text: "Diagnostics" }
+                    VlcOption { option: "file-logging"; label: "Save a log"; info: "Write VLC core messages to a log file." }
+                    VlcOption { option: "logfile"; kind: "text"; fieldWidth: 220; label: "Log file" }
+                    VlcOption {
+                        option: "log-verbose"; kind: "choice"; label: "Log details"
+                        choices: [{ label: "Default", value: -1 }, { label: "Information", value: 0 },
+                                  { label: "Errors", value: 1 }, { label: "Warnings", value: 2 }, { label: "Debug", value: 3 }]
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 36
+                        radius: Theme.radiusSmall
+                        color: advancedMouse.containsMouse ? Theme.hover : Theme.raised
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            NText { text: "Advanced Options"; color: Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
+                            Icon { name: "chevron-right"; size: 14; rotation: root.advancedOpen ? 90 : 0; color: Theme.icon; anchors.verticalCenter: parent.verticalCenter }
+                        }
+                        MouseArea { id: advancedMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.advancedOpen = !root.advancedOpen }
+                    }
+                    ColumnLayout {
+                        visible: root.advancedOpen
+                        Layout.fillWidth: true
+                        VlcOption {
+                            option: "verbose"; kind: "choice"; label: "Core output verbosity"
+                            choices: [{ label: "Default", value: 0 }, { label: "Verbose", value: 1 }, { label: "Debug", value: 2 }]
+                        }
+                        SettingRow { label: "Show the welcome screens again"; NButton { text: "Show"; onClicked: { root.close(); root.showOnboarding() } } }
+                    }
                 }
 
                 // ---------------------------------------------- Interface
