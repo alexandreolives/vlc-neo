@@ -104,10 +104,14 @@ FocusScope {
         onWheel: (e) => player.seekBy(e.angleDelta.y > 0 ? 5000 : -5000)
     }
 
-    Keys.onLeftPressed: (event) => { player.seekBy(-5000); event.accepted = true }
-    Keys.onRightPressed: (event) => { player.seekBy(5000); event.accepted = true }
     Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Home) {
+        if (event.key === Qt.Key_Left) {
+            player.seekBy(-5000)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            player.seekBy(5000)
+            event.accepted = true
+        } else if (event.key === Qt.Key_Home) {
             player.seek(0)
             event.accepted = true
         } else if (event.key === Qt.Key_End) {

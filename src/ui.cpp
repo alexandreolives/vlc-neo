@@ -47,8 +47,10 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
         QQuickItem *focusItem = window ? window->activeFocusItem() : nullptr;
         if (keys.contains(keyName) && focusItem) {
             QKeyEvent event(QEvent::KeyPress, keys.value(keyName), Qt::NoModifier);
+            event.setAccepted(false);
             QCoreApplication::sendEvent(focusItem, &event);
-            qInfo("neo test: key %s delivered (accepted=%d)", qPrintable(keyName), event.isAccepted());
+            qInfo("neo test: key %s delivered to %s (accepted=%d)", qPrintable(keyName),
+                  focusItem->metaObject()->className(), event.isAccepted());
         } else {
             qWarning("neo test: key %s not delivered (no focus item or unknown key)", qPrintable(keyName));
         }
