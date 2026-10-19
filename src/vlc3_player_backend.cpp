@@ -288,6 +288,95 @@ public:
         if (m_input)
             var_SetInteger(m_input, "chapter", index);
     }
+    void setSubtitleScale(int percent) override
+    {
+        percent = qBound(10, percent, 500);
+        if (var_Type(m_playlist, "sub-text-scale") == 0)
+            var_Create(m_playlist, "sub-text-scale", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+        var_SetInteger(m_playlist, "sub-text-scale", percent);
+    }
+    int subtitleScale() const override
+    {
+        const int value = int(var_InheritInteger(m_playlist, "sub-text-scale"));
+        return value > 0 ? value : 100;
+    }
+    void setSubtitleMargin(int px) override
+    {
+        var_Create(m_playlist, "sub-margin", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+        var_SetInteger(m_playlist, "sub-margin", px);
+        if (vout_thread_t *vout = currentVout()) {
+            var_SetInteger(vout, "sub-margin", px);
+            vlc_object_release(vout);
+        }
+    }
+    int subtitleMargin() const override
+    {
+        int value = 0;
+        if (vout_thread_t *vout = currentVout()) {
+            value = int(var_GetInteger(vout, "sub-margin"));
+            vlc_object_release(vout);
+        }
+        return value;
+    }
+    void setAspectRatio(const QString &ratio) override
+    {
+        if (vout_thread_t *vout = currentVout()) {
+            var_SetString(vout, "aspect-ratio", ratio.toUtf8().constData());
+            vlc_object_release(vout);
+        }
+    }
+    QString aspectRatio() const override
+    {
+        if (vout_thread_t *vout = currentVout()) {
+            const QString value = takeString(var_GetString(vout, "aspect-ratio"));
+            vlc_object_release(vout);
+            return value;
+        }
+        return {};
+    }
+    void setTransform(const QString &type) override
+    {
+        vout_thread_t *vout = currentVout();
+        if (!vout)
+            return;
+        var_Create(vout, "transform-type", VLC_VAR_STRING);
+        var_SetString(vout, "transform-type", type.toUtf8().constData());
+        var_SetString(vout, "video-filter", type.isEmpty() ? "" : "transform");
+        vlc_object_release(vout);
+    }
+    void setDeinterlace(bool enabled) override
+    {
+        if (vout_thread_t *vout = currentVout()) {
+            var_SetString(vout, "deinterlace-mode", "yadif");
+            var_SetInteger(vout, "deinterlace", enabled ? 1 : 0);
+            vlc_object_release(vout);
+        }
+    }
+    void setEqualizerEnabled(const QString &preset, bool enabled) override
+    {
+        if (!enabled) {
+            playlist_EnableAudioFilter(m_playlist, "equalizer", false);
+            return;
+        }
+        const QByteArray name = preset.toUtf8();
+        var_Create(m_playlist, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+        var_SetString(m_playlist, "equalizer-preset", name.constData());
+        if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+            var_Create(aout, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+            var_SetString(aout, "equalizer-preset", name.constData());
+            vlc_object_release(aout);
+        }
+        playlist_EnableAudioFilter(m_playlist, "equalizer", true);
+    }
+    bool snapshot() override
+    {
+        if (vout_thread_t *vout = currentVout()) {
+            var_TriggerCallback(vout, "video-snapshot");
+            vlc_object_release(vout);
+            return true;
+        }
+        return false;
+    }
 
     bool exportQueue(const QString &path) override
     {
@@ -370,6 +459,8 @@ public:
     }
 
 private:
+    vout_thread_t *currentVout() const { return m_input ? input_GetVout(m_input) : nullptr; }
+
     static void collectLeaves(playlist_item_t *node, QList<MediaQueueEntry> &out)
     {
         for (int i = 0; i < node->i_children; ++i) {

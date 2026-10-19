@@ -100,6 +100,16 @@ public:
     virtual void setSubtitleDelay(int ms) = 0;
     virtual QList<BackendChapter> chapters() const = 0;
     virtual void selectChapter(int index) = 0;
+    virtual void setSubtitleScale(int percent) = 0;
+    virtual int subtitleScale() const = 0;
+    virtual void setSubtitleMargin(int px) = 0;
+    virtual int subtitleMargin() const = 0;
+    virtual void setAspectRatio(const QString &ratio) = 0;
+    virtual QString aspectRatio() const = 0;
+    virtual void setTransform(const QString &type) = 0;
+    virtual void setDeinterlace(bool enabled) = 0;
+    virtual void setEqualizerEnabled(const QString &preset, bool enabled) = 0;
+    virtual bool snapshot() = 0;
 
     virtual void setLoop(bool enabled) = 0;
     virtual void setRepeatOne(bool enabled) = 0;

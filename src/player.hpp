@@ -198,7 +198,6 @@ private:
     void saveResumePoint();
     QString mediaKey(const QString &group) const;
     void rememberRecent(const QString &mrl);
-    vout_thread_t *currentVout() const; // caller releases
     QString presetKey() const;
 
     playlist_t *m_pl;

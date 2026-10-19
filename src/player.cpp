@@ -10,13 +10,6 @@ namespace {
 
 constexpr int kRecentMax = 15;
 
-QString takeString(char *raw)
-{
-    QString out = raw ? QString::fromUtf8(raw) : QString();
-    free(raw);
-    return out;
-}
-
 template <typename Fn>
 void post(QObject *ctx, Fn &&fn)
 {
@@ -438,11 +431,6 @@ void Player::setAudioDevice(const QString &id) { m_backend->setAudioDevice(id); 
 
 // --------------------------------------------------------------- live tuning
 
-vout_thread_t *Player::currentVout() const
-{
-    return m_input ? input_GetVout(m_input) : nullptr;
-}
-
 void Player::setAudioDelay(int ms)
 {
     m_backend->setAudioDelay(ms);
@@ -455,94 +443,27 @@ void Player::setSubtitleDelay(int ms)
 
 void Player::setSubtitleScale(int percent)
 {
-    // freetype re-reads "sub-text-scale" by inheritance on every render (VLC 3),
-    // so a playlist-level variable applies live to the current and next videos.
-    percent = qBound(10, percent, 500);
-    if (var_Type(m_pl, "sub-text-scale") == 0)
-        var_Create(m_pl, "sub-text-scale", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_SetInteger(m_pl, "sub-text-scale", percent);
+    m_backend->setSubtitleScale(percent);
 }
 
-int Player::subtitleScale() const
-{
-    const int value = int(var_InheritInteger(m_pl, "sub-text-scale"));
-    return value > 0 ? value : 100;
-}
+int Player::subtitleScale() const { return m_backend->subtitleScale(); }
 
-void Player::setSubtitleMargin(int px)
-{
-    var_Create(m_pl, "sub-margin", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_SetInteger(m_pl, "sub-margin", px);
-    if (vout_thread_t *vout = currentVout()) {
-        var_SetInteger(vout, "sub-margin", px);
-        vlc_object_release(vout);
-    }
-}
+void Player::setSubtitleMargin(int px) { m_backend->setSubtitleMargin(px); }
 
-int Player::subtitleMargin() const
-{
-    int value = 0;
-    if (vout_thread_t *vout = currentVout()) {
-        value = int(var_GetInteger(vout, "sub-margin"));
-        vlc_object_release(vout);
-    }
-    return value;
-}
+int Player::subtitleMargin() const { return m_backend->subtitleMargin(); }
 
-void Player::setAspectRatio(const QString &ratio)
-{
-    if (vout_thread_t *vout = currentVout()) {
-        var_SetString(vout, "aspect-ratio", ratio.toUtf8().constData());
-        vlc_object_release(vout);
-    }
-}
+void Player::setAspectRatio(const QString &ratio) { m_backend->setAspectRatio(ratio); }
 
-QString Player::aspectRatio() const
-{
-    QString value;
-    if (vout_thread_t *vout = currentVout()) {
-        value = takeString(var_GetString(vout, "aspect-ratio"));
-        vlc_object_release(vout);
-    }
-    return value;
-}
+QString Player::aspectRatio() const { return m_backend->aspectRatio(); }
 
-void Player::setTransform(const QString &type)
-{
-    vout_thread_t *vout = currentVout();
-    if (!vout)
-        return;
-    var_Create(vout, "transform-type", VLC_VAR_STRING);
-    var_SetString(vout, "transform-type", type.toUtf8().constData());
-    var_SetString(vout, "video-filter", type.isEmpty() ? "" : "transform");
-    vlc_object_release(vout);
-}
+void Player::setTransform(const QString &type) { m_backend->setTransform(type); }
 
-void Player::setDeinterlace(bool on)
-{
-    if (vout_thread_t *vout = currentVout()) {
-        var_SetString(vout, "deinterlace-mode", "yadif");
-        var_SetInteger(vout, "deinterlace", on ? 1 : 0);
-        vlc_object_release(vout);
-    }
-}
+void Player::setDeinterlace(bool on) { m_backend->setDeinterlace(on); }
 
 void Player::setEqualizerPreset(const QString &preset)
 {
     m_settings.setValue(QStringLiteral("equalizer"), preset);
-    if (preset.isEmpty() || preset == QLatin1String("off")) {
-        playlist_EnableAudioFilter(m_pl, "equalizer", false);
-        return;
-    }
-    const QByteArray name = preset.toUtf8();
-    var_Create(m_pl, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
-    var_SetString(m_pl, "equalizer-preset", name.constData());
-    if (audio_output_t *aout = playlist_GetAout(m_pl)) {
-        var_Create(aout, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
-        var_SetString(aout, "equalizer-preset", name.constData());
-        vlc_object_release(aout);
-    }
-    playlist_EnableAudioFilter(m_pl, "equalizer", true);
+    m_backend->setEqualizerEnabled(preset, !preset.isEmpty() && preset != QLatin1String("off"));
 }
 
 QString Player::equalizerPreset() const
@@ -568,11 +489,8 @@ void Player::setSleepTimer(int minutes)
 
 void Player::snapshot()
 {
-    if (vout_thread_t *vout = currentVout()) {
-        var_TriggerCallback(vout, "video-snapshot");
-        vlc_object_release(vout);
+    if (m_backend->snapshot())
         emit notify(tr("Snapshot saved"));
-    }
 }
 
 void Player::toggleRecord()
