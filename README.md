@@ -321,7 +321,8 @@ scripts/test-installer.sh # default install/uninstall lifecycle in a disposable 
 The smoke test runs `vlc -I neo` on Qt's offscreen platform and generates its
 own media. It checks:
 - playback and frame delivery to QML
-- the queue
+- queue contents and next-item playback
+- pause/resume, volume and mute controls
 - folder subtitle matching
 - show presets carried across episodes
 - resume

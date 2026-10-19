@@ -31,6 +31,15 @@ check "plays (state 2)" "$out" "state=2"
 check "frames reach the QML video item" "$out" "video=true"
 check "queue has both episodes" "$out" "queue=2"
 check "duration known" "$out" "len=40"
+out=$(run "1500:player.next()|2600:'next=' + player.mediaUrl.toString().endsWith('My.Show.S01E02.1080p.mkv')|2800:quit" "$E1" "$E2")
+check "next advances to the following queue item" "$out" "next=true"
+
+echo "== transport, volume and mute controls"
+out=$(run "1500:player.togglePause()|2300:'paused=' + player.state|2400:player.togglePause()|3300:'resumed=' + player.state|3500:quit" "$E1")
+check "pause control pauses playback" "$out" "paused=3"
+check "play control resumes playback" "$out" "resumed=2"
+out=$(run "1500:player.setVolume(0.5); player.toggleMute()|2300:'volume=' + player.volume + ' muted=' + player.muted|2500:quit" "$E1")
+check "volume control updates level and mute state" "$out" "volume=0.5 muted=true"
 
 echo "== folder subtitles + show preset"
 out=$(run "1500:'matched=' + player.linkSubtitleFolder(platform.fileUrl('$WORK/subs'))|2500:player.setSubtitleDelay(-400); player.setSubtitleScale(160)|2800:player.savePresetForFolder()|3000:quit" "$E1" "$E2")
