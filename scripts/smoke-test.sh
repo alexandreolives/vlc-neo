@@ -55,6 +55,20 @@ check "speed applied" "$out" "rate=1.5"
 echo "== VLC core config round trip"
 out=$(run "1000:player.setConfig('network-caching', 1500)|1200:'cache=' + player.config('network-caching')|1300:quit")
 check "vlcrc option written and read back" "$out" "cache=1500"
+out=$(run "1000:'cache=' + player.config('network-caching')|1200:quit")
+check "vlcrc preference persists across VLC launches" "$out" "cache=1500"
+
+echo "== appearance, window sizes and persistent settings"
+out=$(run "1000:Theme.store.mode='dark'; Theme.store.accent='#D9822B'|+350:grab:$WORK/dark.png|+200:Theme.store.mode='light'; Theme.store.accent='#2F5FC4'|+350:grab:$WORK/light.png|+200:win.width=560; win.height=340|+350:grab:$WORK/compact.png|+200:quit" "$E1")
+check "dark theme captured at standard size" "$out" "window 1120x680"
+check "light theme captured at standard size" "$out" "window 1120x680"
+check "compact window size captured" "$out" "window 560x340"
+for image in dark light compact; do
+    if [ -s "$WORK/$image.png" ]; then echo "PASS  $image screenshot written"; pass=$((pass + 1))
+    else echo "FAIL  $image screenshot missing"; fail=$((fail + 1)); fi
+done
+out=$(run "1000:'mode=' + Theme.store.mode + ' accent=' + Theme.store.accent|1200:quit" "$E1")
+check "theme and accent persist across VLC launches" "$out" "mode=light accent=#2F5FC4"
 
 echo
 echo "passed $pass, failed $fail"

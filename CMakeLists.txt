@@ -20,11 +20,15 @@ add_library(neo_plugin MODULE
   src/vout_display.cpp
   src/video_item.cpp
   src/player.cpp
+  src/queue_model.cpp
+  src/subtitle_matcher.cpp
   src/ui.cpp
   src/frame_store.hpp
   src/neo.hpp
   src/platform.hpp
   src/player.hpp
+  src/queue_model.hpp
+  src/subtitle_matcher.hpp
   src/video_item.hpp
   src/vlc_headers.hpp
 )

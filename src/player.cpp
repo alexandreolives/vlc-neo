@@ -1,10 +1,10 @@
 #include "player.hpp"
+#include "subtitle_matcher.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
 #include <QPointer>
-#include <QRegularExpression>
 
 #include <vlc_configuration.h>
 
@@ -39,59 +39,6 @@ const char *const kPlaylistVars[] = {"volume", "mute", "fullscreen", "rate", "lo
 const char *const kPlaylistChangeVars[] = {"playlist-item-append", "playlist-item-deleted", "item-change"};
 
 } // namespace
-
-// ---------------------------------------------------------------- QueueModel
-
-QVariant QueueModel::data(const QModelIndex &index, int role) const
-{
-    if (!index.isValid() || index.row() >= m_entries.size())
-        return {};
-    const Entry &e = m_entries.at(index.row());
-    switch (role) {
-    case IdRole: return e.id;
-    case TitleRole: return e.title;
-    case DurationRole: return e.durationMs;
-    case CurrentRole: return e.id == m_currentId;
-    case UriRole: return e.uri;
-    default: return {};
-    }
-}
-
-QHash<int, QByteArray> QueueModel::roleNames() const
-{
-    return {{IdRole, "itemId"}, {TitleRole, "title"}, {DurationRole, "duration"},
-            {CurrentRole, "current"}, {UriRole, "uri"}};
-}
-
-void QueueModel::reset(QList<Entry> entries, int currentId)
-{
-    beginResetModel();
-    m_entries = std::move(entries);
-    m_currentId = currentId;
-    endResetModel();
-    emit countChanged();
-}
-
-void QueueModel::setCurrentId(int id)
-{
-    if (id == m_currentId)
-        return;
-    const int oldRow = indexOfId(m_currentId);
-    m_currentId = id;
-    const int newRow = indexOfId(id);
-    if (oldRow >= 0)
-        emit dataChanged(index(oldRow), index(oldRow), {CurrentRole});
-    if (newRow >= 0)
-        emit dataChanged(index(newRow), index(newRow), {CurrentRole});
-}
-
-int QueueModel::indexOfId(int id) const
-{
-    for (int i = 0; i < m_entries.size(); ++i)
-        if (m_entries.at(i).id == id)
-            return i;
-    return -1;
-}
 
 // -------------------------------------------------------------------- Player
 
@@ -969,37 +916,6 @@ const QStringList kSubtitleFilters = {
     QStringLiteral("*.srt"), QStringLiteral("*.ass"), QStringLiteral("*.ssa"),
     QStringLiteral("*.sub"), QStringLiteral("*.vtt"), QStringLiteral("*.smi")};
 
-// "Show.S01E05.1080p" -> "1:5", "Show - 05 [720p]" -> "5"
-QString episodeKey(const QString &fileName)
-{
-    static const QRegularExpression seasonEpisode(QStringLiteral("[Ss](\\d{1,2})[ ._-]?[Ee](\\d{1,3})"));
-    static const QRegularExpression crossed(QStringLiteral("(\\d{1,2})x(\\d{1,3})"));
-    static const QRegularExpression noise(QStringLiteral("(\\d{3,4}p|[xh]\\.?26[45]|\\b(19|20)\\d{2}\\b|\\d+bit)"),
-                                          QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression number(QStringLiteral("(\\d{1,3})"));
-
-    const QString base = QFileInfo(fileName).completeBaseName();
-    QRegularExpressionMatch m = seasonEpisode.match(base);
-    if (!m.hasMatch())
-        m = crossed.match(base);
-    if (m.hasMatch())
-        return QStringLiteral("%1:%2").arg(m.captured(1).toInt()).arg(m.captured(2).toInt());
-
-    QString cleaned = base;
-    cleaned.remove(noise);
-    QString last;
-    auto it = number.globalMatch(cleaned);
-    while (it.hasNext())
-        last = it.next().captured(1);
-    return last.isEmpty() ? QString() : QString::number(last.toInt());
-}
-
-QString folderKey(const QString &folder)
-{
-    return QStringLiteral("subfolders/")
-        + QString::fromLatin1(QCryptographicHash::hash(folder.toUtf8(), QCryptographicHash::Md5).toHex());
-}
-
 } // namespace
 
 int Player::linkSubtitleFolder(const QUrl &folder)
@@ -1009,19 +925,19 @@ int Player::linkSubtitleFolder(const QUrl &folder)
         return 0;
     }
     const QString dir = folder.toLocalFile();
-    m_settings.setValue(folderKey(m_folderPath), dir);
+    m_settings.setValue(SubtitleMatcher::folderSettingsKey(m_folderPath), dir);
     m_subsLinkedApplied = false;
     applyLinkedSubtitles();
 
     // Report how many queue items will find a subtitle.
     QSet<QString> subKeys;
     for (const QString &f : QDir(dir).entryList(kSubtitleFilters, QDir::Files))
-        subKeys.insert(episodeKey(f));
+        subKeys.insert(SubtitleMatcher::episodeKey(f));
     int matched = 0;
     for (const QueueModel::Entry &e : m_queue.entries()) {
         const QUrl u(e.uri);
         if (u.isLocalFile() && QFileInfo(u.toLocalFile()).absolutePath() == m_folderPath
-            && subKeys.contains(episodeKey(u.toLocalFile())))
+            && subKeys.contains(SubtitleMatcher::episodeKey(u.toLocalFile())))
             ++matched;
     }
     emit notify(tr("Subtitles linked: %1 episode(s) matched").arg(matched));
@@ -1031,13 +947,13 @@ int Player::linkSubtitleFolder(const QUrl &folder)
 void Player::unlinkSubtitleFolder()
 {
     if (!m_folderPath.isEmpty())
-        m_settings.remove(folderKey(m_folderPath));
+        m_settings.remove(SubtitleMatcher::folderSettingsKey(m_folderPath));
     emit notify(tr("Subtitle folder unlinked"));
 }
 
 QString Player::linkedSubtitleFolder() const
 {
-    return m_folderPath.isEmpty() ? QString() : m_settings.value(folderKey(m_folderPath)).toString();
+    return m_folderPath.isEmpty() ? QString() : m_settings.value(SubtitleMatcher::folderSettingsKey(m_folderPath)).toString();
 }
 
 void Player::applyLinkedSubtitles()
@@ -1050,18 +966,8 @@ void Player::applyLinkedSubtitles()
     m_subsLinkedApplied = true;
 
     const QString mediaFile = m_mediaUrl.toLocalFile();
-    const QString wanted = episodeKey(mediaFile);
-    const QString mediaBase = QFileInfo(mediaFile).completeBaseName();
     const QStringList files = QDir(dir).entryList(kSubtitleFilters, QDir::Files, QDir::Name);
-    QString best;
-    for (const QString &f : files) {
-        if (QFileInfo(f).completeBaseName().startsWith(mediaBase, Qt::CaseInsensitive)) {
-            best = f;
-            break;
-        }
-        if (best.isEmpty() && !wanted.isEmpty() && episodeKey(f) == wanted)
-            best = f;
-    }
+    const QString best = SubtitleMatcher::bestMatch(mediaFile, files);
     if (best.isEmpty())
         return;
     const QByteArray mrl = QUrl::fromLocalFile(QDir(dir).filePath(best)).toString(QUrl::FullyEncoded).toUtf8();

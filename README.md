@@ -36,6 +36,8 @@ in `vlcrc` are still handled by VLC itself.
 - [Screenshots](#screenshots)
 - [Install](#install)
 - [Linux Mint compatibility](docs/linux-mint.md)
+- [Figma parity matrix](docs/figma-parity.md)
+- [Contributing](CONTRIBUTING.md)
 - [Usage and shortcuts](#usage-and-shortcuts)
 - [How it works](#how-it-works)
 - [Updating VLC](#updating-vlc)
@@ -49,7 +51,7 @@ The interface is an implementation of the **VLC Redesign** by
 **Juxtopposed**:
 
 - **Video:** [I Redesigned VLC After 25 Years](https://www.youtube.com/watch?v=ERFeOgqk324)
-- **Figma file:** [VLC Redesign (Community)](https://www.figma.com/design/xFcea7IvQREQfVe43DpqfT/VLC-Redesign--Community-)
+- **Figma file:** [VLC Redesign (Community)](https://www.figma.com/design/5UEUReDQz2dQjwoQDHY5z9/VLC-Redesign--Community-)
 - **Designer:** [Juxtopposed on YouTube](https://www.youtube.com/@juxtopposed)
 
 <p align="center">
@@ -218,7 +220,7 @@ Qt setup and checks for default install, uninstall, and classic VLC restore.
 ### Build and install
 
 ```bash
-git clone https://github.com/karem505/vlc-neo.git
+git clone https://github.com/AlexandreOlives/vlc-neo.git
 cd vlc-neo
 scripts/install.sh            # adds `vlc-neo` and a "VLC (Neo)" launcher entry
 # or
@@ -286,7 +288,8 @@ VLC 3 core (system package, unchanged)
 | `src/module.cpp` | Module descriptor; routes the playlist's video to `neo_vout` |
 | `src/vout_display.cpp` | Receives decoded pictures from the VLC core |
 | `src/video_item.cpp` | Draws them in QML (fit or fill) |
-| `src/player.cpp` | Everything the UI needs from VLC 3: tracks, delays, devices, equalizer, presets, resume, bookmarks, folder subtitles, `vlcrc` access, hotkeys |
+| `src/player.cpp` | VLC 3 player bridge: playlist/input callbacks, playback controls, tracks, delays, devices, presets, resume, bookmarks, folder subtitles, `vlcrc` access and hotkeys |
+| `src/queue_model.cpp` | QML-facing playlist model, separated from the VLC bridge implementation |
 | `qml/` | The interface. Design tokens live in `qml/singletons/NeoTheme.qml` |
 
 Video is composited by Qt, so the interface runs as a native **Wayland** window
@@ -318,7 +321,9 @@ own media. It checks:
 - show presets carried across episodes
 - resume
 - hotkeys, bookmarks and speed
-- `vlcrc` writes
+- `vlcrc` writes and persistence across launches
+- dark/light and compact-window screenshots
+- theme and accent persistence across launches
 
 `NEO_TEST_STEPS` drives any launch with timed QML expressions and window grabs.
 It is ignored when the variable is unset:
@@ -327,8 +332,9 @@ It is ignored when the variable is unset:
 NEO_TEST_STEPS="1500:player.togglePause()|+800:grab:/tmp/shot.png|+200:quit" vlc-neo movie.mkv
 ```
 
-Contributions are welcome. The design tokens and every screen are plain QML
-files under `qml/`.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Figma parity matrix](docs/figma-parity.md) before changing the interface. The
+design tokens and every screen are plain QML files under `qml/`.
 
 ## Roadmap
 
