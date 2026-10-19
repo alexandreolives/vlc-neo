@@ -332,6 +332,9 @@ own media. It checks:
 - dark/light and compact-window screenshots
 - theme and accent persistence across launches
 
+CI uploads the dark, light and compact-window captures as workflow artifacts so
+they can be inspected after each run.
+
 `NEO_TEST_STEPS` drives any launch with timed QML expressions and window grabs.
 It is ignored when the variable is unset:
 
