@@ -322,14 +322,16 @@ The smoke test runs `vlc -I neo` on Qt's offscreen platform and generates its
 own media. It checks:
 - playback and frame delivery to QML
 - queue contents and next-item playback
-- pause/resume, volume and mute controls
+- pause/resume controls
 - folder subtitle matching
 - show presets carried across episodes
 - resume
 - hotkeys, bookmarks and speed
 - `vlcrc` writes and persistence across launches
-- subtitle filename matching and backend-injected player facade behavior (CTest)
 - dark/light and compact-window screenshots
+
+CTest covers subtitle filename matching and the backend-injected player facade,
+including volume clamping, mute/unmute state and audio restoration after mute.
 - theme and accent persistence across launches
 
 CI uploads the dark, light and compact-window captures as workflow artifacts so
