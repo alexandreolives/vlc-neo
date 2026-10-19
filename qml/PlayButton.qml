@@ -5,14 +5,15 @@ import Neo 1.0
 Rectangle {
     id: root
     signal clicked()
-    implicitWidth: 38
-    implicitHeight: 24
-    radius: 4
+    property bool compact: false
+    implicitWidth: compact ? 42 : 54
+    implicitHeight: compact ? 26 : 28
+    radius: 6
     color: mouse.pressed ? Qt.darker(Theme.accent, 1.15) : (mouse.containsMouse ? Qt.lighter(Theme.accent, 1.1) : Theme.accent)
     Icon {
         anchors.centerIn: parent
         name: player.playing ? "pause" : "play"
-        size: 13
+        size: root.compact ? 18 : 24
         color: "#141414"
     }
     MouseArea {

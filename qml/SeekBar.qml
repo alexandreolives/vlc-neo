@@ -3,12 +3,15 @@ import Neo 1.0
 
 // Thick seek bar (Figma): dark track, dimmed-accent progress, narrow accent handle,
 // bookmark/chapter ticks and a hover time bubble.
-Item {
+FocusScope {
     id: root
     property real position: player.position
     property bool dragging: mouse.pressed
     property real dragPosition: 0
-    implicitHeight: 22
+    implicitHeight: 28
+    activeFocusOnTab: true
+    Accessible.name: "Seek position"
+    Accessible.role: Accessible.Slider
 
     readonly property real shown: dragging ? dragPosition : position
 
@@ -16,15 +19,19 @@ Item {
         id: track
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width
-        height: 16
-        radius: 3
+        height: 28
+        radius: 6
         color: Theme.seekTrack
+        border.width: root.activeFocus ? 1 : 0
+        border.color: Theme.accent
 
         Rectangle {
-            width: Math.max(0, root.shown * parent.width)
-            height: parent.height
-            radius: 3
-            color: Theme.accentDim
+            x: 2
+            y: 2
+            width: Math.max(0, root.shown * (parent.width - 4))
+            height: parent.height - 4
+            radius: 4
+            color: Theme.seekProgress
         }
         Repeater {
             model: player.length > 0 ? bookmarksModel : []
@@ -47,12 +54,12 @@ Item {
         }
     }
     Rectangle {
-        width: 6
-        height: track.height + 4
-        radius: 2
+        width: 8
+        height: 24
+        radius: 4
         color: Theme.accent
-        anchors.verticalCenter: parent.verticalCenter
-        x: root.shown * (root.width - width)
+        y: 2
+        x: Math.max(2, Math.min(track.width - width - 2, 2 + root.shown * (track.width - 4) - width / 2))
         visible: player.hasMedia
     }
 
@@ -92,7 +99,20 @@ Item {
         function posAt(x) { return Math.max(0, Math.min(1, x / root.width)) }
         onPressed: (e) => root.dragPosition = posAt(e.x)
         onPositionChanged: (e) => { if (pressed) root.dragPosition = posAt(e.x) }
-        onReleased: (e) => player.seek(posAt(e.x))
+        onClicked: root.forceActiveFocus()
+        onReleased: (e) => { player.seek(posAt(e.x)); root.forceActiveFocus() }
         onWheel: (e) => player.seekBy(e.angleDelta.y > 0 ? 5000 : -5000)
+    }
+
+    Keys.onLeftPressed: (event) => { player.seekBy(-5000); event.accepted = true }
+    Keys.onRightPressed: (event) => { player.seekBy(5000); event.accepted = true }
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Home) {
+            player.seek(0)
+            event.accepted = true
+        } else if (event.key === Qt.Key_End) {
+            player.seek(1)
+            event.accepted = true
+        }
     }
 }

@@ -13,9 +13,9 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
-        spacing: 4
+        anchors.leftMargin: root.width < 720 ? 6 : 20
+        anchors.rightMargin: root.width < 720 ? 6 : 20
+        spacing: root.width < 720 ? 2 : 8
         Repeater {
             model: root.items
             delegate: ControlItem {
@@ -24,10 +24,9 @@ Rectangle {
                 preview: root.preview
                 Layout.fillWidth: flexible
                 Layout.preferredWidth: implicitWidth
-                Layout.minimumWidth: controlId === "seek" ? 80 : implicitWidth
+                Layout.minimumWidth: controlId === "seek" ? (compact ? 48 : 80) : implicitWidth
                 Layout.alignment: Qt.AlignVCenter
-                Layout.leftMargin: controlId === "seek" ? 4 : 0
-                Layout.rightMargin: controlId === "seek" ? 4 : 0
+                Layout.leftMargin: controlId === "time" || controlId === "volume" || controlId === "audio" ? 12 : 0
                 onAction: (id, source) => root.action(id, source)
             }
         }

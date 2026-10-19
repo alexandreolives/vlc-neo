@@ -5,8 +5,9 @@ import Neo 1.0
 // VLC's wedge volume, completed into a cone: green to orange gradient (Figma/video).
 Item {
     id: root
-    implicitWidth: 64
-    implicitHeight: 22
+    property bool compact: false
+    implicitWidth: compact ? 50 : 88
+    implicitHeight: compact ? 22 : 28
     readonly property real maxVolume: 1.25
     readonly property real level: player.muted ? 0 : Math.min(player.volume / maxVolume, 1)
 

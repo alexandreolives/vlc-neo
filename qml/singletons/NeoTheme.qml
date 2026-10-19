@@ -76,13 +76,14 @@ QtObject {
     readonly property color textFaint: dark ? "#6B6B6B" : "#888888"
     readonly property color icon: dark ? "#8F8F8F" : "#3C3C3C"
     readonly property color seekTrack: dark ? "#090909" : "#B3B3B3"
+    readonly property color seekProgress: dark ? "#371F06" : accentDim
     readonly property color videoBg: "#000000"
     readonly property color volumeLow: "#7BAF14"
     readonly property color volumeHigh: "#D37918"
 
     readonly property int radius: 6
     readonly property int radiusSmall: 4
-    readonly property int barHeight: 44
+    readonly property int barHeight: 54
     readonly property int topHeight: 34
     readonly property int fontSmall: 11
     readonly property int fontBody: 13

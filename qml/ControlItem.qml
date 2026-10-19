@@ -8,6 +8,7 @@ Item {
     required property string controlId
     property bool preview: false        // inside the Customize dialog: no actions
     signal action(string id, Item source)
+    readonly property bool compact: parent && parent.width < 720
 
     readonly property bool flexible: controlId === "seek" || controlId === "spacer"
     implicitWidth: loader.item ? loader.item.implicitWidth : 0
@@ -39,6 +40,9 @@ Item {
             icon: root.controlId === "fullscreen" && win.fullscreen ? "minimize-2"
                   : root.controlId === "loop" && player.repeatOne ? "repeat-1" : meta.icon
             tip: meta.label
+            iconSize: root.compact ? 20 : 24
+            implicitWidth: 30
+            implicitHeight: 30
             checked: (root.controlId === "queue" && win.rightPanel === "queue")
                      || (root.controlId === "settings" && win.rightPanel === "settings")
                      || (root.controlId === "loop" && (player.loop || player.repeatOne))
@@ -53,20 +57,20 @@ Item {
     Component {
         id: playComp
         Item {
-            implicitWidth: 40
-            PlayButton { anchors.centerIn: parent; onClicked: root.fire() }
+            implicitWidth: root.compact ? 42 : 54
+            PlayButton { anchors.centerIn: parent; compact: root.compact; onClicked: root.fire() }
         }
     }
     Component {
         id: timeComp
         Item {
-            implicitWidth: 64
+            implicitWidth: root.compact ? 56 : 76
             NText {
                 anchors.fill: parent
                 horizontalAlignment: Text.AlignHCenter
                 text: player.formatTime(player.time)
                 dim: true
-                font.pixelSize: 12
+                font.pixelSize: root.compact ? 12 : 15
                 font.features: { "tnum": 1 }
             }
         }
@@ -74,32 +78,35 @@ Item {
     Component {
         id: lengthComp
         Item {
-            implicitWidth: 64
+            implicitWidth: root.compact ? 56 : 76
             NText {
                 anchors.fill: parent
                 horizontalAlignment: Text.AlignHCenter
                 text: player.formatTime(player.length)
                 dim: true
-                font.pixelSize: 12
+                font.pixelSize: root.compact ? 12 : 15
                 font.features: { "tnum": 1 }
             }
         }
     }
     Component {
         id: seekComp
-        SeekBar { implicitWidth: 120; enabled: !root.preview }
+        SeekBar { implicitWidth: root.compact ? 60 : 120; enabled: !root.preview }
     }
     Component {
         id: volumeComp
         Row {
-            spacing: 4
+            spacing: root.compact ? 2 : 8
             IconButton {
                 icon: player.muted || player.volume === 0 ? "volume-x" : (player.volume < 0.5 ? "volume-1" : "volume-2")
                 tip: "Mute"
+                iconSize: root.compact ? 20 : 24
+                implicitWidth: 30
+                implicitHeight: 30
                 anchors.verticalCenter: parent.verticalCenter
                 onClicked: if (!root.preview) player.toggleMute()
             }
-            ConeVolume { anchors.verticalCenter: parent.verticalCenter; enabled: !root.preview }
+            ConeVolume { anchors.verticalCenter: parent.verticalCenter; compact: root.compact; enabled: !root.preview }
         }
     }
     Component {
