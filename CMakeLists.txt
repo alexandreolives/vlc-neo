@@ -22,6 +22,7 @@ add_library(neo_plugin MODULE
   src/vout_display.cpp
   src/video_item.cpp
   src/player.cpp
+  src/player_state_store.cpp
   src/vlc3_player_backend.cpp
   src/queue_model.cpp
   src/subtitle_matcher.cpp
@@ -30,6 +31,7 @@ add_library(neo_plugin MODULE
   src/neo.hpp
   src/platform.hpp
   src/player.hpp
+  src/player_state_store.hpp
   src/player_backend.hpp
   src/vlc3_player_backend.hpp
   src/media_queue_entry.hpp
@@ -66,9 +68,11 @@ if(BUILD_TESTING)
   add_executable(player_facade_test
     tests/player_facade_test.cpp
     src/player.cpp
+    src/player_state_store.cpp
     src/queue_model.cpp
     src/subtitle_matcher.cpp
     src/player.hpp
+    src/player_state_store.hpp
     src/player_backend.hpp
     src/queue_model.hpp
     src/subtitle_matcher.hpp
@@ -78,6 +82,19 @@ if(BUILD_TESTING)
   add_test(NAME player_facade COMMAND player_facade_test)
   set_tests_properties(player_facade PROPERTIES
     ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/player-facade-test-config")
+
+  add_executable(player_state_store_test
+    tests/player_state_store_test.cpp
+    src/player_state_store.cpp
+    src/subtitle_matcher.cpp
+    src/player_state_store.hpp
+    src/subtitle_matcher.hpp
+  )
+  target_include_directories(player_state_store_test PRIVATE src)
+  target_link_libraries(player_state_store_test PRIVATE Qt6::Core)
+  add_test(NAME player_state_store COMMAND player_state_store_test)
+  set_tests_properties(player_state_store PROPERTIES
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/player-state-store-test-config")
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")

@@ -40,7 +40,7 @@ scripts/screenshots.sh /path/to/media
 
 The smoke test uses the installed VLC 3 core with Qt's offscreen platform and generates test media itself. It covers playback, queue state, subtitle behavior, hotkeys, VLC configuration, dark/light appearance, two window sizes, screenshot creation and theme persistence across launches. To use a per-user Qt installation, set `NEO_QT_ROOT="$HOME/Qt/6.8.3/gcc_64"` for the test command. Screenshot generation expects the Sintel media folder described in the script and writes images under `docs/screenshots/`. When UI output changes, inspect the generated images and include updated screenshots when they clarify the change.
 
-CTest covers subtitle filename matching and the QML-facing player facade through an injected fake backend. The facade test runs without VLC, so it can verify UI-facing state and command bounds without starting the VLC core.
+CTest covers subtitle filename matching, persistent player state, and the QML-facing player facade through an injected fake backend. `PlayerStateStore` owns recents, resume points, bookmarks, folder presets, equalizer preference and linked subtitle folders; its test runs without VLC. The facade test also runs without VLC, so it can verify UI-facing state and command bounds without starting the VLC core.
 
 For packaging or installer changes, also review the installer help and document any new supported package manager, environment variable or install behavior in the README. Do not run package installation or uninstall commands against a system you do not control.
 

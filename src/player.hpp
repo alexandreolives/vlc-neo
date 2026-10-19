@@ -2,7 +2,6 @@
 #pragma once
 
 #include <QObject>
-#include <QSettings>
 #include <QTimer>
 #include <QUrl>
 #include <QVariant>
@@ -12,6 +11,7 @@
 
 #include "queue_model.hpp"
 #include "player_backend.hpp"
+#include "player_state_store.hpp"
 
 class Player : public QObject
 {
@@ -191,13 +191,11 @@ private:
     void applyPendingPreset();
     void applyLinkedSubtitles();
     void saveResumePoint();
-    QString mediaKey(const QString &group) const;
     void rememberRecent(const QString &mrl);
-    QString presetKey() const;
 
     std::unique_ptr<PlayerBackend> m_backend;
     QueueModel m_queue;
-    QSettings m_settings;
+    PlayerStateStore m_stateStore;
     QTimer m_queueTimer;
     QTimer m_sleepTimer;
 

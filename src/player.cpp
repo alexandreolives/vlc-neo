@@ -1,23 +1,16 @@
 #include "player.hpp"
 #include "subtitle_matcher.hpp"
 
-#include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
+#include <QSet>
 
 #include <utility>
-
-namespace {
-
-constexpr int kRecentMax = 15;
-
-} // namespace
 
 // -------------------------------------------------------------------- Player
 
 Player::Player(std::unique_ptr<PlayerBackend> backend, QObject *parent)
-    : QObject(parent), m_backend(std::move(backend)),
-      m_settings(QStringLiteral("vlc-neo"), QStringLiteral("neo"))
+    : QObject(parent), m_backend(std::move(backend))
 {
     Q_ASSERT(m_backend);
     m_queueTimer.setSingleShot(true);
@@ -302,20 +295,15 @@ void Player::clearQueue() { m_backend->clearQueue(); }
 
 void Player::rememberRecent(const QString &mrl)
 {
-    QStringList list = m_settings.value(QStringLiteral("recent")).toStringList();
-    list.removeAll(mrl);
-    list.prepend(mrl);
-    while (list.size() > kRecentMax)
-        list.removeLast();
-    m_settings.setValue(QStringLiteral("recent"), list);
+    m_stateStore.rememberRecentMedia(mrl);
 }
 
 QStringList Player::recentMedia() const
 {
-    return m_settings.value(QStringLiteral("recent")).toStringList();
+    return m_stateStore.recentMedia();
 }
 
-void Player::clearRecentMedia() { m_settings.remove(QStringLiteral("recent")); }
+void Player::clearRecentMedia() { m_stateStore.clearRecentMedia(); }
 
 // ------------------------------------------------------------------- tracks
 
@@ -392,13 +380,13 @@ void Player::setDeinterlace(bool on) { m_backend->setDeinterlace(on); }
 
 void Player::setEqualizerPreset(const QString &preset)
 {
-    m_settings.setValue(QStringLiteral("equalizer"), preset);
+    m_stateStore.setEqualizerPreset(preset);
     m_backend->setEqualizerEnabled(preset, !preset.isEmpty() && preset != QLatin1String("off"));
 }
 
 QString Player::equalizerPreset() const
 {
-    return m_settings.value(QStringLiteral("equalizer"), QStringLiteral("off")).toString();
+    return m_stateStore.equalizerPreset();
 }
 
 void Player::setLoop(bool on) { m_backend->setLoop(on); }
@@ -435,14 +423,6 @@ void Player::setFullscreenState(bool fs)
 
 // ------------------------------------------------------------------ presets
 
-QString Player::presetKey() const
-{
-    if (m_folderPath.isEmpty())
-        return {};
-    const QByteArray hash = QCryptographicHash::hash(m_folderPath.toUtf8(), QCryptographicHash::Md5).toHex();
-    return QStringLiteral("presets/") + QString::fromLatin1(hash);
-}
-
 static QString selectedTrackName(const QVariantList &tracks)
 {
     for (const QVariant &t : tracks) {
@@ -455,20 +435,15 @@ static QString selectedTrackName(const QVariantList &tracks)
 
 void Player::savePresetForFolder()
 {
-    const QString key = presetKey();
-    if (key.isEmpty()) {
+    if (m_folderPath.isEmpty()) {
         emit notify(tr("Presets work with local folders only"));
         return;
     }
     refreshDelays(); // read live values, events may still be queued
-    m_settings.beginGroup(key);
-    m_settings.setValue(QStringLiteral("folder"), m_folderPath);
-    m_settings.setValue(QStringLiteral("spuDelay"), m_subtitleDelayMs);
-    m_settings.setValue(QStringLiteral("audioDelay"), m_audioDelayMs);
-    m_settings.setValue(QStringLiteral("subScale"), subtitleScale());
-    m_settings.setValue(QStringLiteral("spuTrack"), selectedTrackName(tracks(QStringLiteral("spu"))));
-    m_settings.setValue(QStringLiteral("audioTrack"), selectedTrackName(tracks(QStringLiteral("audio"))));
-    m_settings.endGroup();
+    m_stateStore.saveFolderPreset(m_folderPath, FolderPlaybackPreset{
+        m_subtitleDelayMs, m_audioDelayMs, subtitleScale(),
+        selectedTrackName(tracks(QStringLiteral("spu"))),
+        selectedTrackName(tracks(QStringLiteral("audio")))});
     m_presetActive = true;
     emit presetChanged();
     emit notify(tr("Preset saved for \"%1\"").arg(m_folderName));
@@ -476,10 +451,9 @@ void Player::savePresetForFolder()
 
 void Player::forgetPresetForFolder()
 {
-    const QString key = presetKey();
-    if (key.isEmpty())
+    if (m_folderPath.isEmpty())
         return;
-    m_settings.remove(key);
+    m_stateStore.forgetFolderPreset(m_folderPath);
     m_presetActive = false;
     emit presetChanged();
     emit notify(tr("Preset removed"));
@@ -492,21 +466,13 @@ void Player::applyPendingPreset()
         return;
     m_presetPending = false;
 
-    const QString key = presetKey();
-    if (key.isEmpty() || !m_settings.contains(key + QStringLiteral("/folder")))
+    if (m_folderPath.isEmpty() || !m_stateStore.hasFolderPreset(m_folderPath))
         return;
+    const FolderPlaybackPreset preset = m_stateStore.folderPreset(m_folderPath);
 
-    m_settings.beginGroup(key);
-    const int spuDelay = m_settings.value(QStringLiteral("spuDelay"), 0).toInt();
-    const int audioDelay = m_settings.value(QStringLiteral("audioDelay"), 0).toInt();
-    const int subScale = m_settings.value(QStringLiteral("subScale"), 100).toInt();
-    const QString spuTrack = m_settings.value(QStringLiteral("spuTrack")).toString();
-    const QString audioTrack = m_settings.value(QStringLiteral("audioTrack")).toString();
-    m_settings.endGroup();
-
-    setSubtitleDelay(spuDelay);
-    setAudioDelay(audioDelay);
-    setSubtitleScale(subScale);
+    setSubtitleDelay(preset.subtitleDelayMs);
+    setAudioDelay(preset.audioDelayMs);
+    setSubtitleScale(preset.subtitleScale);
     auto pick = [this](const QString &category, const QString &name) {
         if (name.isEmpty())
             return;
@@ -518,8 +484,8 @@ void Player::applyPendingPreset()
             }
         }
     };
-    pick(QStringLiteral("spu"), spuTrack);
-    pick(QStringLiteral("audio"), audioTrack);
+    pick(QStringLiteral("spu"), preset.subtitleTrack);
+    pick(QStringLiteral("audio"), preset.audioTrack);
     m_presetActive = true;
     emit presetChanged();
     emit notify(tr("Preset applied: %1").arg(m_folderName));
@@ -527,34 +493,17 @@ void Player::applyPendingPreset()
 
 // ------------------------------------------------- resume / bookmarks / chapters
 
-QString Player::mediaKey(const QString &group) const
-{
-    if (m_mediaUrl.isEmpty())
-        return {};
-    const QByteArray hash = QCryptographicHash::hash(m_mediaUrl.toString().toUtf8(), QCryptographicHash::Md5).toHex();
-    return group + QLatin1Char('/') + QString::fromLatin1(hash);
-}
-
 void Player::saveResumePoint()
 {
-    const QString key = mediaKey(QStringLiteral("resume"));
-    if (key.isEmpty() || m_lengthMs <= 0)
+    if (m_mediaUrl.isEmpty() || m_lengthMs <= 0)
         return;
     m_lastSavedResume = m_timeMs;
-    // Nothing to resume at the very start, or at the end (credits = finished).
-    constexpr qint64 kMinMs = 10000;
-    constexpr qint64 kMaxTailMs = 20000;
-    const qint64 tail = qMin(kMaxTailMs, m_lengthMs / 10);
-    if (m_timeMs < kMinMs || m_timeMs > m_lengthMs - tail)
-        m_settings.remove(key);
-    else
-        m_settings.setValue(key, m_timeMs);
+    m_stateStore.saveResumePoint(m_mediaUrl, m_timeMs, m_lengthMs);
 }
 
 qint64 Player::resumePoint() const
 {
-    const QString key = mediaKey(QStringLiteral("resume"));
-    return key.isEmpty() ? 0 : m_settings.value(key, 0).toLongLong();
+    return m_stateStore.resumePoint(m_mediaUrl);
 }
 
 void Player::resume()
@@ -572,40 +521,25 @@ void Player::jumpTo(qint64 ms)
 QVariantList Player::bookmarks() const
 {
     QVariantList out;
-    const QString key = mediaKey(QStringLiteral("bookmarks"));
-    if (key.isEmpty())
-        return out;
-    QList<qint64> marks;
-    for (const QVariant &v : m_settings.value(key).toList())
-        marks.append(v.toLongLong());
-    std::sort(marks.begin(), marks.end());
-    for (qint64 ms : marks)
+    for (qint64 ms : m_stateStore.bookmarks(m_mediaUrl))
         out.append(QVariantMap{{QStringLiteral("time"), ms}, {QStringLiteral("label"), formatTime(ms)}});
     return out;
 }
 
 void Player::addBookmark()
 {
-    const QString key = mediaKey(QStringLiteral("bookmarks"));
-    if (key.isEmpty() || !m_backend->hasInput())
+    if (m_mediaUrl.isEmpty() || !m_backend->hasInput())
         return;
-    QVariantList list = m_settings.value(key).toList();
-    list.append(m_timeMs);
-    m_settings.setValue(key, list);
+    m_stateStore.addBookmark(m_mediaUrl, m_timeMs);
     emit bookmarksChanged();
     emit notify(tr("Bookmark added at %1").arg(formatTime(m_timeMs)));
 }
 
 void Player::removeBookmark(qint64 ms)
 {
-    const QString key = mediaKey(QStringLiteral("bookmarks"));
-    if (key.isEmpty())
+    if (m_mediaUrl.isEmpty())
         return;
-    QVariantList list = m_settings.value(key).toList();
-    for (int i = list.size() - 1; i >= 0; --i)
-        if (list.at(i).toLongLong() == ms)
-            list.removeAt(i);
-    m_settings.setValue(key, list);
+    m_stateStore.removeBookmark(m_mediaUrl, ms);
     emit bookmarksChanged();
 }
 
@@ -643,7 +577,7 @@ int Player::linkSubtitleFolder(const QUrl &folder)
         return 0;
     }
     const QString dir = folder.toLocalFile();
-    m_settings.setValue(SubtitleMatcher::folderSettingsKey(m_folderPath), dir);
+    m_stateStore.linkSubtitleFolder(m_folderPath, dir);
     m_subsLinkedApplied = false;
     applyLinkedSubtitles();
 
@@ -665,13 +599,13 @@ int Player::linkSubtitleFolder(const QUrl &folder)
 void Player::unlinkSubtitleFolder()
 {
     if (!m_folderPath.isEmpty())
-        m_settings.remove(SubtitleMatcher::folderSettingsKey(m_folderPath));
+        m_stateStore.unlinkSubtitleFolder(m_folderPath);
     emit notify(tr("Subtitle folder unlinked"));
 }
 
 QString Player::linkedSubtitleFolder() const
 {
-    return m_folderPath.isEmpty() ? QString() : m_settings.value(SubtitleMatcher::folderSettingsKey(m_folderPath)).toString();
+    return m_stateStore.linkedSubtitleFolder(m_folderPath);
 }
 
 void Player::applyLinkedSubtitles()
