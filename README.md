@@ -327,7 +327,7 @@ own media. It checks:
 - resume
 - hotkeys, bookmarks and speed
 - `vlcrc` writes and persistence across launches
-- subtitle filename matching rules (CTest)
+- subtitle filename matching and backend-injected player facade behavior (CTest)
 - dark/light and compact-window screenshots
 - theme and accent persistence across launches
 
