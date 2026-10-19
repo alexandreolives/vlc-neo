@@ -254,6 +254,9 @@ ApplicationWindow {
                         cursorShape: videoArea.cursorHidden ? Qt.BlankCursor : Qt.ArrowCursor
                         enabled: player.hasMedia
                         onClicked: (e) => {
+                            // The video MouseArea consumes clicks before Popup's
+                            // outside-press handler can dismiss the track picker.
+                            if (tracksPopup.visible) tracksPopup.close()
                             win.focusKeys()
                             if (e.button === Qt.RightButton) { contextMenu.popup(); return }
                             if (Theme.store.clickToPause) clickTimer.restart()
