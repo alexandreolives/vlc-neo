@@ -3,7 +3,7 @@
 # Generates its own media, runs VLC with -I neo offscreen, asserts on the results.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="${TMPDIR:-/tmp}/neo-smoke"
+WORK="${NEO_SMOKE_DIR:-${TMPDIR:-/tmp}/neo-smoke}"
 rm -rf "$WORK" && mkdir -p "$WORK/show" "$WORK/subs"
 export NEO_SANDBOX="$WORK/sandbox"
 pass=0; fail=0
