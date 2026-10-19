@@ -78,8 +78,9 @@ out=$(run "1000:'mode=' + Theme.store.mode + ' accent=' + Theme.store.accent|120
 check "theme and accent persist across VLC launches" "$out" "mode=light accent=#2F5FC4"
 
 echo "== preferences global screen"
-out=$(run "1000:settingsDialog.open()|+150:'settings=' + settingsDialog.visible + ' page=' + settingsDialog.page|+250:grab:$WORK/settings-global.png|+100:settingsDialog.close()|+100:quit" "$E1")
+out=$(run "1000:Theme.store.mode='dark'; Theme.store.accent='#D37918'; settingsDialog.open()|+150:'settings=' + settingsDialog.visible + ' page=' + settingsDialog.page|+150:settingsDialog.categorySearch='audio'|+100:'search=' + settingsDialog.pagesInGroup(settingsDialog.categoryGroups[1].ids).length|+100:settingsDialog.categorySearch=''|+100:grab:$WORK/settings-global.png|+100:settingsDialog.close(); Theme.store.mode='light'; Theme.store.accent='#2F5FC4'|+100:quit" "$E1")
 check "global settings opens on the General page" "$out" "settings=true page=general"
+check "settings search filters the category list" "$out" "search=1"
 if [ -s "$WORK/settings-global.png" ]; then echo "PASS  global settings screenshot written"; pass=$((pass + 1))
 else echo "FAIL  global settings screenshot missing"; fail=$((fail + 1)); fi
 
