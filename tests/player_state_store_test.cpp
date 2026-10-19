@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     QCoreApplication::setOrganizationName(QStringLiteral("vlc-neo"));
     QCoreApplication::setApplicationName(QStringLiteral("neo"));
     QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings settings;
+    QSettings settings(QStringLiteral("vlc-neo"), QStringLiteral("neo"));
     settings.clear();
     settings.sync();
 
