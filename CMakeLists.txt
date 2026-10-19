@@ -22,6 +22,7 @@ add_library(neo_plugin MODULE
   src/vout_display.cpp
   src/video_item.cpp
   src/player.cpp
+  src/vlc3_player_backend.cpp
   src/queue_model.cpp
   src/subtitle_matcher.cpp
   src/ui.cpp
@@ -29,6 +30,9 @@ add_library(neo_plugin MODULE
   src/neo.hpp
   src/platform.hpp
   src/player.hpp
+  src/player_backend.hpp
+  src/vlc3_player_backend.hpp
+  src/media_queue_entry.hpp
   src/queue_model.hpp
   src/subtitle_matcher.hpp
   src/video_item.hpp

@@ -1,12 +1,10 @@
 #include "player.hpp"
 #include "subtitle_matcher.hpp"
+#include "vlc3_player_backend.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
-#include <QPointer>
-
-#include <vlc_configuration.h>
 
 namespace {
 
@@ -43,7 +41,8 @@ const char *const kPlaylistChangeVars[] = {"playlist-item-append", "playlist-ite
 // -------------------------------------------------------------------- Player
 
 Player::Player(intf_thread_t *intf, QObject *parent)
-    : QObject(parent), m_intf(intf), m_pl(pl_Get(intf)),
+    : QObject(parent), m_pl(pl_Get(intf)),
+      m_backend(makeVlc3PlayerBackend(intf, m_pl)),
       m_settings(QStringLiteral("vlc-neo"), QStringLiteral("neo"))
 {
     m_queueTimer.setSingleShot(true);
@@ -55,7 +54,7 @@ Player::Player(intf_thread_t *intf, QObject *parent)
         if (--m_sleepRemaining <= 0) {
             m_sleepTimer.stop();
             m_sleepRemaining = 0;
-            playlist_Pause(m_pl);
+            m_backend->pause();
             emit notify(tr("Sleep timer finished"));
         }
         emit sleepChanged();
@@ -336,34 +335,10 @@ void Player::refreshModes()
     emit playbackModeChanged();
 }
 
-static void collectLeaves(playlist_item_t *node, QList<QueueModel::Entry> &out)
-{
-    for (int i = 0; i < node->i_children; ++i) {
-        playlist_item_t *child = node->pp_children[i];
-        if (child->i_children >= 0) {
-            collectLeaves(child, out);
-            continue;
-        }
-        input_item_t *in = child->p_input;
-        QueueModel::Entry e;
-        e.id = child->i_id;
-        e.title = takeString(input_item_GetTitleFbName(in));
-        const vlc_tick_t d = input_item_GetDuration(in);
-        e.durationMs = d > 0 ? d / kUsPerMs : 0;
-        e.uri = takeString(input_item_GetURI(in));
-        out.append(e);
-    }
-}
-
 void Player::rebuildQueue()
 {
-    QList<QueueModel::Entry> entries;
-    playlist_Lock(m_pl);
-    collectLeaves(m_pl->p_playing, entries);
-    playlist_item_t *current = playlist_CurrentPlayingItem(m_pl);
-    const int currentId = current ? current->i_id : -1;
-    playlist_Unlock(m_pl);
-    m_queue.reset(std::move(entries), currentId);
+    const QueueSnapshot snapshot = m_backend->queueSnapshot();
+    m_queue.reset(snapshot.entries, snapshot.currentId);
 }
 
 // ---------------------------------------------------------------- transport
@@ -371,16 +346,16 @@ void Player::rebuildQueue()
 void Player::togglePause()
 {
     if (!m_input) {
-        playlist_Play(m_pl);
+        m_backend->play();
         return;
     }
-    playlist_TogglePause(m_pl);
+    m_backend->togglePause();
 }
 
-void Player::play() { playlist_Play(m_pl); }
-void Player::stop() { playlist_Stop(m_pl); }
-void Player::next() { playlist_Next(m_pl); }
-void Player::previous() { playlist_Prev(m_pl); }
+void Player::play() { m_backend->play(); }
+void Player::stop() { m_backend->stop(); }
+void Player::next() { m_backend->next(); }
+void Player::previous() { m_backend->previous(); }
 
 void Player::seek(double position)
 {
@@ -396,17 +371,17 @@ void Player::seekBy(int ms)
 
 void Player::setRate(double rate)
 {
-    var_SetFloat(m_pl, "rate", float(qBound(0.25, rate, 4.0)));
+    m_backend->setRate(qBound(0.25, rate, 4.0));
 }
 
 void Player::setVolume(double volume)
 {
-    playlist_VolumeSet(m_pl, float(qBound(0.0, volume, 1.25)));
+    m_backend->setVolume(qBound(0.0, volume, 1.25));
     if (m_muted && volume > 0.0)
-        playlist_MuteSet(m_pl, false);
+        m_backend->setMuted(false);
 }
 
-void Player::toggleMute() { playlist_MuteToggle(m_pl); }
+void Player::toggleMute() { m_backend->toggleMute(); }
 
 void Player::frameStep()
 {
@@ -418,12 +393,7 @@ void Player::frameStep()
 
 void Player::openUrls(const QList<QUrl> &urls, bool playNow)
 {
-    bool first = true;
-    for (const QUrl &url : urls) {
-        const QByteArray mrl = url.toString(QUrl::FullyEncoded).toUtf8();
-        playlist_Add(m_pl, mrl.constData(), playNow && first);
-        first = false;
-    }
+    m_backend->openUrls(urls, playNow);
 }
 
 void Player::openLocation(const QString &mrl, bool playNow)
@@ -437,23 +407,15 @@ void Player::openLocation(const QString &mrl, bool playNow)
 
 void Player::playItem(int id)
 {
-    playlist_Lock(m_pl);
-    playlist_item_t *item = playlist_ItemGetById(m_pl, id);
-    if (item)
-        playlist_ViewPlay(m_pl, nullptr, item);
-    playlist_Unlock(m_pl);
+    m_backend->playItem(id);
 }
 
 void Player::removeItem(int id)
 {
-    playlist_Lock(m_pl);
-    playlist_item_t *item = playlist_ItemGetById(m_pl, id);
-    if (item)
-        playlist_NodeDelete(m_pl, item);
-    playlist_Unlock(m_pl);
+    m_backend->removeItem(id);
 }
 
-void Player::clearQueue() { playlist_Clear(m_pl, pl_Unlocked); }
+void Player::clearQueue() { m_backend->clearQueue(); }
 
 void Player::rememberRecent(const QString &mrl)
 {
@@ -663,9 +625,9 @@ QString Player::equalizerPreset() const
     return m_settings.value(QStringLiteral("equalizer"), QStringLiteral("off")).toString();
 }
 
-void Player::setLoop(bool on) { var_SetBool(m_pl, "loop", on); }
-void Player::setRepeatOne(bool on) { var_SetBool(m_pl, "repeat", on); }
-void Player::setRandom(bool on) { var_SetBool(m_pl, "random", on); }
+void Player::setLoop(bool on) { m_backend->setLoop(on); }
+void Player::setRepeatOne(bool on) { m_backend->setRepeatOne(on); }
+void Player::setRandom(bool on) { m_backend->setRandom(on); }
 
 void Player::setSleepTimer(int minutes)
 {
@@ -694,15 +656,9 @@ void Player::toggleRecord()
         var_ToggleBool(m_input, "record");
 }
 
-void Player::sendHotkey(int vlcKey)
-{
-    var_SetInteger(m_intf->obj.libvlc, "key-pressed", vlcKey);
-}
-
 void Player::setFullscreenState(bool fs)
 {
-    if (var_GetBool(m_pl, "fullscreen") != fs)
-        var_SetBool(m_pl, "fullscreen", fs);
+    m_backend->setFullscreen(fs);
 }
 
 // ------------------------------------------------------------------ presets
@@ -934,7 +890,7 @@ int Player::linkSubtitleFolder(const QUrl &folder)
     for (const QString &f : QDir(dir).entryList(kSubtitleFilters, QDir::Files))
         subKeys.insert(SubtitleMatcher::episodeKey(f));
     int matched = 0;
-    for (const QueueModel::Entry &e : m_queue.entries()) {
+    for (const MediaQueueEntry &e : m_queue.entries()) {
         const QUrl u(e.uri);
         if (u.isLocalFile() && QFileInfo(u.toLocalFile()).absolutePath() == m_folderPath
             && subKeys.contains(SubtitleMatcher::episodeKey(u.toLocalFile())))
@@ -979,70 +935,19 @@ void Player::applyLinkedSubtitles()
 
 QVariant Player::config(const QString &name) const
 {
-    const QByteArray key = name.toUtf8();
-    vlc_object_t *obj = VLC_OBJECT(m_intf);
-    switch (config_GetType(key.constData())) {
-    case VLC_VAR_BOOL: return bool(config_GetInt(obj, key.constData()));
-    case VLC_VAR_INTEGER: return qint64(config_GetInt(obj, key.constData()));
-    case VLC_VAR_FLOAT: return double(config_GetFloat(obj, key.constData()));
-    case VLC_VAR_STRING: return takeString(config_GetPsz(obj, key.constData()));
-    default: return {};
-    }
+    return m_backend->config(name);
 }
 
 void Player::setConfig(const QString &name, const QVariant &value)
 {
-    const QByteArray key = name.toUtf8();
-    vlc_object_t *obj = VLC_OBJECT(m_intf);
-    switch (config_GetType(key.constData())) {
-    case VLC_VAR_BOOL:
-    case VLC_VAR_INTEGER: config_PutInt(obj, key.constData(), value.toLongLong()); break;
-    case VLC_VAR_FLOAT: config_PutFloat(obj, key.constData(), value.toFloat()); break;
-    case VLC_VAR_STRING: config_PutPsz(obj, key.constData(), value.toString().toUtf8().constData()); break;
-    default: return;
-    }
-    config_SaveConfigFile(m_intf);
+    m_backend->setConfig(name, value);
 }
 
 // ------------------------------------------------------------- hotkeys
 
 bool Player::forwardKey(int qtKey, int qtModifiers, const QString &text)
 {
-    static const QHash<int, uint32_t> special = {
-        {Qt::Key_Left, KEY_LEFT}, {Qt::Key_Right, KEY_RIGHT}, {Qt::Key_Up, KEY_UP}, {Qt::Key_Down, KEY_DOWN},
-        {Qt::Key_Space, ' '}, {Qt::Key_Escape, KEY_ESC}, {Qt::Key_Return, KEY_ENTER}, {Qt::Key_Enter, KEY_ENTER},
-        {Qt::Key_Tab, KEY_TAB}, {Qt::Key_Backspace, KEY_BACKSPACE}, {Qt::Key_Home, KEY_HOME}, {Qt::Key_End, KEY_END},
-        {Qt::Key_PageUp, KEY_PAGEUP}, {Qt::Key_PageDown, KEY_PAGEDOWN}, {Qt::Key_Insert, KEY_INSERT},
-        {Qt::Key_Delete, KEY_DELETE}, {Qt::Key_Menu, KEY_MENU}, {Qt::Key_Pause, KEY_PAUSE},
-        {Qt::Key_F1, KEY_F1}, {Qt::Key_F2, KEY_F2}, {Qt::Key_F3, KEY_F3}, {Qt::Key_F4, KEY_F4},
-        {Qt::Key_F5, KEY_F5}, {Qt::Key_F6, KEY_F6}, {Qt::Key_F7, KEY_F7}, {Qt::Key_F8, KEY_F8},
-        {Qt::Key_F9, KEY_F9}, {Qt::Key_F10, KEY_F10}, {Qt::Key_F11, KEY_F11}, {Qt::Key_F12, KEY_F12},
-        {Qt::Key_VolumeUp, KEY_VOLUME_UP}, {Qt::Key_VolumeDown, KEY_VOLUME_DOWN},
-        {Qt::Key_VolumeMute, KEY_VOLUME_MUTE}, {Qt::Key_MediaPlay, KEY_MEDIA_PLAY_PAUSE},
-        {Qt::Key_MediaTogglePlayPause, KEY_MEDIA_PLAY_PAUSE}, {Qt::Key_MediaNext, KEY_MEDIA_NEXT_TRACK},
-        {Qt::Key_MediaPrevious, KEY_MEDIA_PREV_TRACK}, {Qt::Key_MediaStop, KEY_MEDIA_STOP}};
-
-    uint32_t code = special.value(qtKey, 0);
-    if (!code) {
-        if (qtKey >= Qt::Key_A && qtKey <= Qt::Key_Z)
-            code = uint32_t('a' + (qtKey - Qt::Key_A));
-        else if (!text.isEmpty() && text.at(0).isPrint())
-            code = text.toLower().toUcs4().value(0);
-        else if (qtKey > 0 && qtKey < 0x80)
-            code = uint32_t(qtKey);
-    }
-    if (!code)
-        return false;
-    if (qtModifiers & Qt::ShiftModifier && qtKey >= Qt::Key_A && qtKey <= Qt::Key_Z)
-        code |= KEY_MODIFIER_SHIFT;
-    if (qtModifiers & Qt::ControlModifier)
-        code |= KEY_MODIFIER_CTRL;
-    if (qtModifiers & Qt::AltModifier)
-        code |= KEY_MODIFIER_ALT;
-    if (qtModifiers & Qt::MetaModifier)
-        code |= KEY_MODIFIER_META;
-    var_SetInteger(m_intf->obj.libvlc, "key-pressed", code);
-    return true;
+    return m_backend->forwardKey(qtKey, qtModifiers, text);
 }
 
 bool Player::saveQueueAs(const QUrl &file)
@@ -1050,7 +955,7 @@ bool Player::saveQueueAs(const QUrl &file)
     QString path = file.toLocalFile();
     if (!path.endsWith(QLatin1String(".m3u8"), Qt::CaseInsensitive) && !path.endsWith(QLatin1String(".m3u")))
         path += QStringLiteral(".m3u8");
-    const bool ok = playlist_Export(m_pl, path.toUtf8().constData(), true, "export-m3u8") == VLC_SUCCESS;
+    const bool ok = m_backend->exportQueue(path);
     emit notify(ok ? tr("Playlist saved") : tr("Could not save playlist"));
     return ok;
 }

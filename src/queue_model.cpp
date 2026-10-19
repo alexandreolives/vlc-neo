@@ -4,7 +4,7 @@ QVariant QueueModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || index.row() >= m_entries.size())
         return {};
-    const Entry &entry = m_entries.at(index.row());
+    const MediaQueueEntry &entry = m_entries.at(index.row());
     switch (role) {
     case IdRole: return entry.id;
     case TitleRole: return entry.title;
@@ -21,7 +21,7 @@ QHash<int, QByteArray> QueueModel::roleNames() const
             {CurrentRole, "current"}, {UriRole, "uri"}};
 }
 
-void QueueModel::reset(QList<Entry> entries, int currentId)
+void QueueModel::reset(QList<MediaQueueEntry> entries, int currentId)
 {
     beginResetModel();
     m_entries = std::move(entries);

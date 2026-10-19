@@ -1,5 +1,4 @@
-// Bridge between the VLC 3 core (playlist/input/aout/vout) and QML.
-// All public methods run on the Qt GUI thread; VLC callbacks only post work.
+// QML-facing player facade. VLC callbacks only post updates to the GUI thread.
 #pragma once
 
 #include <QObject>
@@ -9,9 +8,11 @@
 #include <QVariant>
 
 #include <atomic>
+#include <memory>
 
 #include "vlc_headers.hpp"
 #include "queue_model.hpp"
+#include "player_backend.hpp"
 
 class Player : public QObject
 {
@@ -124,7 +125,6 @@ public:
     // Tools
     Q_INVOKABLE void snapshot();
     Q_INVOKABLE void toggleRecord();
-    Q_INVOKABLE void sendHotkey(int vlcKey);
     Q_INVOKABLE void setFullscreenState(bool fs);
 
     // Per-folder presets ("show presets")
@@ -201,9 +201,9 @@ private:
     vout_thread_t *currentVout() const; // caller releases
     QString presetKey() const;
 
-    intf_thread_t *m_intf;
     playlist_t *m_pl;
     input_thread_t *m_input = nullptr;
+    std::unique_ptr<PlayerBackend> m_backend;
     QueueModel m_queue;
     QSettings m_settings;
     QTimer m_queueTimer;
