@@ -85,6 +85,18 @@ check "settings search resets when reopened" "$out" "searchReset=true"
 check "diagnostic fields map to VLC config options" "$out" "logTypes=boolean/string/number/number"
 if [ -s "$WORK/settings-global.png" ]; then echo "PASS  global settings screenshot written"; pass=$((pass + 1))
 else echo "FAIL  global settings screenshot missing"; fail=$((fail + 1)); fi
+out=$(run "1000:settingsDialog.open(); settingsDialog.page='audio'|+150:'simpleHidesAdvanced=' + !settingsDialog.optionVisible('volume-step')|+150:click-item:preferences-detail-level|+150:'buttonEnablesAdvanced=' + (Theme.store.advancedOptions && settingsDialog.optionVisible('volume-step'))|+150:click-item:preferences-detail-level|+150:'buttonReturnsToSimple=' + (!Theme.store.advancedOptions && !settingsDialog.optionVisible('volume-step'))|+150:Theme.store.advancedOptions=true|+150:'advancedShowsOption=' + settingsDialog.optionVisible('volume-step')|+150:'advancedValueRead=' + (player.config('volume-step') !== undefined)|+150:'fractionalInput=' + settingsDialog.optionNumberValue('volume-step', '0.75')|+150:'integerInput=' + settingsDialog.optionNumberValue('network-caching', '1500')|+150:'floatRoundTrip=' + (() => { const previous = player.config('volume-step'); player.setConfig('volume-step', 1.75); const ok = Math.abs(player.config('volume-step') - 1.75) < 0.001; player.setConfig('volume-step', previous); return ok })()|+150:Theme.store.advancedOptions=false|+150:'simpleKeepsValue=' + (player.config('volume-step') !== undefined && !settingsDialog.optionVisible('volume-step'))|+150:Theme.store.advancedOptions=true|+100:settingsDialog.close()|+100:quit" "$E1")
+check "simple preferences hide advanced VLC options" "$out" "simpleHidesAdvanced=true"
+check "the detail-level button enables advanced mode" "$out" "buttonEnablesAdvanced=true"
+check "the detail-level button switches back to simple mode" "$out" "buttonReturnsToSimple=true"
+check "advanced preferences reveal the mapped VLC option" "$out" "advancedShowsOption=true"
+check "advanced option values remain readable" "$out" "advancedValueRead=true"
+check "switching back to simple preserves the option value" "$out" "simpleKeepsValue=true"
+check "float VLC settings round-trip without losing fractional precision" "$out" "floatRoundTrip=true"
+check "decimal VLC options parse fractional values" "$out" "fractionalInput=0.75"
+check "integer VLC options keep whole-number input" "$out" "integerInput=1500"
+out=$(run "1000:'advancedModePersists=' + Theme.store.advancedOptions|+100:Theme.store.advancedOptions=false|+100:quit")
+check "the preference detail level persists across launches" "$out" "advancedModePersists=true"
 
 echo "== timeline focus and keyboard navigation"
 out=$(run "1200:'focus=' + controlBar.focusControl('seek')|+150:key:Right|+400:'right=' + (player.time >= 5000)|+100:key:Left|+400:'left=' + (player.time < 5000)|+150:grab:$WORK/timeline-focus.png|+150:key:Home|+600:'home=' + (player.position < 0.02)|+150:key:End|+800:'endState=' + player.state|+150:quit" "$E1")
@@ -103,6 +115,10 @@ check "track popup opens" "$out" "opened=true"
 check "clicking the video outside the track popup closes it" "$out" "outsideClosed=true"
 check "clicking the same track control closes its popup" "$out" "toggleClosed=true"
 check "clicking another track control switches the popup" "$out" "switched=true"
+
+echo "== side panel dismissal"
+out=$(run "1200:win.rightPanel='settings'|+100:'opened=' + (win.rightPanel === 'settings')|+100:click-item:video-click-area|+100:'closed=' + (win.rightPanel === '')|+100:quit" "$E1")
+check "clicking the video closes the audio/subtitle panel" "$out" "closed=true"
 
 echo "== primary navigation"
 out=$(run "1200:'focusVideos=' + navigationRail.focusPage('videos')|+100:key:Space|+100:'videos=' + (navigationPage === 'videos' && libraryOpen && libraryPanel.section === 'folder' && libraryPanel.mediaType === 'video')|+100:'focusRecent=' + navigationRail.focusPage('recent')|+100:key:Space|+100:'recent=' + (navigationPage === 'recent' && libraryPanel.section === 'recent')|+100:quit" "$E1")

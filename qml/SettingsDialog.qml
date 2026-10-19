@@ -14,7 +14,6 @@ Modal {
     height: Math.min(parent ? parent.height - 40 : 820, 820)
     property string page: "general"
     property string categorySearch: ""
-    property bool advancedOpen: false
     signal showShortcuts()
     signal showOnboarding()
 
@@ -43,6 +42,26 @@ Modal {
         const query = categorySearch.trim().toLowerCase()
         return pages.filter(p => ids.indexOf(p.id) >= 0 && p.label.toLowerCase().includes(query))
     }
+    function optionVisible(optionName) {
+        const pending = [root.contentItem]
+        while (pending.length) {
+            const item = pending.pop()
+            if (item.objectName === "vlc-option-" + optionName)
+                return item.visible
+            for (const child of item.children || []) pending.push(child)
+        }
+        return false
+    }
+    function optionNumberValue(optionName, text) {
+        const pending = [root.contentItem]
+        while (pending.length) {
+            const item = pending.pop()
+            if (item.objectName === "vlc-option-" + optionName)
+                return item.parseNumber(text)
+            for (const child of item.children || []) pending.push(child)
+        }
+        return undefined
+    }
     onClosed: {
         categorySearch = ""
         categoryField.clear()
@@ -70,6 +89,25 @@ Modal {
                 Icon { name: "search"; size: 16; x: 9; anchors.verticalCenter: parent.verticalCenter; color: Theme.textFaint }
             }
             NText { text: "Global Settings"; font.pixelSize: 15; color: Theme.textDim; Layout.fillWidth: true }
+            Button {
+                id: detailLevel
+                objectName: "preferences-detail-level"
+                text: Theme.store.advancedOptions ? "Simple" : "Advanced"
+                implicitWidth: 92
+                implicitHeight: 30
+                focusPolicy: Qt.TabFocus
+                Accessible.name: "Switch to " + text + " preference settings"
+                onClicked: Theme.store.advancedOptions = !Theme.store.advancedOptions
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: detailLevel.down ? Theme.raised : (detailLevel.hovered ? Theme.hover : Theme.bar)
+                    border.width: detailLevel.activeFocus ? 2 : 1
+                    border.color: detailLevel.activeFocus ? Theme.accent : Theme.border
+                }
+                contentItem: NText { text: detailLevel.text; color: Theme.textDim; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                ToolTip.visible: hovered
+                ToolTip.text: "Show " + (Theme.store.advancedOptions ? "basic" : "advanced") + " VLC settings"
+            }
             IconButton { icon: "x"; tip: "Close"; onClicked: root.close() }
         }
 
@@ -160,36 +198,21 @@ Modal {
                     SectionTitle { text: "Startup" }
                     VlcOption { option: "one-instance"; label: "Allow only one instance"; info: "Opening a file from the file manager reuses the running player." }
                     VlcOption { option: "playlist-enqueue"; label: "Enqueue items into the queue in one instance mode" }
-                    SectionTitle { text: "Diagnostics" }
-                    VlcOption { option: "file-logging"; label: "Save a log"; info: "Write VLC core messages to a log file." }
-                    VlcOption { option: "logfile"; kind: "text"; fieldWidth: 220; label: "Log file" }
+                    SectionTitle { text: "Diagnostics"; advanced: true }
+                    VlcOption { option: "file-logging"; label: "Save a log"; info: "Write VLC core messages to a log file."; advanced: true }
+                    VlcOption { option: "logfile"; kind: "text"; fieldWidth: 220; label: "Log file"; advanced: true }
                     VlcOption {
                         option: "log-verbose"; kind: "choice"; label: "Log details"
+                        advanced: true
                         choices: [{ label: "Default", value: -1 }, { label: "Information", value: 0 },
                                   { label: "Errors", value: 1 }, { label: "Warnings", value: 2 }, { label: "Debug", value: 3 }]
                     }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: 36
-                        radius: Theme.radiusSmall
-                        color: advancedMouse.containsMouse ? Theme.hover : Theme.raised
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 8
-                            NText { text: "Advanced Options"; color: Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
-                            Icon { name: "chevron-right"; size: 14; rotation: root.advancedOpen ? 90 : 0; color: Theme.icon; anchors.verticalCenter: parent.verticalCenter }
-                        }
-                        MouseArea { id: advancedMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.advancedOpen = !root.advancedOpen }
+                    SectionTitle { text: "Advanced"; advanced: true }
+                    VlcOption {
+                        option: "verbose"; kind: "choice"; label: "Core output verbosity"; advanced: true
+                        choices: [{ label: "Default", value: 0 }, { label: "Verbose", value: 1 }, { label: "Debug", value: 2 }]
                     }
-                    ColumnLayout {
-                        visible: root.advancedOpen
-                        Layout.fillWidth: true
-                        VlcOption {
-                            option: "verbose"; kind: "choice"; label: "Core output verbosity"
-                            choices: [{ label: "Default", value: 0 }, { label: "Verbose", value: 1 }, { label: "Debug", value: 2 }]
-                        }
-                        SettingRow { label: "Show the welcome screens again"; NButton { text: "Show"; onClicked: { root.close(); root.showOnboarding() } } }
-                    }
+                    SettingRow { label: "Show the welcome screens again"; NButton { text: "Show"; onClicked: { root.close(); root.showOnboarding() } } }
                 }
 
                 // ---------------------------------------------- Interface
@@ -219,7 +242,7 @@ Modal {
                     SectionTitle { text: "On-screen display" }
                     VlcOption { option: "osd"; label: "Show messages on the video"; info: "VLC's own on-video text: volume, seek position…" }
                     VlcOption { option: "video-title-show"; label: "Show the media title when it starts" }
-                    VlcOption { option: "video-title-timeout"; kind: "number"; fieldWidth: 90; label: "Title duration (ms)" }
+                    VlcOption { option: "video-title-timeout"; kind: "number"; fieldWidth: 90; label: "Title duration (ms)"; advanced: true }
                 }
 
                 // ------------------------------------------------ Privacy
@@ -241,9 +264,10 @@ Modal {
                         option: "hotkeys-y-wheel-mode"; kind: "choice"; label: "Mouse wheel over the video"
                         choices: [{ label: "Changes volume", value: 0 }, { label: "Seeks", value: 1 }, { label: "Does nothing", value: -1 }]
                     }
-                    VlcOption { option: "extrashort-jump-size"; kind: "number"; fieldWidth: 80; label: "Very short jump (seconds)" }
-                    VlcOption { option: "short-jump-size"; kind: "number"; fieldWidth: 80; label: "Short jump (seconds)" }
-                    VlcOption { option: "medium-jump-size"; kind: "number"; fieldWidth: 80; label: "Medium jump (seconds)" }
+                    SectionTitle { text: "Advanced"; advanced: true }
+                    VlcOption { option: "extrashort-jump-size"; kind: "number"; fieldWidth: 80; label: "Very short jump (seconds)"; advanced: true }
+                    VlcOption { option: "short-jump-size"; kind: "number"; fieldWidth: 80; label: "Short jump (seconds)"; advanced: true }
+                    VlcOption { option: "medium-jump-size"; kind: "number"; fieldWidth: 80; label: "Medium jump (seconds)"; advanced: true }
                 }
 
                 // ----------------------------------------------- Playback
@@ -254,9 +278,9 @@ Modal {
                     VlcOption { option: "play-and-exit"; label: "Quit at the end of the queue" }
                     VlcOption { option: "play-and-pause"; label: "Pause at the end of every item" }
                     VlcOption { option: "playlist-autostart"; label: "Play automatically on startup" }
-                    SectionTitle { text: "Advanced" }
-                    VlcOption { option: "auto-preparse"; label: "Read durations and tags of queued files" }
-                    VlcOption { option: "rate"; kind: "number"; fieldWidth: 80; label: "Default speed" }
+                    SectionTitle { text: "Advanced"; advanced: true }
+                    VlcOption { option: "auto-preparse"; label: "Read durations and tags of queued files"; advanced: true }
+                    VlcOption { option: "rate"; kind: "number"; allowDecimal: true; fieldWidth: 80; label: "Default speed"; advanced: true }
                 }
 
                 // -------------------------------------------------- Video
@@ -269,6 +293,7 @@ Modal {
                     }
                     VlcOption {
                         option: "deinterlace-mode"; kind: "choice"; label: "Deinterlace method"
+                        advanced: true
                         choices: [{ label: "Automatic", value: "auto" }, { label: "Yadif (best)", value: "yadif" }, { label: "Yadif 2x", value: "yadif2x" },
                                   { label: "Blend", value: "blend" }, { label: "Linear", value: "linear" }, { label: "Bob", value: "bob" }]
                     }
@@ -290,9 +315,9 @@ Modal {
                         option: "audio-replay-gain-mode"; kind: "choice"; label: "Volume normalization (ReplayGain)"
                         choices: [{ label: "Off", value: "none" }, { label: "Per track", value: "track" }, { label: "Per album", value: "album" }]
                     }
-                    SectionTitle { text: "Advanced" }
-                    VlcOption { option: "spdif"; label: "Pass-through to the receiver (S/PDIF / HDMI)" }
-                    VlcOption { option: "volume-step"; kind: "number"; fieldWidth: 80; label: "Volume step" }
+                    SectionTitle { text: "Advanced"; advanced: true }
+                    VlcOption { option: "spdif"; label: "Pass-through to the receiver (S/PDIF / HDMI)"; advanced: true }
+                    VlcOption { option: "volume-step"; kind: "number"; allowDecimal: true; fieldWidth: 80; label: "Volume step"; advanced: true }
                 }
 
                 // ---------------------------------------------- Subtitles
@@ -319,8 +344,8 @@ Modal {
                         choices: [{ label: "Auto", value: 0 }, { label: "Smaller", value: 20 }, { label: "Small", value: 18 },
                                   { label: "Normal", value: 16 }, { label: "Large", value: 12 }, { label: "Larger", value: 6 }]
                     }
-                    VlcOption { option: "freetype-fontsize"; kind: "number"; fieldWidth: 80; label: "Exact size in pixels"; info: "Overrides the relative size when not 0." }
-                    VlcOption { option: "sub-margin"; kind: "number"; fieldWidth: 80; label: "Distance from the bottom (px)" }
+                    VlcOption { option: "freetype-fontsize"; kind: "number"; fieldWidth: 80; label: "Exact size in pixels"; info: "Overrides the relative size when not 0."; advanced: true }
+                    VlcOption { option: "sub-margin"; kind: "number"; fieldWidth: 80; label: "Distance from the bottom (px)"; advanced: true }
                 }
 
                 // ------------------------------------------------ Library
@@ -339,8 +364,8 @@ Modal {
                         }
                     }
                     NText { visible: Theme.store.pinned.length === 0; text: "Pin folders from the library panel (L)."; dim: true }
-                    SectionTitle { text: "Playlists" }
-                    VlcOption { option: "playlist-tree"; kind: "choice"; label: "Show folders inside playlists"
+                    SectionTitle { text: "Playlists"; advanced: true }
+                    VlcOption { option: "playlist-tree"; kind: "choice"; label: "Show folders inside playlists"; advanced: true
                         choices: [{ label: "Default", value: 0 }, { label: "Always", value: 1 }, { label: "Never", value: 2 }] }
                 }
 
@@ -349,28 +374,31 @@ Modal {
                     id_: "network"
                     SectionTitle { text: "Connection" }
                     VlcOption { option: "network-caching"; kind: "number"; fieldWidth: 90; label: "Network buffer (ms)"; info: "Raise it if streams stutter." }
-                    VlcOption { option: "http-proxy"; kind: "text"; fieldWidth: 220; label: "HTTP proxy" }
-                    VlcOption { option: "http-reconnect"; label: "Reconnect automatically" }
+                    VlcOption { option: "http-proxy"; kind: "text"; fieldWidth: 220; label: "HTTP proxy"; advanced: true }
+                    VlcOption { option: "http-reconnect"; label: "Reconnect automatically"; advanced: true }
                 }
 
                 // -------------------------------------------- Performance
                 Page_ {
                     id_: "performance"
-                    SectionTitle { text: "Decoding" }
+                    NText { visible: !Theme.store.advancedOptions; text: "Turn on Advanced mode to view decoder and cache controls."; dim: true; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    SectionTitle { text: "Decoding"; advanced: true }
                     VlcOption {
                         option: "avcodec-hw"; kind: "choice"; label: "Hardware decoding"
+                        advanced: true
                         choices: [{ label: "Automatic", value: "any" }, { label: "Off (software)", value: "none" },
                                   { label: "VA-API", value: "vaapi" }, { label: "VDPAU", value: "vdpau" }]
                     }
-                    VlcOption { option: "avcodec-threads"; kind: "number"; fieldWidth: 80; label: "Decoding threads (0 = auto)" }
+                    VlcOption { option: "avcodec-threads"; kind: "number"; fieldWidth: 80; label: "Decoding threads (0 = auto)"; advanced: true }
                     VlcOption {
                         option: "avcodec-skiploopfilter"; kind: "choice"; label: "Skip H.264 loop filter (faster, lower quality)"
+                        advanced: true
                         choices: [{ label: "None", value: 0 }, { label: "Non-reference frames", value: 1 }, { label: "Bidirectional", value: 2 },
                                   { label: "Non-key frames", value: 3 }, { label: "All", value: 4 }]
                     }
-                    SectionTitle { text: "Caching" }
-                    VlcOption { option: "file-caching"; kind: "number"; fieldWidth: 90; label: "Local file buffer (ms)" }
-                    VlcOption { option: "disc-caching"; kind: "number"; fieldWidth: 90; label: "Disc buffer (ms)" }
+                    SectionTitle { text: "Caching"; advanced: true }
+                    VlcOption { option: "file-caching"; kind: "number"; fieldWidth: 90; label: "Local file buffer (ms)"; advanced: true }
+                    VlcOption { option: "disc-caching"; kind: "number"; fieldWidth: 90; label: "Disc buffer (ms)"; advanced: true }
                 }
 
                 // ---------------------------------------------- Recording
@@ -378,7 +406,7 @@ Modal {
                     id_: "recording"
                     SectionTitle { text: "Recording" }
                     VlcOption { option: "input-record-path"; kind: "text"; fieldWidth: 240; label: "Save recordings to" }
-                    VlcOption { option: "input-record-native"; label: "Keep the original format" }
+                    VlcOption { option: "input-record-native"; label: "Keep the original format"; advanced: true }
                 }
 
                 // --------------------------------------------- Extensions

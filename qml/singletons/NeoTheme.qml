@@ -49,6 +49,7 @@ QtObject {
         property int hideDelay: 1200
         property bool clickToPause: true
         property bool keyOsd: true
+        property bool advancedOptions: false
         property string resumeMode: "ask"     // ask | always | never
         property string pinned: ""
     }

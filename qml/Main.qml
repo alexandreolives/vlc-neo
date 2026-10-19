@@ -288,6 +288,7 @@ ApplicationWindow {
                     }
 
                     MouseArea {
+                        objectName: "video-click-area"
                         anchors.fill: parent
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
@@ -297,6 +298,7 @@ ApplicationWindow {
                             // The video MouseArea consumes clicks before Popup's
                             // outside-press handler can dismiss the track picker.
                             if (tracksPopup.visible) tracksPopup.close()
+                            if (win.rightPanel.length) win.rightPanel = ""
                             win.focusKeys()
                             if (e.button === Qt.RightButton) { contextMenu.popup(); return }
                             if (Theme.store.clickToPause) clickTimer.restart()

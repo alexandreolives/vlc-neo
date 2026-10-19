@@ -39,10 +39,24 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
 {
     if (action == QLatin1String("quit")) {
         window->close();
-    } else if (action.startsWith(QLatin1String("click:"))) {
-        const QStringList coordinates = action.mid(6).split(QLatin1Char(','));
-        if (window && coordinates.size() == 2) {
-            const QPointF local(coordinates.at(0).toDouble(), coordinates.at(1).toDouble());
+    } else if (action.startsWith(QLatin1String("click:")) || action.startsWith(QLatin1String("click-item:"))) {
+        QPointF local;
+        bool validTarget = false;
+        if (action.startsWith(QLatin1String("click:"))) {
+            const QStringList coordinates = action.mid(6).split(QLatin1Char(','));
+            if (coordinates.size() == 2) {
+                local = QPointF(coordinates.at(0).toDouble(), coordinates.at(1).toDouble());
+                validTarget = true;
+            }
+        } else if (window) {
+            const QString objectName = action.mid(11);
+            if (QQuickItem *target = root->findChild<QQuickItem *>(objectName);
+                target && target->window() == window) {
+                local = target->mapToScene(QPointF(target->width() / 2, target->height() / 2));
+                validTarget = true;
+            }
+        }
+        if (window && validTarget) {
             const QPointF global(window->mapToGlobal(local.toPoint()));
             QMouseEvent press(QEvent::MouseButtonPress, local, local, global,
                               Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
@@ -50,9 +64,9 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
             QMouseEvent release(QEvent::MouseButtonRelease, local, local, global,
                                 Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
             QCoreApplication::sendEvent(window, &release);
-            qInfo("neo test: click %d,%d delivered", int(local.x()), int(local.y()));
+            qInfo("neo test: click target at %d,%d delivered", int(local.x()), int(local.y()));
         } else {
-            qWarning("neo test: invalid click coordinates: %s", qPrintable(action));
+            qWarning("neo test: invalid click target: %s", qPrintable(action));
         }
     } else if (action.startsWith(QLatin1String("key:"))) {
         const QString keyName = action.mid(4);
