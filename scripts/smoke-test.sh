@@ -104,6 +104,19 @@ check "integer VLC options keep whole-number input" "$out" "integerInput=1500"
 out=$(run "1000:'advancedModePersists=' + Theme.store.advancedOptions|+100:Theme.store.advancedOptions=false|+100:quit")
 check "the preference detail level persists across launches" "$out" "advancedModePersists=true"
 
+echo "== Figma interface preferences"
+out=$(run "1000:Theme.store.mode='dark'; Theme.store.accent='#D37918'; settingsDialog.page='interface'; settingsDialog.open()|+200:'interfaceTitle=' + settingsDialog.pageTitle|+150:click-item:auto-hide-delay|+100:'sliderMouse=' + Theme.store.hideDelay|+100:key:Right|+100:'sliderKeyboard=' + Theme.store.hideDelay|+100:Theme.store.autoHideMode='always'; 'alwaysHides=' + win.overlayMode|+100:Theme.store.autoHideMode='never'; 'neverShows=' + !win.overlayMode|+100:Theme.store.autoHideMode='always'; Theme.store.showControlsFullscreen=true; Theme.store.compactAtStart=true|+150:grab:$WORK/settings-interface.png|+100:quit")
+check "interface preferences use the Figma page title" "$out" "interfaceTitle=Interface Settings"
+check "the auto-hide slider responds to pointer input" "$out" "sliderMouse=5000"
+check "the auto-hide slider responds to keyboard input" "$out" "sliderKeyboard=5100"
+check "always auto-hide applies in a normal window" "$out" "alwaysHides=true"
+check "never auto-hide keeps controls visible in a normal window" "$out" "neverShows=true"
+if [ -s "$WORK/settings-interface.png" ]; then echo "PASS  interface settings screenshot written"; pass=$((pass + 1))
+else echo "FAIL  interface settings screenshot missing"; fail=$((fail + 1)); fi
+out=$(run "1000:'interfacePreferencesPersist=' + (Theme.store.hideDelay === 5100 && Theme.store.autoHideMode === 'always' && Theme.store.showControlsFullscreen && Theme.store.compactAtStart)|+100:'compactStart=' + (win.width === 560 && win.height === 340)|+100:Theme.store.compactAtStart=false; Theme.store.showControlsFullscreen=false; Theme.store.autoHideMode='fullscreen'; win.width=1120; win.height=680|+100:quit")
+check "interface preferences persist across launches" "$out" "interfacePreferencesPersist=true"
+check "compact mode changes the next launch size" "$out" "compactStart=true"
+
 echo "== timeline focus and keyboard navigation"
 out=$(run "1200:'focus=' + controlBar.focusControl('seek')|+150:key:Right|+400:'right=' + (player.time >= 5000)|+100:key:Left|+400:'left=' + (player.time < 5000)|+150:grab:$WORK/timeline-focus.png|+150:key:Home|+600:'home=' + (player.position < 0.02)|+150:key:End|+800:'endState=' + player.state|+150:quit" "$E1")
 check "timeline accepts keyboard focus" "$out" "focus=true"

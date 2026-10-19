@@ -13,6 +13,9 @@ Item {
     readonly property bool pressed: mouse.pressed
     signal moved(real value)
 
+    activeFocusOnTab: true
+    Accessible.role: Accessible.Slider
+
     implicitWidth: 200
     implicitHeight: 22
 
@@ -30,6 +33,8 @@ Item {
         height: root.trackHeight
         radius: 3
         color: Theme.seekTrack
+        border.width: root.activeFocus ? 1 : 0
+        border.color: Theme.accent
         Rectangle {
             x: Math.min(root.ratio(root.origin), root.ratio(root.value)) * parent.width
             width: Math.abs(root.ratio(root.value) - root.ratio(root.origin)) * parent.width
@@ -50,11 +55,27 @@ Item {
         id: mouse
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onPressed: (e) => root.moved(root.valueAt(e.x))
+        onPressed: (e) => { root.forceActiveFocus(); root.moved(root.valueAt(e.x)) }
         onPositionChanged: (e) => { if (pressed) root.moved(root.valueAt(e.x)) }
         onWheel: (e) => {
             const step = root.stepSize > 0 ? root.stepSize : (root.to - root.from) / 50
             root.moved(Math.min(Math.max(root.value + (e.angleDelta.y > 0 ? step : -step), root.from), root.to))
+        }
+    }
+    Keys.onPressed: (event) => {
+        const step = root.stepSize > 0 ? root.stepSize : (root.to - root.from) / 50
+        if (event.key === Qt.Key_Left || event.key === Qt.Key_Down) {
+            root.moved(Math.max(root.from, root.value - step))
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Up) {
+            root.moved(Math.min(root.to, root.value + step))
+            event.accepted = true
+        } else if (event.key === Qt.Key_Home) {
+            root.moved(root.from)
+            event.accepted = true
+        } else if (event.key === Qt.Key_End) {
+            root.moved(root.to)
+            event.accepted = true
         }
     }
 }

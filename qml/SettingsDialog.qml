@@ -14,6 +14,12 @@ Modal {
     height: Math.min(parent ? parent.height - 40 : 820, 820)
     property string page: "general"
     property string categorySearch: ""
+    readonly property string pageTitle: {
+        if (page === "general") return "Global Settings"
+        for (const entry of pages)
+            if (entry.id === page) return entry.label + " Settings"
+        return "Settings"
+    }
     signal showShortcuts()
     signal showOnboarding()
 
@@ -88,7 +94,7 @@ Modal {
                 }
                 Icon { name: "search"; size: 16; x: 9; anchors.verticalCenter: parent.verticalCenter; color: Theme.textFaint }
             }
-            NText { text: "Global Settings"; font.pixelSize: 15; color: Theme.textDim; Layout.fillWidth: true }
+            NText { text: root.pageTitle; font.pixelSize: 15; color: Theme.textDim; Layout.fillWidth: true }
             Button {
                 id: detailLevel
                 objectName: "preferences-detail-level"
@@ -218,16 +224,48 @@ Modal {
                 // ---------------------------------------------- Interface
                 Page_ {
                     id_: "interface"
-                    SectionTitle { text: "Behaviour" }
+                    SectionTitle { text: "Window" }
                     SettingRow {
-                        label: "Hide controls after"
-                        info: "In fullscreen and hidden-UI mode the bars appear when the pointer comes near them."
+                        label: "Start in compact mode"
+                        info: "The next VLC Neo launch opens in a small window. You can resize it at any time."
+                        NSwitch { checked: Theme.store.compactAtStart; onToggled: (on) => Theme.store.compactAtStart = on }
+                    }
+                    SectionTitle { text: "Playback Controls" }
+                    SettingRow {
+                        label: "Auto-hide the controls"
+                        info: "Choose when the top and bottom bars hide after the pointer leaves them."
                         Chips {
-                            model: [{ label: "0.6 s", value: 600 }, { label: "1.2 s", value: 1200 }, { label: "2.5 s", value: 2500 }, { label: "5 s", value: 5000 }]
-                            current: Theme.store.hideDelay
-                            onPicked: (v) => Theme.store.hideDelay = v
+                            model: [{ label: "Fullscreen only", value: "fullscreen" },
+                                    { label: "Always", value: "always" }, { label: "Never", value: "never" }]
+                            current: Theme.store.autoHideMode
+                            onPicked: (v) => Theme.store.autoHideMode = v
                         }
                     }
+                    SettingRow {
+                        label: "Hide after"
+                        info: "The bars appear when the pointer reaches an edge and hide after this delay."
+                        ColumnLayout {
+                            Layout.preferredWidth: 300
+                            spacing: 2
+                            NSlider {
+                                id: hideDelaySlider
+                                objectName: "auto-hide-delay"
+                                Layout.fillWidth: true
+                                from: 0; to: 10000; stepSize: 100
+                                value: Theme.store.hideDelay
+                                onMoved: (v) => Theme.store.hideDelay = Math.round(v)
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                NText { text: "0 s"; dim: true; font.pixelSize: 10; Layout.alignment: Qt.AlignLeft }
+                                Item { Layout.fillWidth: true }
+                                NText { text: "5 s"; dim: true; font.pixelSize: 10 }
+                                Item { Layout.fillWidth: true }
+                                NText { text: "10 s"; dim: true; font.pixelSize: 10; Layout.alignment: Qt.AlignRight }
+                            }
+                        }
+                    }
+                    SettingRow { label: "Show controls in fullscreen"; NSwitch { checked: Theme.store.showControlsFullscreen; onToggled: (on) => Theme.store.showControlsFullscreen = on } }
                     SettingRow { label: "Click on the video to pause"; NSwitch { checked: Theme.store.clickToPause; onToggled: (on) => Theme.store.clickToPause = on } }
                     SettingRow { label: "Show the key pressed with every action"; info: "Shows a small “F · Fullscreen” message, so an accidental key press is easy to undo."; NSwitch { checked: Theme.store.keyOsd; onToggled: (on) => Theme.store.keyOsd = on } }
                     SettingRow {

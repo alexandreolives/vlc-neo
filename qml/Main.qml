@@ -27,7 +27,10 @@ ApplicationWindow {
     property string rightPanel: ""          // "" | queue | settings
     property bool videoFill: false
     property bool wasMaximized: false
-    readonly property bool overlayMode: fullscreen || uiHidden || pip
+    readonly property bool autoHideActive: Theme.store.autoHideMode === "always"
+                                            || (Theme.store.autoHideMode === "fullscreen" && fullscreen)
+    readonly property bool overlayMode: uiHidden || pip
+                                        || (autoHideActive && !(fullscreen && Theme.store.showControlsFullscreen))
     property bool topHot: false
     property bool bottomHot: false
     readonly property bool popupsOpen: tracksPopup.visible || contextMenu.visible || mainMenu.visible
@@ -216,6 +219,10 @@ ApplicationWindow {
         }
     }
     Component.onCompleted: {
+        if (Theme.store.compactAtStart && !fullscreen) {
+            width = 560
+            height = 340
+        }
         if (!Theme.store.onboarded) onboarding.open()
         focusKeys()
     }
@@ -231,7 +238,9 @@ ApplicationWindow {
             id: hover
             onPointChanged: {
                 const y = point.position.y
-                win.topHot = win.overlayMode && y < Theme.topHeight + 28
+                const top = win.overlayMode && y < Theme.topHeight + 28
+                if (top) { win.topHot = true; topHide.stop() }
+                else if (win.topHot && !topHide.running) topHide.start()
                 const hot = win.overlayMode && y > win.height - Theme.barHeight - 44
                 if (hot) { win.bottomHot = true; bottomHide.stop() }
                 else if (win.bottomHot && !bottomHide.running) bottomHide.start()
@@ -239,7 +248,8 @@ ApplicationWindow {
                 videoArea.cursorHidden = false
             }
         }
-        Timer { id: bottomHide; interval: Math.min(Theme.store.hideDelay, 900); onTriggered: win.bottomHot = false }
+        Timer { id: topHide; interval: Theme.store.hideDelay; onTriggered: win.topHot = false }
+        Timer { id: bottomHide; interval: Theme.store.hideDelay; onTriggered: win.bottomHot = false }
         Timer { id: cursorTimer; interval: Theme.store.hideDelay + 800; onTriggered: if (win.overlayMode && !win.chromeShown) videoArea.cursorHidden = true }
 
         // Middle: library | video | side panel

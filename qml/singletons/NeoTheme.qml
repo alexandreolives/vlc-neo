@@ -47,6 +47,9 @@ QtObject {
         property bool onboarded: false
         property string layout: ""
         property int hideDelay: 1200
+        property string autoHideMode: "fullscreen" // fullscreen | always | never
+        property bool showControlsFullscreen: false
+        property bool compactAtStart: false
         property bool clickToPause: true
         property bool keyOsd: true
         property bool advancedOptions: false
