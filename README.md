@@ -199,24 +199,19 @@ episodes. A shortcut to search OpenSubtitles for the current title is included.
 ## Install
 
 ### Requirements
-- **VLC 3.0.x** with its plugin headers. Arch already ships them with
-  `libvlc`. On Debian and Ubuntu install `libvlccore-dev`. On Fedora install
-  `vlc-devel`.
-- **Qt 6.6 or newer:** Base, Declarative (Qt Quick), Svg
-- **Build tools:** CMake 3.21+, Ninja, a C++17 compiler, pkg-config
 
-```bash
-# Arch Linux
-sudo pacman -S --needed vlc libvlc qt6-base qt6-declarative qt6-svg cmake ninja pkgconf
-# Debian 13 / Ubuntu 24.10+ (Qt 6.6 or newer is required)
-sudo apt install vlc libvlccore-dev qt6-base-dev qt6-declarative-dev qt6-svg-dev \
-                 qml6-module-qtquick-controls qml6-module-qtquick-dialogs \
-                 qml6-module-qtquick-layouts qml6-module-qt-labs-folderlistmodel \
-                 qml6-module-qtcore qml6-module-qtquick-shapes qml6-module-qtquick-effects \
-                 cmake ninja-build pkg-config g++
-```
+- **VLC 3.0.x** with its plugin headers.
+- **Qt 6.6 or newer:** Base, Declarative (Qt Quick), Svg.
+- **Build tools:** CMake 3.21+, Ninja, a C++17 compiler, pkg-config.
 
-### Build and install (per user, no root)
+The installer checks for the required packages and asks before installing any
+that are missing. It supports apt-based Debian/Ubuntu/Mint, Arch, and Fedora.
+It also checks Qt's version. If the system Qt is older than 6.6, it installs
+Qt 6.8.3 in `~/Qt` and tries the Berkeley, FAU, and dotsrc mirrors in turn.
+Override the Qt version or the first mirror with `VLC_NEO_QT_VERSION` and
+`VLC_NEO_QT_MIRROR`.
+
+### Build and install
 
 ```bash
 git clone https://github.com/karem505/vlc-neo.git
@@ -224,7 +219,13 @@ cd vlc-neo
 scripts/install.sh            # adds `vlc-neo` and a "VLC (Neo)" launcher entry
 # or
 scripts/install.sh --default  # make Neo the interface of plain `vlc` everywhere
+# or, for an unattended package install
+scripts/install.sh --default --yes
 ```
+
+System packages are installed with the system package manager and may require
+`sudo`. Qt is installed per user. The build and VLC plugin remain in the user
+account.
 
 `--default` makes every way of opening VLC use Neo: the `vlc` command, the app
 launcher, "Open with VLC" in the file manager, and existing file associations.
