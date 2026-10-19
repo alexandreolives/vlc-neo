@@ -12,6 +12,7 @@
 #include "queue_model.hpp"
 #include "player_backend.hpp"
 #include "player_state_store.hpp"
+#include "subtitle_timeline.hpp"
 
 class Player : public QObject
 {
@@ -41,6 +42,7 @@ class Player : public QObject
     Q_PROPERTY(bool random READ random NOTIFY playbackModeChanged)
     Q_PROPERTY(int sleepRemaining READ sleepRemaining NOTIFY sleepChanged)
     Q_PROPERTY(bool presetActive READ presetActive NOTIFY presetChanged)
+    Q_PROPERTY(QVariantList subtitleCues READ subtitleCues NOTIFY subtitleTimelineChanged)
     Q_PROPERTY(QObject *queue READ queue CONSTANT)
 
 public:
@@ -73,6 +75,7 @@ public:
     int sleepRemaining() const { return m_sleepRemaining; }
     bool presetActive() const { return m_presetActive; }
     QObject *queue() { return &m_queue; }
+    QVariantList subtitleCues() const { return m_subtitleCues; }
 
     // Transport
     Q_INVOKABLE void togglePause();
@@ -172,6 +175,7 @@ signals:
     void playbackModeChanged();
     void sleepChanged();
     void presetChanged();
+    void subtitleTimelineChanged();
     void fullscreenRequested(bool fullscreen);
     void notify(const QString &message);
 
@@ -190,6 +194,8 @@ private:
     void rebuildQueue();
     void applyPendingPreset();
     void applyLinkedSubtitles();
+    void refreshSubtitleTimeline();
+    void loadSubtitleTimeline();
     void saveResumePoint();
     void rememberRecent(const QString &mrl);
 
@@ -198,6 +204,7 @@ private:
     PlayerStateStore m_stateStore;
     QTimer m_queueTimer;
     QTimer m_sleepTimer;
+    QTimer m_subtitleDebounce;
 
     int m_state = 0;
     double m_position = 0.0;
@@ -219,6 +226,14 @@ private:
     bool m_presetPending = false;
     bool m_subsLinkedApplied = false;
     QString m_linkedSubtitleFile;
+    QString m_manualSubtitlePath;
+    QString m_subtitleTimelineSource;
+    int m_manualSubtitleTrackId = -1;
+    int m_linkedSubtitleTrackId = -1;
+    QVariantList m_subtitleCues;
+    quint64 m_subtitleTimelineRevision = 0;
+    bool m_subtitleLoadInProgress = false;
+    bool m_subtitleLoadPending = false;
     qint64 m_lastSavedResume = 0;
     std::atomic<bool> m_timePosted{false};
 };

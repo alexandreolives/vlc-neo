@@ -31,6 +31,8 @@ check "plays (state 2)" "$out" "state=2"
 check "frames reach the QML video item" "$out" "video=true"
 check "queue has both episodes" "$out" "queue=2"
 check "duration known" "$out" "len=40"
+out=$(run "1000:'noSubtitleCues=' + (player.subtitleCues.length === 0)|+100:quit" "$E1")
+check "media without subtitles produces an empty timeline" "$out" "noSubtitleCues=true"
 out=$(run "1500:player.next()|2600:'next=' + player.mediaUrl.toString().endsWith('My.Show.S01E02.1080p.mkv')|2800:quit" "$E1" "$E2")
 check "next advances to the following queue item" "$out" "next=true"
 
@@ -42,11 +44,15 @@ check "play control resumes playback" "$out" "resumed=2"
 echo "== folder subtitles + show preset"
 out=$(run "1500:'matched=' + player.linkSubtitleFolder(platform.fileUrl('$WORK/subs'))|2500:player.setSubtitleDelay(-400); player.setSubtitleScale(160)|2800:player.savePresetForFolder()|3000:quit" "$E1" "$E2")
 check "folder link matches both episodes" "$out" "matched=2"
-out=$(run "3500:'sub=' + player.linkedSubtitleFile() + ' shown=' + player.tracks('spu').some(t => t.selected && t.id >= 0) + ' delay=' + player.subtitleDelay + ' scale=' + player.subtitleScale()|+200:quit" "$E2")
+out=$(run "3500:'sub=' + player.linkedSubtitleFile() + ' shown=' + player.tracks('spu').some(t => t.selected && t.id >= 0) + ' delay=' + player.subtitleDelay + ' scale=' + player.subtitleScale() + ' cues=' + player.subtitleCues.length + ' cueText=' + (player.subtitleCues.length ? player.subtitleCues[0].text : '')|+100:'cueLookup=' + (controlBar.findControl('seek').contentItem.cueAt(1500) ? controlBar.findControl('seek').contentItem.cueAt(1500).text : '')|+100:grab:$WORK/subtitle-timeline.png|+200:quit" "$E2")
 check "episode 2 gets its own subtitle file" "$out" "sub=myshow_1x02_ar.srt"
 check "that subtitle is the active track" "$out" "shown=true"
 check "preset restores subtitle delay" "$out" "delay=-400"
 check "preset restores subtitle size" "$out" "scale=160"
+check "linked subtitles populate the text timeline" "$out" "cues=1 cueText=Episode 02"
+check "hover lookup finds the subtitle text at the matching time" "$out" "cueLookup=Episode 02"
+if [ -s "$WORK/subtitle-timeline.png" ]; then echo "PASS  subtitle timeline screenshot written"; pass=$((pass + 1))
+else echo "FAIL  subtitle timeline screenshot missing"; fail=$((fail + 1)); fi
 
 echo "== resume"
 run "1500:player.jumpTo(20000)|2500:win.close()" "$E1" >/dev/null

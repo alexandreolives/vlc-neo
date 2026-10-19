@@ -1,9 +1,11 @@
 #include "player.hpp"
 #include "subtitle_matcher.hpp"
 
+#include <QFutureWatcher>
 #include <QDir>
 #include <QFileInfo>
 #include <QSet>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <utility>
 
@@ -16,6 +18,10 @@ Player::Player(std::unique_ptr<PlayerBackend> backend, QObject *parent)
     m_queueTimer.setSingleShot(true);
     m_queueTimer.setInterval(120);
     connect(&m_queueTimer, &QTimer::timeout, this, &Player::rebuildQueue);
+
+    m_subtitleDebounce.setSingleShot(true);
+    m_subtitleDebounce.setInterval(120);
+    connect(&m_subtitleDebounce, &QTimer::timeout, this, &Player::loadSubtitleTimeline);
 
     m_sleepTimer.setInterval(1000);
     connect(&m_sleepTimer, &QTimer::timeout, this, [this] {
@@ -57,6 +63,10 @@ void Player::onBackendInputChanged()
     m_presetPending = true;
     m_subsLinkedApplied = false;
     m_linkedSubtitleFile.clear();
+    m_manualSubtitlePath.clear();
+    m_linkedSubtitleTrackId = -1;
+    m_manualSubtitleTrackId = -1;
+    refreshSubtitleTimeline();
     m_lastSavedResume = 0;
     m_presetActive = false;
     emit presetChanged();
@@ -183,6 +193,7 @@ void Player::refreshTracks()
     emit chaptersChanged();
     applyLinkedSubtitles();
     applyPendingPreset();
+    refreshSubtitleTimeline();
 }
 
 void Player::refreshDelays()
@@ -323,11 +334,18 @@ QVariantList Player::tracks(const QString &category) const
 void Player::selectTrack(const QString &category, int id)
 {
     m_backend->selectTrack(category, id);
+    if (category == QLatin1String("spu"))
+        refreshSubtitleTimeline();
 }
 
 bool Player::addSubtitleFile(const QUrl &url)
 {
     const bool ok = m_backend->addSubtitleFile(url, true);
+    if (ok) {
+        m_manualSubtitlePath = url.isLocalFile() ? url.toLocalFile() : QString();
+        m_manualSubtitleTrackId = -1;
+        refreshSubtitleTimeline();
+    }
     emit notify(ok ? tr("Subtitle added") : tr("Could not load subtitle"));
     return ok;
 }
@@ -623,8 +641,98 @@ void Player::applyLinkedSubtitles()
     if (best.isEmpty())
         return;
     const QUrl subtitleUrl = QUrl::fromLocalFile(QDir(dir).filePath(best));
-    if (m_backend->addSubtitleFile(subtitleUrl, false))
+    if (m_backend->addSubtitleFile(subtitleUrl, false)) {
         m_linkedSubtitleFile = best;
+        m_linkedSubtitleTrackId = -1;
+        refreshSubtitleTimeline();
+    }
+}
+
+void Player::refreshSubtitleTimeline()
+{
+    QString source;
+    const QVariantList subtitleTracks = tracks(QStringLiteral("spu"));
+    int selectedId = -1;
+    int activeTrackCount = 0;
+    for (const QVariant &row : subtitleTracks) {
+        const QVariantMap track = row.toMap();
+        const int id = track.value(QStringLiteral("id")).toInt();
+        if (id < 0)
+            continue;
+        ++activeTrackCount;
+        if (track.value(QStringLiteral("selected")).toBool())
+            selectedId = id;
+    }
+    const bool enabled = selectedId >= 0;
+
+    if (enabled && !m_manualSubtitlePath.isEmpty() && m_manualSubtitleTrackId < 0)
+        m_manualSubtitleTrackId = selectedId;
+    if (enabled && !m_linkedSubtitleFile.isEmpty() && m_linkedSubtitleTrackId < 0)
+        m_linkedSubtitleTrackId = selectedId;
+
+    if (enabled && !m_manualSubtitlePath.isEmpty() && selectedId == m_manualSubtitleTrackId) {
+        source = m_manualSubtitlePath;
+    } else if (enabled && !m_linkedSubtitleFile.isEmpty() && selectedId == m_linkedSubtitleTrackId) {
+        source = QDir(linkedSubtitleFolder()).filePath(m_linkedSubtitleFile);
+    } else if (enabled && activeTrackCount == 1 && m_mediaUrl.isLocalFile()) {
+        const QStringList filters = {QStringLiteral("*.srt"), QStringLiteral("*.vtt"),
+                                     QStringLiteral("*.ass"), QStringLiteral("*.ssa")};
+        const QStringList files = QDir(m_folderPath).entryList(filters, QDir::Files, QDir::Name);
+        const QString best = SubtitleMatcher::bestMatch(m_mediaUrl.toLocalFile(), files);
+        if (!best.isEmpty())
+            source = QDir(m_folderPath).filePath(best);
+    }
+
+    if (source == m_subtitleTimelineSource)
+        return;
+    m_subtitleTimelineSource = source;
+    ++m_subtitleTimelineRevision;
+    m_subtitleDebounce.stop();
+    m_subtitleCues.clear();
+    emit subtitleTimelineChanged();
+    if (!source.isEmpty())
+        m_subtitleDebounce.start();
+}
+
+void Player::loadSubtitleTimeline()
+{
+    const QString source = m_subtitleTimelineSource;
+    const quint64 revision = m_subtitleTimelineRevision;
+    if (source.isEmpty())
+        return;
+    if (m_subtitleLoadInProgress) {
+        m_subtitleLoadPending = true;
+        return;
+    }
+
+    m_subtitleLoadInProgress = true;
+    auto *watcher = new QFutureWatcher<QList<SubtitleCue>>(this);
+    connect(watcher, &QFutureWatcher<QList<SubtitleCue>>::finished, this, [this, watcher, source, revision] {
+        const QList<SubtitleCue> parsed = watcher->result();
+        watcher->deleteLater();
+        m_subtitleLoadInProgress = false;
+        if (revision == m_subtitleTimelineRevision && source == m_subtitleTimelineSource) {
+            QVariantList cues;
+            cues.reserve(parsed.size());
+            qint64 maxEnd = 0;
+            for (const SubtitleCue &cue : parsed) {
+                maxEnd = qMax(maxEnd, cue.endMs);
+                cues.append(QVariantMap{{QStringLiteral("start"), cue.startMs},
+                                        {QStringLiteral("end"), cue.endMs},
+                                        {QStringLiteral("maxEnd"), maxEnd},
+                                        {QStringLiteral("text"), cue.text}});
+            }
+            m_subtitleCues = cues;
+            emit subtitleTimelineChanged();
+        }
+
+        if (m_subtitleLoadPending) {
+            m_subtitleLoadPending = false;
+            if (!m_subtitleTimelineSource.isEmpty())
+                loadSubtitleTimeline();
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([source] { return SubtitleTimeline::parseFile(source); }));
 }
 
 // -------------------------------------------------------- core config

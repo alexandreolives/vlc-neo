@@ -75,6 +75,8 @@ If you like VLC, consider [donating to VideoLAN](https://www.videolan.org/contri
   rectangles, and two-tone icons.
 - The play button stays on the left. It is larger, and previous/next sit around it.
 - A **thick seek bar** with a hover time preview and bookmark ticks.
+- A **subtitle text timeline** for active local SRT, WebVTT, ASS and SSA tracks;
+  cue marks appear on the seek bar and hovering shows the matching line.
 - A **cone-shaped volume slider** that runs from green to orange.
 - Fullscreen, **picture-in-picture** and window buttons are in the top bar. The
   media title stays reachable in fullscreen.
@@ -324,14 +326,16 @@ own media. It checks:
 - queue contents and next-item playback
 - pause/resume controls
 - folder subtitle matching
+- subtitle timeline parsing, hover lookup and empty state when no subtitle is loaded
 - show presets carried across episodes
 - resume
 - hotkeys, bookmarks and speed
 - `vlcrc` writes and persistence across launches
 - dark/light and compact-window screenshots
 
-CTest covers subtitle filename matching and the backend-injected player facade,
-including volume clamping, mute/unmute state and audio restoration after mute.
+CTest covers subtitle filename matching, SRT/WebVTT/ASS timeline parsing with
+input limits, and the backend-injected player facade, including volume clamping,
+mute/unmute state and audio restoration after mute.
 - theme and accent persistence across launches
 
 CI uploads the dark, light and compact-window captures as workflow artifacts so
@@ -353,7 +357,6 @@ design tokens and every screen are plain QML files under `qml/`.
 These parts of the redesign are not implemented yet:
 - **Waveform seek bar and seek thumbnails.** VLC 3 has no API for them. They
   need a second decoder per file.
-- **Subtitle timeline** (see when lines appear while syncing).
 - **Filter previews** for the audio and video presets.
 - **Music library sections** (albums, artists, genres). VLC 3 has no
   media-library database. Music folders play from the library panel today.
