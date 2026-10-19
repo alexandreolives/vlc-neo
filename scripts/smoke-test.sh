@@ -129,6 +129,9 @@ if [ -s "$WORK/timeline-focus.png" ]; then echo "PASS  focused timeline screensh
 else echo "FAIL  focused timeline screenshot missing"; fail=$((fail + 1)); fi
 
 echo "== track popup dismissal"
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'tabFocus=' + tracksPopup.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+check "track popup tabs accept keyboard focus" "$out" "tabFocus=true"
+check "Space activates the focused audio tab" "$out" "tabKeyboard=true"
 out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:click:900,300|+100:'outsideClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:win.libraryOpen=true; tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:click:900,500|+100:'miniCloses=' + (!tracksPopup.visible && !libraryOpen)|+100:tracksPopup.close()|+100:quit" "$E1")
 check "track popup opens" "$out" "opened=true"
 check "clicking the video outside the track popup closes it" "$out" "outsideClosed=true"
@@ -137,7 +140,9 @@ check "clicking another track control switches the popup" "$out" "switched=true"
 check "clicking the mini-player video dismisses tracks and restores playback" "$out" "miniCloses=true"
 
 echo "== side panel dismissal"
-out=$(run "1200:win.rightPanel='settings'|+100:'opened=' + (win.rightPanel === 'settings')|+100:click-item:video-click-area|+100:'closed=' + (win.rightPanel === '')|+100:quit" "$E1")
+out=$(run "1200:win.rightPanel='settings'; sidePanel.tab='spu'|+100:'tabFocus=' + sidePanel.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (sidePanel.tab === 'audio')|+100:win.focusKeys()|+100:click-item:video-click-area|+100:'closed=' + (win.rightPanel === '')|+100:quit" "$E1")
+check "settings panel tabs accept keyboard focus" "$out" "tabFocus=true"
+check "Space activates the focused audio settings tab" "$out" "tabKeyboard=true"
 check "clicking the video closes the audio/subtitle panel" "$out" "closed=true"
 
 echo "== primary navigation"

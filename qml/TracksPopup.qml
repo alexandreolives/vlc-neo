@@ -36,6 +36,16 @@ Popup {
         trackList.model = player.tracks(tab)
         deviceList.model = tab === "audio" ? player.audioDevices() : []
     }
+    function focusTab(tabName) {
+        for (let i = 0; i < tabButtons.count; ++i) {
+            const button = tabButtons.itemAt(i)
+            if (button && button.tabId === tabName) {
+                button.forceActiveFocus()
+                return button.activeFocus
+            }
+        }
+        return false
+    }
     onTabChanged: refresh()
     Connections {
         target: player
@@ -58,34 +68,47 @@ Popup {
                 Layout.fillWidth: true
                 spacing: 0
                 Repeater {
+                    id: tabButtons
                     model: [{ id: "video", label: "Video", icon: "film" },
                             { id: "audio", label: "Audio", icon: "audio-lines" },
                             { id: "spu", label: "Subtitles", icon: "captions" }]
-                    delegate: Item {
+                    delegate: Button {
+                        id: tabButton
                         required property var modelData
+                        property string tabId: modelData.id
                         Layout.fillWidth: true
                         implicitHeight: 40
-                        Row {
+                        padding: 0
+                        focusPolicy: Qt.TabFocus
+                        Accessible.name: modelData.label
+                        objectName: "track-tab-" + modelData.id
+                        onClicked: root.tab = modelData.id
+                        background: Rectangle {
+                            color: tabButton.hovered ? Theme.hover : "transparent"
+                            border.width: tabButton.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                width: parent.width
+                                height: 2
+                                color: root.tab === tabButton.tabId ? Theme.accent : Theme.border
+                            }
+                        }
+                        contentItem: Row {
                             anchors.centerIn: parent
                             spacing: 6
                             Icon {
-                                name: modelData.icon; size: 15
-                                color: root.tab === modelData.id ? Theme.accent : Theme.textDim
+                                name: tabButton.modelData.icon; size: 15
+                                color: root.tab === tabButton.tabId ? Theme.accent : Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             NText {
-                                text: modelData.label
+                                text: tabButton.modelData.label
                                 font.pixelSize: 12
-                                color: root.tab === modelData.id ? Theme.text : Theme.textDim
+                                color: root.tab === tabButton.tabId ? Theme.text : Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                         }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            width: parent.width; height: 2
-                            color: root.tab === modelData.id ? Theme.accent : Theme.border
-                        }
-                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.tab = modelData.id }
                     }
                 }
             }
