@@ -2,6 +2,8 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QHash>
+#include <QKeyEvent>
 #include <QMutex>
 #include <QPointer>
 #include <QQmlApplicationEngine>
@@ -12,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <QQuickStyle>
+#include <QQuickItem>
 #include <QQuickWindow>
 
 #include "icon_provider.hpp"
@@ -35,6 +38,20 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
 {
     if (action == QLatin1String("quit")) {
         window->close();
+    } else if (action.startsWith(QLatin1String("key:"))) {
+        const QString keyName = action.mid(4);
+        const QHash<QString, int> keys = {
+            {QStringLiteral("Left"), Qt::Key_Left}, {QStringLiteral("Right"), Qt::Key_Right},
+            {QStringLiteral("Home"), Qt::Key_Home}, {QStringLiteral("End"), Qt::Key_End}
+        };
+        QQuickItem *focusItem = window ? window->activeFocusItem() : nullptr;
+        if (keys.contains(keyName) && focusItem) {
+            QKeyEvent event(QEvent::KeyPress, keys.value(keyName), Qt::NoModifier);
+            QCoreApplication::sendEvent(focusItem, &event);
+            qInfo("neo test: key %s delivered (accepted=%d)", qPrintable(keyName), event.isAccepted());
+        } else {
+            qWarning("neo test: key %s not delivered (no focus item or unknown key)", qPrintable(keyName));
+        }
     } else if (action.startsWith(QLatin1String("grab:"))) {
         if (window) {
             const QImage img = window->grabWindow();

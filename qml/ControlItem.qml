@@ -9,6 +9,7 @@ Item {
     property bool preview: false        // inside the Customize dialog: no actions
     signal action(string id, Item source)
     readonly property bool compact: parent && parent.width < 720
+    readonly property var contentItem: loader.item
 
     readonly property bool flexible: controlId === "seek" || controlId === "spacer"
     implicitWidth: loader.item ? loader.item.implicitWidth : 0
