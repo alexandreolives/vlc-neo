@@ -12,7 +12,7 @@ Popup {
     signal addSubtitles()
 
     width: 340
-    height: Math.min(440, content.implicitHeight + 24)
+    height: Math.min(440, content.implicitHeight + 24, parent ? parent.height - 16 : 440)
     padding: 0
     modal: false
     focus: true
@@ -26,11 +26,18 @@ Popup {
         currentAnchor = triggerItem
         tab = tabName
         refresh()
-        const p = triggerItem.mapToItem(parent, triggerItem.width / 2, 0)
-        x = Math.min(Math.max(8, p.x - width / 2), parent.width - width - 8)
-        y = p.y - height - 10
+        place()
         open()
+        Qt.callLater(place)
     }
+    function place() {
+        if (!currentAnchor || !parent)
+            return
+        const p = currentAnchor.mapToItem(parent, currentAnchor.width / 2, 0)
+        x = Math.max(8, Math.min(p.x - width / 2, parent.width - width - 8))
+        y = Math.max(8, Math.min(p.y - height - 10, parent.height - height - 8))
+    }
+    function schedulePlace() { Qt.callLater(place) }
     onClosed: currentAnchor = null
     function refresh() {
         trackList.model = player.tracks(tab)
@@ -47,6 +54,18 @@ Popup {
         return false
     }
     onTabChanged: refresh()
+    Connections {
+        target: win
+        function onWidthChanged() { root.schedulePlace() }
+        function onHeightChanged() { root.schedulePlace() }
+    }
+    Connections {
+        target: root.currentAnchor
+        function onXChanged() { root.schedulePlace() }
+        function onYChanged() { root.schedulePlace() }
+        function onWidthChanged() { root.schedulePlace() }
+        function onHeightChanged() { root.schedulePlace() }
+    }
     Connections {
         target: player
         enabled: root.visible

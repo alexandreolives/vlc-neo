@@ -138,6 +138,10 @@ check "clicking the video outside the track popup closes it" "$out" "outsideClos
 check "clicking the same track control closes its popup" "$out" "toggleClosed=true"
 check "clicking another track control switches the popup" "$out" "switched=true"
 check "clicking the mini-player video dismisses tracks and restores playback" "$out" "miniCloses=true"
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle')); win.width=560; win.height=340|+200:'popupFitsCompact=' + (tracksPopup.x >= 0 && tracksPopup.y >= 0 && tracksPopup.x + tracksPopup.width <= keyCatcher.width && tracksPopup.y + tracksPopup.height <= keyCatcher.height)|+100:grab:$WORK/track-popup-compact.png|+100:win.width=1120; win.height=680; tracksPopup.close()|+100:quit" "$E1")
+check "track popup repositions within compact window bounds" "$out" "popupFitsCompact=true"
+if [ -s "$WORK/track-popup-compact.png" ]; then echo "PASS  compact track popup screenshot written"; pass=$((pass + 1))
+else echo "FAIL  compact track popup screenshot missing"; fail=$((fail + 1)); fi
 
 echo "== side panel dismissal"
 out=$(run "1200:win.rightPanel='settings'; sidePanel.tab='spu'|+100:'tabFocus=' + sidePanel.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (sidePanel.tab === 'audio')|+100:win.focusKeys()|+100:click-item:video-click-area|+100:'closed=' + (win.rightPanel === '')|+100:quit" "$E1")
