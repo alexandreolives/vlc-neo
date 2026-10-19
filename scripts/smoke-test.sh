@@ -77,6 +77,12 @@ done
 out=$(run "1000:'mode=' + Theme.store.mode + ' accent=' + Theme.store.accent|1200:quit" "$E1")
 check "theme and accent persist across VLC launches" "$out" "mode=light accent=#2F5FC4"
 
+echo "== preferences global screen"
+out=$(run "1000:settingsDialog.open()|+150:'settings=' + settingsDialog.visible + ' page=' + settingsDialog.page|+250:grab:$WORK/settings-global.png|+100:settingsDialog.close()|+100:quit" "$E1")
+check "global settings opens on the General page" "$out" "settings=true page=general"
+if [ -s "$WORK/settings-global.png" ]; then echo "PASS  global settings screenshot written"; pass=$((pass + 1))
+else echo "FAIL  global settings screenshot missing"; fail=$((fail + 1)); fi
+
 echo "== timeline focus and keyboard navigation"
 out=$(run "1200:'focus=' + controlBar.focusControl('seek')|+150:key:Right|+400:'right=' + (player.time >= 5000)|+100:key:Left|+400:'left=' + (player.time < 5000)|+150:grab:$WORK/timeline-focus.png|+150:key:Home|+600:'home=' + (player.position < 0.02)|+150:key:End|+800:'endState=' + player.state|+150:quit" "$E1")
 check "timeline accepts keyboard focus" "$out" "focus=true"

@@ -9,32 +9,68 @@ import Neo 1.0
 // advanced ones further down the same page — no separate "All" maze.
 Modal {
     id: root
-    width: Math.min(parent ? parent.width - 80 : 900, 920)
-    height: Math.min(parent ? parent.height - 80 : 620, 640)
+    width: Math.min(parent ? parent.width - 40 : 1000, 1000)
+    height: Math.min(parent ? parent.height - 40 : 820, 820)
     property string page: "general"
+    property string categorySearch: ""
     signal showShortcuts()
     signal showOnboarding()
 
     readonly property var pages: [
-        { id: "general", label: "General", icon: "monitor" },
-        { id: "interface", label: "Interface", icon: "panel-left" },
-        { id: "privacy", label: "Privacy", icon: "eye-off" },
-        { id: "controls", label: "Controls", icon: "keyboard" },
-        { id: "playback", label: "Playback", icon: "play" },
-        { id: "video", label: "Video", icon: "film" },
-        { id: "audio", label: "Audio", icon: "audio-lines" },
-        { id: "subtitles", label: "Subtitles", icon: "captions" },
+        { id: "general", label: "General", icon: "preferences" },
+        { id: "interface", label: "Interface", icon: "interface" },
+        { id: "privacy", label: "Privacy", icon: "privacy" },
+        { id: "controls", label: "Controls", icon: "hotkeys" },
+        { id: "playback", label: "Playback", icon: "playback" },
+        { id: "video", label: "Video", icon: "video" },
+        { id: "audio", label: "Audio", icon: "audio" },
+        { id: "subtitles", label: "Subtitles", icon: "subtitles" },
         { id: "library", label: "Library", icon: "folder" },
-        { id: "network", label: "Network", icon: "link" },
-        { id: "performance", label: "Performance", icon: "gauge" },
-        { id: "recording", label: "Recording", icon: "circle-dot" },
-        { id: "extensions", label: "Extensions", icon: "plus" }
+        { id: "network", label: "Network", icon: "streaming" },
+        { id: "performance", label: "Performance", icon: "preferences" },
+        { id: "recording", label: "Recording", icon: "record" },
+        { id: "extensions", label: "Extensions", icon: "plugins" }
+    ]
+    readonly property var categoryGroups: [
+        { label: "App", ids: ["general", "interface", "privacy", "controls"] },
+        { label: "Media", ids: ["playback", "video", "audio", "subtitles", "library"] },
+        { label: "System", ids: ["network", "performance", "recording", "extensions"] }
     ]
 
-    RowLayout {
+    function pagesInGroup(ids) {
+        const query = categorySearch.trim().toLowerCase()
+        return pages.filter(p => ids.indexOf(p.id) >= 0 && p.label.toLowerCase().includes(query))
+    }
+
+    ColumnLayout {
         width: root.width - 36
         height: root.height - 36
-        spacing: 0
+        spacing: 8
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 34
+            spacing: 26
+            Item {
+                Layout.preferredWidth: 190
+                Layout.fillHeight: true
+                NField {
+                    id: categoryField
+                    anchors.fill: parent
+                    leftPadding: 32
+                    placeholderText: "Search"
+                    onTextChanged: root.categorySearch = text
+                }
+                Icon { name: "search"; size: 16; x: 9; anchors.verticalCenter: parent.verticalCenter; color: Theme.textFaint }
+            }
+            NText { text: "Global Settings"; font.pixelSize: 15; color: Theme.textDim; Layout.fillWidth: true }
+            IconButton { icon: "x"; tip: "Close"; onClicked: root.close() }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 0
 
         // Category list
         Rectangle {
@@ -44,23 +80,41 @@ Modal {
             radius: Theme.radius
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 6
-                spacing: 2
+                anchors.margins: 8
+                spacing: 4
                 Repeater {
-                    model: root.pages
-                    delegate: Rectangle {
+                    model: root.categoryGroups
+                    delegate: ColumnLayout {
                         required property var modelData
                         Layout.fillWidth: true
-                        implicitHeight: 32
-                        radius: Theme.radiusSmall
-                        color: root.page === modelData.id ? Theme.accentSoft : (catMouse.containsMouse ? Theme.hover : "transparent")
-                        Row {
-                            x: 10; spacing: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            Icon { name: modelData.icon; size: 15; color: root.page === modelData.id ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
-                            NText { text: modelData.label; color: root.page === modelData.id ? Theme.accent : Theme.text; anchors.verticalCenter: parent.verticalCenter }
+                        spacing: 2
+                        visible: root.pagesInGroup(modelData.ids).length > 0
+                        NText {
+                            text: modelData.label
+                            visible: root.categorySearch.length === 0
+                            color: Theme.textFaint
+                            font.pixelSize: 11
+                            Layout.leftMargin: 8
+                            Layout.topMargin: 6
+                            Layout.bottomMargin: 2
                         }
-                        MouseArea { id: catMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.page = modelData.id }
+                        Repeater {
+                            model: root.pagesInGroup(parent.modelData.ids)
+                            delegate: Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                implicitHeight: 34
+                                radius: Theme.radiusSmall
+                                color: root.page === modelData.id || categoryMouse.containsMouse ? Theme.hover : "transparent"
+                                Row {
+                                    x: 10; spacing: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Icon { name: modelData.icon; size: 17; color: root.page === modelData.id ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
+                                    NText { text: modelData.label; color: root.page === modelData.id ? Theme.text : Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
+                                }
+                                MouseArea { id: categoryMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.page = modelData.id }
+                            }
+                        }
                     }
                 }
                 Item { Layout.fillHeight: true }
@@ -314,6 +368,7 @@ Modal {
                 }
                 Item { implicitHeight: 12 }
             }
+        }
         }
     }
 
