@@ -10,9 +10,10 @@
 #include <atomic>
 #include <memory>
 
-#include "vlc_headers.hpp"
 #include "queue_model.hpp"
 #include "player_backend.hpp"
+
+struct intf_thread_t;
 
 class Player : public QObject
 {
@@ -178,13 +179,9 @@ signals:
 
 private:
     // VLC callbacks (any thread)
-    static int onInputCurrent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *);
-    static int onInputEvent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *);
-    static int onPlaylistVar(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *);
-    static int onPlaylistChange(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *);
-
-    void attachInput();
-    void detachInput();
+    void refreshCurrentInput();
+    void onBackendInputChanged();
+    void onBackendInputEvent(BackendInputEvent event);
     void refreshTime();
     void refreshState();
     void refreshMeta();
@@ -200,8 +197,6 @@ private:
     void rememberRecent(const QString &mrl);
     QString presetKey() const;
 
-    playlist_t *m_pl;
-    input_thread_t *m_input = nullptr;
     std::unique_ptr<PlayerBackend> m_backend;
     QueueModel m_queue;
     QSettings m_settings;

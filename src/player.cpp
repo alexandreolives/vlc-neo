@@ -10,22 +10,12 @@ namespace {
 
 constexpr int kRecentMax = 15;
 
-template <typename Fn>
-void post(QObject *ctx, Fn &&fn)
-{
-    QMetaObject::invokeMethod(ctx, std::forward<Fn>(fn), Qt::QueuedConnection);
-}
-
-const char *const kPlaylistVars[] = {"volume", "mute", "fullscreen", "rate", "loop", "repeat", "random"};
-const char *const kPlaylistChangeVars[] = {"playlist-item-append", "playlist-item-deleted", "item-change"};
-
 } // namespace
 
 // -------------------------------------------------------------------- Player
 
 Player::Player(intf_thread_t *intf, QObject *parent)
-    : QObject(parent), m_pl(pl_Get(intf)),
-      m_backend(makeVlc3PlayerBackend(intf, m_pl)),
+    : QObject(parent), m_backend(makeVlc3PlayerBackend(intf, pl_Get(intf))),
       m_settings(QStringLiteral("vlc-neo"), QStringLiteral("neo"))
 {
     m_queueTimer.setSingleShot(true);
@@ -43,13 +33,19 @@ Player::Player(intf_thread_t *intf, QObject *parent)
         emit sleepChanged();
     });
 
-    var_AddCallback(m_pl, "input-current", onInputCurrent, this);
-    for (const char *name : kPlaylistVars)
-        var_AddCallback(m_pl, name, onPlaylistVar, this);
-    for (const char *name : kPlaylistChangeVars)
-        var_AddCallback(m_pl, name, onPlaylistChange, this);
+    connect(m_backend.get(), &PlayerBackend::inputChanged, this, &Player::onBackendInputChanged);
+    connect(m_backend.get(), &PlayerBackend::inputEvent, this, &Player::onBackendInputEvent);
+    connect(m_backend.get(), &PlayerBackend::fullscreenChanged, this, &Player::fullscreenRequested);
+    connect(m_backend.get(), &PlayerBackend::volumeStateChanged, this, &Player::refreshVolume);
+    connect(m_backend.get(), &PlayerBackend::rateStateChanged, this, &Player::refreshState);
+    connect(m_backend.get(), &PlayerBackend::playbackModesChanged, this, &Player::refreshModes);
+    connect(m_backend.get(), &PlayerBackend::queueChanged, this, [this] {
+        if (!m_queueTimer.isActive())
+            m_queueTimer.start();
+    });
 
-    attachInput();
+    if (!m_backend->syncCurrentInput())
+        refreshCurrentInput();
     refreshVolume();
     refreshModes();
     rebuildQueue();
@@ -57,111 +53,54 @@ Player::Player(intf_thread_t *intf, QObject *parent)
 
 Player::~Player()
 {
-    for (const char *name : kPlaylistChangeVars)
-        var_DelCallback(m_pl, name, onPlaylistChange, this);
-    for (const char *name : kPlaylistVars)
-        var_DelCallback(m_pl, name, onPlaylistVar, this);
-    var_DelCallback(m_pl, "input-current", onInputCurrent, this);
-    detachInput();
+    saveResumePoint();
 }
 
-// ------------------------------------------------------------ VLC callbacks
-
-int Player::onInputCurrent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *data)
+void Player::onBackendInputChanged()
 {
-    auto *self = static_cast<Player *>(data);
-    post(self, [self] { self->attachInput(); });
-    return VLC_SUCCESS;
+    saveResumePoint();
+    m_presetPending = true;
+    m_subsLinkedApplied = false;
+    m_linkedSubtitleFile.clear();
+    m_lastSavedResume = 0;
+    m_presetActive = false;
+    emit presetChanged();
+    refreshCurrentInput();
 }
 
-int Player::onInputEvent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t newval, void *data)
+void Player::onBackendInputEvent(BackendInputEvent event)
 {
-    auto *self = static_cast<Player *>(data);
-    switch (newval.i_int) {
-    case INPUT_EVENT_POSITION:
-    case INPUT_EVENT_LENGTH:
-        if (!self->m_timePosted.exchange(true))
-            post(self, [self] { self->refreshTime(); });
+    switch (event) {
+    case BackendInputEvent::Position:
+        if (!m_timePosted.exchange(true))
+            QMetaObject::invokeMethod(this, [this] { refreshTime(); }, Qt::QueuedConnection);
         break;
-    case INPUT_EVENT_STATE:
-    case INPUT_EVENT_RECORD:
-    case INPUT_EVENT_RATE:
-        post(self, [self] { self->refreshState(); });
+    case BackendInputEvent::State:
+        refreshState();
         break;
-    case INPUT_EVENT_ES:
-    case INPUT_EVENT_VOUT:
-        post(self, [self] { self->refreshTracks(); });
+    case BackendInputEvent::Tracks:
+        refreshTracks();
         break;
-    case INPUT_EVENT_ITEM_META:
-    case INPUT_EVENT_TITLE:
-        post(self, [self] { self->refreshMeta(); });
+    case BackendInputEvent::Metadata:
+        refreshMeta();
         break;
-    case INPUT_EVENT_AUDIO_DELAY:
-    case INPUT_EVENT_SUBTITLE_DELAY:
-        post(self, [self] { self->refreshDelays(); });
+    case BackendInputEvent::Delays:
+        refreshDelays();
         break;
-    case INPUT_EVENT_AOUT:
-        post(self, [self] { self->refreshVolume(); });
+    case BackendInputEvent::Volume:
+        refreshVolume();
         break;
-    case INPUT_EVENT_DEAD:
-        post(self, [self] { self->attachInput(); });
-        break;
-    default:
+    case BackendInputEvent::Dead:
+        if (!m_backend->syncCurrentInput())
+            refreshCurrentInput();
         break;
     }
-    return VLC_SUCCESS;
 }
 
-int Player::onPlaylistVar(vlc_object_t *, const char *name, vlc_value_t, vlc_value_t newval, void *data)
+// ---------------------------------------------------------- input state sync
+
+void Player::refreshCurrentInput()
 {
-    auto *self = static_cast<Player *>(data);
-    const QByteArray var(name);
-    if (var == "fullscreen") {
-        const bool fs = newval.b_bool;
-        post(self, [self, fs] { emit self->fullscreenRequested(fs); });
-    } else if (var == "volume" || var == "mute") {
-        post(self, [self] { self->refreshVolume(); });
-    } else if (var == "rate") {
-        post(self, [self] { self->refreshState(); });
-    } else {
-        post(self, [self] { self->refreshModes(); });
-    }
-    return VLC_SUCCESS;
-}
-
-int Player::onPlaylistChange(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *data)
-{
-    auto *self = static_cast<Player *>(data);
-    post(self, [self] {
-        if (!self->m_queueTimer.isActive())
-            self->m_queueTimer.start();
-    });
-    return VLC_SUCCESS;
-}
-
-// ------------------------------------------------------------ input binding
-
-void Player::attachInput()
-{
-    input_thread_t *input = playlist_CurrentInput(m_pl);
-    if (input && input == m_input) {
-        vlc_object_release(input);
-    } else {
-        detachInput();
-        m_input = input;
-        if (m_input) {
-            var_AddCallback(m_input, "intf-event", onInputEvent, this);
-            m_presetPending = true;
-            m_subsLinkedApplied = false;
-            m_linkedSubtitleFile.clear();
-            m_lastSavedResume = 0;
-        }
-        m_presetActive = false;
-        emit presetChanged();
-    }
-
-    m_backend->syncCurrentInput();
-
     const QUrl previousUrl = m_mediaUrl;
     refreshMeta();
     refreshState();
@@ -177,17 +116,6 @@ void Player::attachInput()
     }
 
     m_queue.setCurrentId(m_backend->currentQueueItemId());
-}
-
-void Player::detachInput()
-{
-    if (!m_input)
-        return;
-    saveResumePoint();
-    var_DelCallback(m_input, "intf-event", onInputEvent, this);
-    m_backend->clearCurrentInput();
-    vlc_object_release(m_input);
-    m_input = nullptr;
 }
 
 void Player::refreshTime()

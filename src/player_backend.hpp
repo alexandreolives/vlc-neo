@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QList>
+#include <QObject>
 #include <QUrl>
 #include <QVariant>
 #include <QString>
@@ -58,10 +59,22 @@ struct BackendChapter {
     bool selected = false;
 };
 
-class PlayerBackend
+enum class BackendInputEvent {
+    Position,
+    State,
+    Tracks,
+    Metadata,
+    Delays,
+    Volume,
+    Dead
+};
+
+class PlayerBackend : public QObject
 {
+    Q_OBJECT
 public:
-    virtual ~PlayerBackend() = default;
+    explicit PlayerBackend(QObject *parent = nullptr) : QObject(parent) {}
+    ~PlayerBackend() override = default;
 
     virtual void togglePause() = 0;
     virtual void play() = 0;
@@ -82,8 +95,7 @@ public:
     virtual int currentQueueItemId() const = 0;
     virtual bool exportQueue(const QString &path) = 0;
     virtual BackendPlaylistState playlistState() const = 0;
-    virtual void syncCurrentInput() = 0;
-    virtual void clearCurrentInput() = 0;
+    virtual bool syncCurrentInput() = 0;
     virtual BackendInputState inputState() const = 0;
     virtual bool hasInput() const = 0;
     virtual void seek(double position) = 0;
@@ -119,4 +131,13 @@ public:
     virtual QVariant config(const QString &name) const = 0;
     virtual void setConfig(const QString &name, const QVariant &value) = 0;
     virtual bool forwardKey(int qtKey, int qtModifiers, const QString &text) = 0;
+
+signals:
+    void inputChanged();
+    void inputEvent(BackendInputEvent event);
+    void fullscreenChanged(bool fullscreen);
+    void volumeStateChanged();
+    void rateStateChanged();
+    void playbackModesChanged();
+    void queueChanged();
 };

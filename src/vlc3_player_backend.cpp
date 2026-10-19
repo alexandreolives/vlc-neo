@@ -3,6 +3,7 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QUrl>
+#include <utility>
 
 #include <vlc_configuration.h>
 
@@ -24,10 +25,36 @@ QByteArray esVarName(const QString &category)
     return "video-es";
 }
 
+const char *const kPlaylistVars[] = {"volume", "mute", "fullscreen", "rate", "loop", "repeat", "random"};
+const char *const kPlaylistChangeVars[] = {"playlist-item-append", "playlist-item-deleted", "item-change"};
+
+template <typename Fn>
+void post(QObject *context, Fn &&fn)
+{
+    QMetaObject::invokeMethod(context, std::forward<Fn>(fn), Qt::QueuedConnection);
+}
+
 class Vlc3PlayerBackend final : public PlayerBackend
 {
 public:
-    Vlc3PlayerBackend(intf_thread_t *intf, playlist_t *playlist) : m_intf(intf), m_playlist(playlist) {}
+    Vlc3PlayerBackend(intf_thread_t *intf, playlist_t *playlist) : m_intf(intf), m_playlist(playlist)
+    {
+        var_AddCallback(m_playlist, "input-current", onInputCurrent, this);
+        for (const char *name : kPlaylistVars)
+            var_AddCallback(m_playlist, name, onPlaylistVar, this);
+        for (const char *name : kPlaylistChangeVars)
+            var_AddCallback(m_playlist, name, onPlaylistChange, this);
+    }
+
+    ~Vlc3PlayerBackend() override
+    {
+        for (const char *name : kPlaylistChangeVars)
+            var_DelCallback(m_playlist, name, onPlaylistChange, this);
+        for (const char *name : kPlaylistVars)
+            var_DelCallback(m_playlist, name, onPlaylistVar, this);
+        var_DelCallback(m_playlist, "input-current", onInputCurrent, this);
+        clearCurrentInput();
+    }
 
     void togglePause() override { playlist_TogglePause(m_playlist); }
     void play() override { playlist_Play(m_playlist); }
@@ -107,24 +134,84 @@ public:
 
     ~Vlc3PlayerBackend() override { clearCurrentInput(); }
 
-    void syncCurrentInput() override
+    bool syncCurrentInput() override
     {
         input_thread_t *input = playlist_CurrentInput(m_playlist);
         if (input == m_input) {
             if (input)
                 vlc_object_release(input);
-            return;
+            return false;
         }
         clearCurrentInput();
         m_input = input;
+        if (m_input)
+            var_AddCallback(m_input, "intf-event", onInputEvent, this);
+        emit inputChanged();
+        return true;
     }
 
-    void clearCurrentInput() override
+    void clearCurrentInput()
     {
         if (!m_input)
             return;
+        var_DelCallback(m_input, "intf-event", onInputEvent, this);
         vlc_object_release(m_input);
         m_input = nullptr;
+    }
+
+    static int onInputCurrent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *data)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(data);
+        post(self, [self] { self->syncCurrentInput(); });
+        return VLC_SUCCESS;
+    }
+
+    static int onInputEvent(vlc_object_t *, const char *, vlc_value_t, vlc_value_t newval, void *data)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(data);
+        BackendInputEvent event;
+        switch (newval.i_int) {
+        case INPUT_EVENT_POSITION:
+        case INPUT_EVENT_LENGTH: event = BackendInputEvent::Position; break;
+        case INPUT_EVENT_STATE:
+        case INPUT_EVENT_RECORD:
+        case INPUT_EVENT_RATE: event = BackendInputEvent::State; break;
+        case INPUT_EVENT_ES:
+        case INPUT_EVENT_VOUT: event = BackendInputEvent::Tracks; break;
+        case INPUT_EVENT_ITEM_META:
+        case INPUT_EVENT_TITLE: event = BackendInputEvent::Metadata; break;
+        case INPUT_EVENT_AUDIO_DELAY:
+        case INPUT_EVENT_SUBTITLE_DELAY: event = BackendInputEvent::Delays; break;
+        case INPUT_EVENT_AOUT: event = BackendInputEvent::Volume; break;
+        case INPUT_EVENT_DEAD: event = BackendInputEvent::Dead; break;
+        default: return VLC_SUCCESS;
+        }
+        post(self, [self, event] { emit self->inputEvent(event); });
+        return VLC_SUCCESS;
+    }
+
+    static int onPlaylistVar(vlc_object_t *, const char *name, vlc_value_t, vlc_value_t newval, void *data)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(data);
+        const QByteArray variable(name);
+        if (variable == "fullscreen") {
+            const bool fullscreen = newval.b_bool;
+            post(self, [self, fullscreen] { emit self->fullscreenChanged(fullscreen); });
+        } else if (variable == "volume" || variable == "mute") {
+            post(self, [self] { emit self->volumeStateChanged(); });
+        } else if (variable == "rate") {
+            post(self, [self] { emit self->rateStateChanged(); });
+        } else {
+            post(self, [self] { emit self->playbackModesChanged(); });
+        }
+        return VLC_SUCCESS;
+    }
+
+    static int onPlaylistChange(vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void *data)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(data);
+        post(self, [self] { emit self->queueChanged(); });
+        return VLC_SUCCESS;
     }
 
     BackendInputState inputState() const override

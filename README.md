@@ -279,7 +279,7 @@ working.
 VLC 3 core (system package, unchanged)
  ├─ interface "neo"        Qt Quick UI thread (QML)
  │                          └─ Player facade ─ PlayerBackend ─ Vlc3PlayerBackend
- │                             (transport, playlist, input snapshots and track/audio controls)
+ │                             (generic state and control API; VLC callbacks stay in adapter)
  └─ vout display "neo_vout" RGB32 frames with subtitles and OSD already blended by VLC
                             └─ FrameStore ─► VideoOutput (Qt scene-graph texture)
 ```
@@ -289,9 +289,9 @@ VLC 3 core (system package, unchanged)
 | `src/module.cpp` | Module descriptor; routes the playlist's video to `neo_vout` |
 | `src/vout_display.cpp` | Receives decoded pictures from the VLC core |
 | `src/video_item.cpp` | Draws them in QML (fit or fill) |
-| `src/player.cpp` | QML-facing player facade, UI state, preferences and VLC event callbacks |
-| `src/player_backend.hpp` | Backend interface for transport, playlist, input, track, chapter, audio and video operations |
-| `src/vlc3_player_backend.cpp` | VLC 3 adapter that owns the current input reference and implements playback state, tracks, chapters, audio and video controls |
+| `src/player.cpp` | QML-facing player facade, UI state, preferences and conversion to QML values |
+| `src/player_backend.hpp` | VLC-independent backend interface for generic state, events and transport, playlist, track, chapter, audio and video operations |
+| `src/vlc3_player_backend.cpp` | VLC 3 adapter that owns input references, registers VLC callbacks and implements the generic backend operations |
 | `src/queue_model.cpp` | QML-facing playlist model, separate from the adapter |
 | `qml/` | The interface. Design tokens live in `qml/singletons/NeoTheme.qml` |
 
