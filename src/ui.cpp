@@ -22,6 +22,7 @@
 #include "neo.hpp"
 #include "platform.hpp"
 #include "player.hpp"
+#include "thumbnail_provider.hpp"
 #include "video_item.hpp"
 #include "vlc3_player_backend.hpp"
 
@@ -183,6 +184,8 @@ void NeoRunUi(intf_thread_t *intf, void (*ready)(void *), void *readyData)
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new IconProvider);
+    auto *thumbnailProvider = new ThumbnailProvider;
+    engine.addImageProvider(QStringLiteral("thumbnail"), thumbnailProvider);
     engine.rootContext()->setContextProperty(QStringLiteral("player"), &player);
     engine.rootContext()->setContextProperty(QStringLiteral("platform"), &platform);
     engine.load(QUrl(QStringLiteral("qrc:/neo/qml/Main.qml")));
@@ -193,6 +196,8 @@ void NeoRunUi(intf_thread_t *intf, void (*ready)(void *), void *readyData)
         installTestHooks(engine.rootObjects().first());
         app.exec();
     }
+    // Drain asynchronous VLC/FFmpeg jobs before Qt image plugins tear down.
+    thumbnailProvider->waitForJobs();
 
     QMutexLocker locker(&g_appLock);
     g_app = nullptr;

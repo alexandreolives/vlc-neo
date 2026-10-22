@@ -22,6 +22,7 @@ add_library(neo_plugin MODULE
   src/module.cpp
   src/vout_display.cpp
   src/video_item.cpp
+  src/thumbnail_provider.cpp
   src/player.cpp
   src/player_state_store.cpp
   src/vlc3_player_backend.cpp
@@ -41,6 +42,8 @@ add_library(neo_plugin MODULE
   src/subtitle_matcher.hpp
   src/subtitle_timeline.hpp
   src/video_item.hpp
+  src/bounded_image_cache.hpp
+  src/thumbnail_provider.hpp
   src/vlc_headers.hpp
 )
 
@@ -119,6 +122,14 @@ if(BUILD_TESTING)
   target_link_libraries(icon_provider_test PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Svg)
   add_test(NAME icon_provider COMMAND icon_provider_test)
   set_tests_properties(icon_provider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+  add_executable(bounded_image_cache_test
+    tests/bounded_image_cache_test.cpp
+    src/bounded_image_cache.hpp
+  )
+  target_include_directories(bounded_image_cache_test PRIVATE src)
+  target_link_libraries(bounded_image_cache_test PRIVATE Qt6::Core Qt6::Gui)
+  add_test(NAME bounded_image_cache COMMAND bounded_image_cache_test)
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")
