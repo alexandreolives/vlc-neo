@@ -127,6 +127,9 @@ Modal {
     property string otherVlcOptionType: ""
     property string otherVlcOptionMessage: ""
     property string skinRestartNotice: ""
+    readonly property bool skinInterfaceAvailable: player.config("intf") !== undefined
+                                                && player.config("skins2-last") !== undefined
+    property alias skinUnavailableMessageVisible: skinUnavailableMessage.visible
     property alias otherVlcOptionNameInput: otherVlcOptionField
     property alias logFilePathField: logFilePathInput
     property alias skinFilePathInput: skinFilePathField
@@ -240,6 +243,10 @@ Modal {
     }
 
     function setSkinInterfaceEnabled(enabled) {
+        if (!skinInterfaceAvailable) {
+            skinRestartNotice = "This VLC build does not include the skins2 interface."
+            return false
+        }
         const value = enabled ? "skins2" : "neo"
         player.setConfig("intf", value)
         skinRestartNotice = String(player.config("intf") || "") === value
@@ -1023,9 +1030,10 @@ Modal {
                 // ---------------------------------------------- Interface
                 Page_ {
                     id_: "interface"
-                    SectionTitle { text: "Skin" }
+                    SectionTitle { text: "Skin"; visible: root.skinInterfaceAvailable }
                     SettingRow {
-                        objectName: "use-custom-skin-row"
+                        objectName: "vlc-option-intf"
+                        visible: root.skinInterfaceAvailable
                         label: "Use a custom skin"
                         info: "Selects VLC's skins2 interface for the regular VLC launcher. Restart VLC to apply it."
                         NSwitch {
@@ -1035,6 +1043,8 @@ Modal {
                         }
                     }
                     SettingRow {
+                        objectName: "vlc-option-skins2-last"
+                        visible: root.skinInterfaceAvailable
                         label: "Skin file"
                         info: "Path to a VLC .vlt skin used by the skins2 interface."
                         RowLayout {
@@ -1053,6 +1063,15 @@ Modal {
                                 onClicked: skinFileDialog.open()
                             }
                         }
+                    }
+                    NText {
+                        id: skinUnavailableMessage
+                        objectName: "skin-unavailable-message"
+                        visible: !root.skinInterfaceAvailable
+                        text: "This VLC build does not include the skins2 interface."
+                        color: Theme.textFaint
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
                     }
                     NText {
                         objectName: "skin-restart-notice"
