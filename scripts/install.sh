@@ -42,14 +42,18 @@ die() {
 }
 
 confirm() {
-    local prompt="$1" answer
+    local prompt="$1" answer="" tty_fd
     if [ "$assume_yes" -eq 1 ]; then
         return 0
     fi
-    if [ ! -r /dev/tty ]; then
+    if ! { exec {tty_fd}<>/dev/tty; } 2>/dev/null; then
         die "$prompt Run this installer in a terminal, or pass --yes."
     fi
-    read -r -p "$prompt [Y/n] " answer </dev/tty
+    if ! read -r -p "$prompt [Y/n] " answer <&"$tty_fd"; then
+        exec {tty_fd}>&-
+        die "$prompt Run this installer in a terminal, or pass --yes."
+    fi
+    exec {tty_fd}>&-
     case "$answer" in
         [nN]|[nN][oO]) return 1 ;;
         *) return 0 ;;
@@ -74,7 +78,7 @@ install_system_dependencies() {
     case " $ID $ID_LIKE " in
         *debian*|*ubuntu*)
             PACKAGE_MANAGER="apt"
-            SYSTEM_PACKAGES=(build-essential cmake ninja-build pkg-config python3-venv libgl1-mesa-dev vlc libvlccore-dev)
+            SYSTEM_PACKAGES=(build-essential cmake ninja-build pkg-config python3-venv libgl1-mesa-dev vlc libvlccore-dev libtag1-dev libsqlite3-dev)
             # QML modules are split into packages on Debian-family systems.
             for package in qml6-module-qtquick-controls qml6-module-qtquick-dialogs \
                 qml6-module-qtquick-layouts qml6-module-qt-labs-folderlistmodel \
@@ -86,11 +90,11 @@ install_system_dependencies() {
             ;;
         *arch*)
             PACKAGE_MANAGER="pacman"
-            SYSTEM_PACKAGES=(base-devel cmake ninja pkgconf python mesa vlc libvlc)
+            SYSTEM_PACKAGES=(base-devel cmake ninja pkgconf python mesa vlc libvlc taglib sqlite)
             ;;
         *fedora*|*rhel*)
             PACKAGE_MANAGER="dnf"
-            SYSTEM_PACKAGES=(gcc-c++ cmake ninja-build pkgconf-pkg-config python3 mesa-libGL-devel vlc vlc-devel)
+            SYSTEM_PACKAGES=(gcc-c++ cmake ninja-build pkgconf-pkg-config python3 mesa-libGL-devel vlc vlc-devel taglib-devel sqlite-devel)
             ;;
         *)
             die "Unsupported package manager for $ID. Install a C++17 compiler, CMake 3.21+, Ninja, pkg-config, Python venv, VLC 3 and VLC plugin headers manually."
@@ -125,7 +129,7 @@ install_system_dependencies() {
 
 qt_pkgconfig_ok() {
     local pkg_path="$1" module
-    local modules=(Qt6Core Qt6Gui Qt6Qml Qt6Quick Qt6QuickControls2 Qt6Svg)
+    local modules=(Qt6Core Qt6DBus Qt6Gui Qt6Qml Qt6Quick Qt6QuickControls2 Qt6Svg)
     for module in "${modules[@]}"; do
         PKG_CONFIG_PATH="$pkg_path" pkg-config --exists "$module" || return 1
     done
@@ -265,7 +269,7 @@ SH
 if [ "$mode" = "--default" ]; then
     mkdir -p "$APPS"
     # `vlc` in ~/.local/bin (ahead of /usr/bin in PATH): Neo unless an interface is
-    # requested explicitly (`vlc -I qt`, `vlc --intf dummy`, --help, ...).
+    # requested explicitly, or the saved skins2 preference enables VLC skins.
     install -Dm755 /dev/stdin "$BIN/vlc" <<SH
 #!/usr/bin/env bash
 $MARK
@@ -280,6 +284,10 @@ for arg in "\$@"; do
         -I|-I*|--intf|--intf=*|-H|--help|--version|--list*) exec "$SYSTEM_VLC" "\$@" ;;
     esac
 done
+vlc_config="\${XDG_CONFIG_HOME:-\$HOME/.config}/vlc/vlcrc"
+if [ -r "\$vlc_config" ] && grep -Eq '^[[:space:]]*intf=skins2([[:space:]]|$)' "\$vlc_config"; then
+    exec "$SYSTEM_VLC" "\$@"
+fi
 exec "$SYSTEM_VLC" -I neo "\$@"
 SH
     # Same id as the system entry, so launchers, "Open with" and existing
@@ -321,7 +329,7 @@ fi
 update-desktop-database "$APPS" 2>/dev/null || true
 
 if [ "$mode" = "--default" ]; then
-    echo "Installed as the default VLC interface. Classic UI: 'vlc -I qt' or 'VLC (Classic interface)'."
+    echo "Installed as the default VLC interface. Classic Qt UI: 'vlc -I qt' or 'VLC (Classic interface)'. Enable a custom skin in Neo Preferences to use skins2 from 'vlc'."
 else
     echo "Installed. Run: vlc-neo <file>   (normal 'vlc' still opens the classic UI)"
 fi

@@ -30,6 +30,7 @@ cat > "$SYSTEM_VLC" <<'VLC'
 if [[ "${1:-}" == "-I" && "${2:-}" == "qt" ]]; then
     : > "$VLC_CLASSIC_CALLED"
 fi
+printf '%s\n' "$*" >> "$VLC_ARGS_LOG"
 echo "VLC version 3.0.20 installer-test"
 VLC
 chmod +x "$SYSTEM_VLC"
@@ -124,6 +125,7 @@ export HOME="$TEST_HOME"
 export QT_ROOT="$FAKE_QT"
 export BUILD_DIR SYSTEM_DESKTOP SYSTEM_VLC
 export VLC_CLASSIC_CALLED="$WORK/classic-called"
+export VLC_ARGS_LOG="$WORK/vlc-args.log"
 export PACKAGE_LOG="$WORK/package-manager.log"
 export AQT_LOG="$WORK/aqt-mirrors.log"
 
@@ -138,6 +140,14 @@ grep -q 'Exec=.*-I qt' "$HOME/.local/share/applications/vlc-classic.desktop"
 "$HOME/.local/bin/vlc" --version | grep -q 'VLC version 3.0.20'
 "$HOME/.local/bin/vlc" -I qt --version | grep -q 'VLC version 3.0.20'
 test -f "$VLC_CLASSIC_CALLED"
+"$HOME/.local/bin/vlc" "$WORK/default.mp4" >/dev/null
+grep -q -- '-I neo ' "$VLC_ARGS_LOG"
+mkdir -p "$HOME/.config/vlc"
+printf 'intf=skins2\n' > "$HOME/.config/vlc/vlcrc"
+"$HOME/.local/bin/vlc" "$WORK/skin.mp4" >/dev/null
+test "$(tail -n 1 "$VLC_ARGS_LOG")" = "$WORK/skin.mp4"
+"$HOME/.local/bin/vlc-neo" "$WORK/neo.mp4" >/dev/null
+test "$(tail -n 1 "$VLC_ARGS_LOG")" = "-I neo $WORK/neo.mp4"
 
 echo 'PASS  default install, classic passthrough, uninstall, and system launcher restore'
 
@@ -154,12 +164,12 @@ echo 'PASS  uninstall removes the user override without changing the system laun
 PACKAGE_MISSING=1 "$HERE/scripts/install.sh" --default --yes
 if [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *debian* || "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *ubuntu* ]]; then
     grep -qx 'update' "$PACKAGE_LOG"
-    grep -q '^install -y .*ninja-build.*libvlccore-dev' "$PACKAGE_LOG"
+    grep -q '^install -y .*ninja-build.*libvlccore-dev.*libtag1-dev.*libsqlite3-dev' "$PACKAGE_LOG"
     ! grep -q 'qml6-module-qtquick-effects' "$PACKAGE_LOG"
 elif [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *arch* ]]; then
-    grep -q '^-S --needed .*ninja.*libvlc' "$PACKAGE_LOG"
+    grep -q '^-S --needed .*ninja.*libvlc.*taglib.*sqlite' "$PACKAGE_LOG"
 elif [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *fedora* || "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *rhel* ]]; then
-    grep -q '^install -y .*ninja-build.*vlc-devel' "$PACKAGE_LOG"
+    grep -q '^install -y .*ninja-build.*vlc-devel.*taglib-devel.*sqlite-devel' "$PACKAGE_LOG"
 else
     echo 'Unsupported host for installer dependency test' >&2
     exit 1
