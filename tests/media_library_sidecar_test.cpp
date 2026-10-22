@@ -97,6 +97,14 @@ int main(int argc, char **argv)
         ok &= expect(model != nullptr, "media model is available");
         ok &= expect(library.addFolder(QUrl::fromLocalFile(music)), "add temporary music folder");
         ok &= expect(waitForScan(library, application), "initial sidecar scan completes");
+        const QString nestedFolder = QDir(music).filePath(QStringLiteral("season"));
+        ok &= expect(QDir().mkpath(nestedFolder), "create a nested folder for overlap checks");
+        ok &= expect(!library.addFolder(QUrl::fromLocalFile(nestedFolder)),
+                     "reject a nested root already covered by the library");
+        ok &= expect(!library.addFolder(QUrl::fromLocalFile(temporary.path())),
+                     "reject a parent root that would duplicate an indexed folder");
+        ok &= expect(library.roots().size() == 1 && library.indexedCount() == 1,
+                     "overlap rejection leaves the persisted roots and catalog unchanged");
         if (model && model->itemCount() == 1)
             originalArtwork = model->itemAt(0).value(QStringLiteral("artwork")).toString();
         ok &= expect(!originalArtwork.isEmpty() && QFileInfo::exists(originalArtwork),
