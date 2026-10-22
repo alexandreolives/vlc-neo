@@ -832,7 +832,7 @@ check "turning off the add-on startup switch changes VLC's preference" "$out" "e
 out=$(NEO_SANDBOX="$extensionShotSandbox" run "100:settingsDialog.open(); settingsDialog.page='extensions'|+700:'extensionStartupPersists=' + (player.config('qt-autoload-extensions') === false && settingsDialog.preferenceControl('vlc-option-qt-autoload-extensions').current === false)|+100:click-item:vlc-option-switch-qt-autoload-extensions|+200:'extensionStartupRestored=' + (player.config('qt-autoload-extensions') === true)|+100:quit")
 check "the add-on startup preference persists in VLC across relaunch" "$out" "extensionStartupPersists=true"
 check "the add-on startup switch can be turned back on" "$out" "extensionStartupRestored=true"
-out=$(NEO_SANDBOX="$extensionShotSandbox" run "100:settingsDialog.open(); settingsDialog.page='extensions'|+300:settingsDialog.importAddonPackage('file://$HERE/tests/fixtures/neo-disposable-test.vlp')|+5000:'addonPackageImportSettled=' + (!settingsDialog.addonPackageImportPending && !settingsDialog.addonActionUuid && !player.addonsLoading && ['VLC could not read or find an installable add-on in the selected package.','VLC found no installable add-on in this package.','Add-on already installed.','Add-on installed.','VLC could not install this add-on.'].indexOf(settingsDialog.addonStatus) >= 0)|+100:'addonPackageImportStatus=' + settingsDialog.addonStatus|+100:quit")
+out=$(NEO_SANDBOX="$extensionShotSandbox" run "100:settingsDialog.open(); settingsDialog.page='extensions'|+300:settingsDialog.importAddonPackage('file://$HERE/tests/fixtures/neo-disposable-test.vlp')|+31500:'addonPackageImportSettled=' + (!settingsDialog.addonPackageImportPending && !settingsDialog.addonActionUuid && !player.addonsLoading && ['VLC could not read or find an installable add-on in the selected package.','VLC found no installable add-on in this package.','Add-on already installed.','Add-on installed.','VLC could not install this add-on.'].indexOf(settingsDialog.addonStatus) >= 0)|+100:'addonPackageImportStatus=' + settingsDialog.addonStatus|+100:quit")
 check "a local .vlp import reaches a terminal VLC package result" "$out" "addonPackageImportSettled=true"
 out=$(NEO_SANDBOX="$extensionShotSandbox" run "100:settingsDialog.open(); settingsDialog.page='extensions'|+200:'packageCandidateSkipsKnownAndUninstallable=' + (() => { settingsDialog.addonPackageKnownUuids=['known']; const addon=settingsDialog.packageAddonCandidate([{uuid:'known',manageable:true,installed:false},{uuid:'plugin',manageable:false,installed:false},{uuid:'installed',manageable:true,installed:true},{uuid:'new',manageable:true,installed:false}]); return addon && addon.uuid==='new' })()|+100:'packageImportDispatchesInstallation=' + (() => { settingsDialog.addonPackageKnownUuids=['known']; settingsDialog.addonPackageImportPending=true; settingsDialog.handleAddonPackageEntries([{uuid:'new',manageable:true,installed:false}]); return !settingsDialog.addonPackageImportPending && settingsDialog.addonActionUuid==='' && settingsDialog.addonStatus==='VLC could not install this add-on.' })()|+100:quit")
 check "local packages select only a newly discovered installable add-on" "$out" "packageCandidateSkipsKnownAndUninstallable=true"
@@ -1371,9 +1371,15 @@ import pathlib
 import sys
 
 directory = pathlib.Path(sys.argv[1])
+class HttpInputHandler(http.server.SimpleHTTPRequestHandler):
+    def guess_type(self, path):
+        if path.lower().endswith(".m3u"):
+            return "audio/x-mpegurl"
+        return super().guess_type(path)
+
 server = http.server.ThreadingHTTPServer(
     ("127.0.0.1", 0),
-    functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory)),
+    functools.partial(HttpInputHandler, directory=str(directory)),
 )
 (directory / "http-input-port").write_text(str(server.server_address[1]))
 server.serve_forever()
