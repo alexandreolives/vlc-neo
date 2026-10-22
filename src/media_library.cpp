@@ -134,7 +134,7 @@ Tags readTags(const QString &path)
         }
     } else if (auto *mp4 = dynamic_cast<TagLib::MP4::File *>(ref.file())) {
         if (TagLib::MP4::Tag *tag = mp4->tag()) {
-            const auto items = tag->itemListMap();
+            const auto items = tag->itemMap();
             if (items.contains("covr")) {
                 const auto covers = items.value("covr").toCoverArtList();
                 if (!covers.isEmpty()) {
