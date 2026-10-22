@@ -16,7 +16,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             base-devel git cmake ninja pkgconf \
-            vlc libvlc vlc-plugins-all \
+            vlc libvlc vlc-plugins-all taglib sqlite \
             qt6-base qt6-declarative qt6-svg \
             ffmpeg ttf-dejavu imagemagick
       - uses: actions/checkout@v5
@@ -58,7 +58,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-svg-dev \
-            vlc libvlc-dev libvlccore-dev ffmpeg
+            vlc libvlc-dev libvlccore-dev libtag1-dev libsqlite3-dev ffmpeg
           dpkg-query -W -f='${Version}' qt6-base-dev > /tmp/system-qt-before
           if [ -f /usr/share/applications/vlc.desktop ]; then
             sha256sum /usr/share/applications/vlc.desktop | cut -d' ' -f1 > /tmp/system-desktop-before

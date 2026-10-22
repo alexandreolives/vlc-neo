@@ -12,6 +12,8 @@ endif()
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(VLCPLUGIN REQUIRED IMPORTED_TARGET vlc-plugin>=3.0.0)
+pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
 find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Core Gui Qml Quick QuickControls2 Svg)
 
 file(GLOB NEO_QML RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
@@ -22,6 +24,7 @@ add_library(neo_plugin MODULE
   src/module.cpp
   src/vout_display.cpp
   src/video_item.cpp
+  src/media_library.cpp
   src/player.cpp
   src/player_state_store.cpp
   src/vlc3_player_backend.cpp
@@ -41,6 +44,7 @@ add_library(neo_plugin MODULE
   src/subtitle_matcher.hpp
   src/subtitle_timeline.hpp
   src/video_item.hpp
+  src/media_library.hpp
   src/vlc_headers.hpp
 )
 
@@ -55,6 +59,7 @@ target_compile_definitions(neo_plugin PRIVATE
 target_compile_options(neo_plugin PRIVATE -Wall -Wno-deprecated-declarations)
 target_link_libraries(neo_plugin PRIVATE
   PkgConfig::VLCPLUGIN
+  PkgConfig::TAGLIB PkgConfig::SQLITE3
   Qt6::Concurrent Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
 )
 set_target_properties(neo_plugin PROPERTIES PREFIX "lib" OUTPUT_NAME "neo_plugin")
@@ -75,6 +80,28 @@ if(BUILD_TESTING)
   )
   target_link_libraries(subtitle_timeline_test PRIVATE Qt6::Core)
   add_test(NAME subtitle_timeline COMMAND subtitle_timeline_test)
+
+  add_executable(media_library_sidecar_test
+    tests/media_library_sidecar_test.cpp
+    src/media_library.cpp
+    src/media_library.hpp
+  )
+  target_include_directories(media_library_sidecar_test PRIVATE src)
+  target_link_libraries(media_library_sidecar_test PRIVATE
+    Qt6::Concurrent Qt6::Core PkgConfig::TAGLIB PkgConfig::SQLITE3
+  )
+  add_test(NAME media_library_sidecar COMMAND media_library_sidecar_test)
+
+  add_executable(media_library_query_failure_test
+    tests/media_library_query_failure_test.cpp
+    src/media_library.cpp
+    src/media_library.hpp
+  )
+  target_include_directories(media_library_query_failure_test PRIVATE src)
+  target_link_libraries(media_library_query_failure_test PRIVATE
+    Qt6::Concurrent Qt6::Core PkgConfig::TAGLIB PkgConfig::SQLITE3
+  )
+  add_test(NAME media_library_query_failure COMMAND media_library_query_failure_test)
 
   add_executable(player_facade_test
     tests/player_facade_test.cpp
