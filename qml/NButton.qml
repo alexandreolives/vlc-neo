@@ -6,6 +6,7 @@ Rectangle {
     property string text
     property string icon
     property bool primary: false
+    property bool selected: false
     property bool flat: false
     property bool enabledState: true
     signal clicked()
@@ -16,10 +17,22 @@ Rectangle {
     radius: Theme.radiusSmall
     opacity: enabledState ? 1 : 0.45
     color: primary ? (mouse.containsMouse ? Qt.lighter(Theme.accent, 1.12) : Theme.accent)
+                   : selected ? (mouse.containsMouse ? Qt.lighter(Theme.accentSoft, 1.15) : Theme.accentSoft)
                    : flat ? (mouse.containsMouse ? Theme.hover : "transparent")
-                          : (mouse.containsMouse ? Theme.hover : Theme.raised)
-    border.width: primary || flat ? 0 : 1
-    border.color: Theme.border
+                          : (mouse.containsMouse ? Theme.hover : Theme.surface)
+    border.width: activeFocus ? 1 : (primary || flat ? 0 : 1)
+    border.color: activeFocus || selected ? Theme.accent : Theme.border
+    Behavior on color { ColorAnimation { duration: 90 } }
+    activeFocusOnTab: enabledState
+    Accessible.name: text
+    Accessible.role: Accessible.Button
+    Accessible.focusable: enabledState
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (root.enabledState && !event.isAutoRepeat) root.clicked()
+            event.accepted = true
+        }
+    }
 
     Row {
         id: row
@@ -29,13 +42,13 @@ Rectangle {
             visible: root.icon.length > 0
             name: root.icon
             size: 15
-            color: root.primary ? Theme.accentText : Theme.text
+            color: root.primary ? Theme.accentText : root.selected ? Theme.accent : Theme.text
             anchors.verticalCenter: parent.verticalCenter
         }
         NText {
             text: root.text
-            color: root.primary ? Theme.accentText : Theme.text
-            font.weight: root.primary ? Font.DemiBold : Font.Normal
+            color: root.primary ? Theme.accentText : root.selected ? Theme.accent : Theme.text
+            font.weight: root.primary || root.selected ? Font.DemiBold : Font.Normal
             anchors.verticalCenter: parent.verticalCenter
         }
     }

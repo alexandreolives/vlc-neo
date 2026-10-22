@@ -14,7 +14,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(VLCPLUGIN REQUIRED IMPORTED_TARGET vlc-plugin>=3.0.0)
 find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Core Gui Qml Quick QuickControls2 Svg)
 
-file(GLOB NEO_QML RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
+file(GLOB NEO_QML CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
 file(GLOB NEO_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} icons/*.svg)
 file(GLOB NEO_FIGMA_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} assets/figma-icons/*.svg)
 
