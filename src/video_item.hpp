@@ -10,6 +10,7 @@ class VideoItem : public QQuickItem
     Q_OBJECT
     Q_PROPERTY(bool hasFrame READ hasFrame NOTIFY hasFrameChanged)
     Q_PROPERTY(QSize frameSize READ frameSize NOTIFY frameSizeChanged)
+    Q_PROPERTY(double frameRate READ frameRate NOTIFY frameRateChanged)
     Q_PROPERTY(bool fill READ fill WRITE setFill NOTIFY fillChanged)
 
 public:
@@ -18,12 +19,14 @@ public:
 
     bool hasFrame() const { return m_hasFrame; }
     QSize frameSize() const { return m_frameSize; }
+    double frameRate() const { return m_propertyFrameRate; }
     bool fill() const { return m_fill; }
     void setFill(bool fill);
 
 signals:
     void hasFrameChanged();
     void frameSizeChanged();
+    void frameRateChanged();
     void fillChanged();
 
 protected:
@@ -40,6 +43,8 @@ private:
     quint64 m_serial = 0;
     QImage m_frame;
     double m_sampleAspect = 1.0;
+    double m_frameRate = 0.0;
+    double m_propertyFrameRate = 0.0;
     bool m_hasFrame = false;
     bool m_fill = false;
     QSize m_frameSize;

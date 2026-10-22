@@ -18,13 +18,14 @@ public:
     }
 
     // Called from the VLC vout thread.
-    void publish(QImage &&frame, double sampleAspect)
+    void publish(QImage &&frame, double sampleAspect, double frameRate)
     {
         QPointer<QObject> sink;
         {
             QMutexLocker locker(&m_lock);
             m_frame = std::move(frame);
             m_sampleAspect = sampleAspect > 0.0 ? sampleAspect : 1.0;
+            m_frameRate = frameRate > 0.0 ? frameRate : 0.0;
             ++m_serial;
             sink = m_sink;
         }
@@ -37,6 +38,7 @@ public:
         {
             QMutexLocker locker(&m_lock);
             m_frame = QImage();
+            m_frameRate = 0.0;
             ++m_serial;
             sink = m_sink;
         }
@@ -44,7 +46,7 @@ public:
     }
 
     // Called from the render thread. Returns false when nothing changed.
-    bool take(quint64 &serial, QImage &frame, double &sampleAspect)
+    bool take(quint64 &serial, QImage &frame, double &sampleAspect, double &frameRate)
     {
         QMutexLocker locker(&m_lock);
         if (serial == m_serial)
@@ -52,6 +54,7 @@ public:
         serial = m_serial;
         frame = m_frame; // implicit sharing, cheap
         sampleAspect = m_sampleAspect;
+        frameRate = m_frameRate;
         return true;
     }
 
@@ -75,6 +78,7 @@ private:
     QMutex m_lock;
     QImage m_frame;
     double m_sampleAspect = 1.0;
+    double m_frameRate = 0.0;
     quint64 m_serial = 0;
     QPointer<QObject> m_sink;
 };

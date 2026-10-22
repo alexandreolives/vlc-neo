@@ -17,8 +17,22 @@ Rectangle {
     implicitWidth: 30
     implicitHeight: 28
     radius: Theme.radiusSmall
-    color: mouse.pressed ? Theme.raised : (mouse.containsMouse ? Theme.hover : "transparent")
+    color: mouse.pressed ? Theme.raised : (mouse.containsMouse || activeFocus ? Theme.hover : "transparent")
+    border.width: activeFocus ? 1 : 0
+    border.color: Theme.accent
+    activeFocusOnTab: enabled
+    Accessible.name: tip.length ? tip : icon
+    Accessible.role: Accessible.Button
+    Accessible.focusable: enabled
     Behavior on color { ColorAnimation { duration: 90 } }
+
+    Keys.onPressed: (event) => {
+        if (!enabled || (event.key !== Qt.Key_Space && event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter))
+            return
+        if (!event.isAutoRepeat)
+            root.clicked()
+        event.accepted = true
+    }
 
     Icon {
         anchors.centerIn: parent
@@ -31,6 +45,7 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: Qt.PointingHandCursor
         onClicked: (e) => e.button === Qt.RightButton ? root.rightClicked() : root.clicked()
     }
     ToolTip.visible: tip.length > 0 && mouse.containsMouse

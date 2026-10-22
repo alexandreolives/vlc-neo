@@ -1,8 +1,17 @@
 #include "vlc3_player_backend.hpp"
+#include "vlc_addon_uuid.hpp"
 
 #include <QFileInfo>
 #include <QHash>
+#include <QSharedPointer>
+#include <QStringList>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QHash>
+#include <QTimer>
 #include <QUrl>
+#include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 #include <vlc_configuration.h>
@@ -39,6 +48,7 @@ class Vlc3PlayerBackend final : public PlayerBackend
 public:
     Vlc3PlayerBackend(intf_thread_t *intf, playlist_t *playlist) : m_intf(intf), m_playlist(playlist)
     {
+        syncHttpProxyEnvironment();
         var_AddCallback(m_playlist, "input-current", onInputCurrent, this);
         for (const char *name : kPlaylistVars)
             var_AddCallback(m_playlist, name, onPlaylistVar, this);
@@ -48,6 +58,12 @@ public:
 
     ~Vlc3PlayerBackend() override
     {
+        discoverRenderers(false);
+        clearRenderers();
+        if (m_addonsManager) {
+            addons_manager_Delete(m_addonsManager);
+            m_addonsManager = nullptr;
+        }
         for (const char *name : kPlaylistChangeVars)
             var_DelCallback(m_playlist, name, onPlaylistChange, this);
         for (const char *name : kPlaylistVars)
@@ -115,6 +131,29 @@ public:
         const int currentId = current ? current->i_id : -1;
         playlist_Unlock(m_playlist);
         return currentId;
+    }
+
+    QString playlistName() const override
+    {
+        QString result;
+        playlist_Lock(m_playlist);
+        playlist_item_t *current = playlist_CurrentPlayingItem(m_playlist);
+        for (playlist_item_t *node = current ? current->p_parent : nullptr;
+             node && node != m_playlist->p_playing; node = node->p_parent) {
+            if (!node->p_input)
+                continue;
+            const QString uri = takeString(input_item_GetURI(node->p_input));
+            const QString suffix = QFileInfo(QUrl(uri).path()).suffix().toLower();
+            if (suffix != QLatin1String("m3u") && suffix != QLatin1String("m3u8")
+                && suffix != QLatin1String("pls") && suffix != QLatin1String("xspf"))
+                continue;
+            result = takeString(input_item_GetName(node->p_input)).trimmed();
+            if (result.isEmpty())
+                result = QFileInfo(QUrl(uri).path()).completeBaseName();
+            break;
+        }
+        playlist_Unlock(m_playlist);
+        return result;
     }
 
     BackendPlaylistState playlistState() const override
@@ -418,6 +457,36 @@ public:
         }
         return {};
     }
+    bool setVideoFilterChain(const QString &filters) override
+    {
+        var_Create(m_playlist, "video-filter", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+        var_SetString(m_playlist, "video-filter", filters.toUtf8().constData());
+        if (vout_thread_t *vout = currentVout()) {
+            const int result = var_SetString(vout, "video-filter", filters.toUtf8().constData());
+            vlc_object_release(vout);
+            return result == VLC_SUCCESS;
+        }
+        return false;
+    }
+    bool setVideoAdjustment(const QString &option, double value) override
+    {
+        static const char *const supported[] = {"contrast", "brightness", "hue", "saturation", "gamma"};
+        bool known = false;
+        for (const char *name : supported)
+            known |= option == QLatin1String(name);
+        if (!known)
+            return false;
+        const QByteArray key = option.toUtf8();
+        var_Create(m_playlist, key.constData(), VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
+        var_SetFloat(m_playlist, key.constData(), float(value));
+        if (vout_thread_t *vout = currentVout()) {
+            var_Create(vout, key.constData(), VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
+            const int result = var_SetFloat(vout, key.constData(), float(value));
+            vlc_object_release(vout);
+            return result == VLC_SUCCESS;
+        }
+        return false;
+    }
     void setTransform(const QString &type) override
     {
         vout_thread_t *vout = currentVout();
@@ -425,7 +494,12 @@ public:
             return;
         var_Create(vout, "transform-type", VLC_VAR_STRING);
         var_SetString(vout, "transform-type", type.toUtf8().constData());
-        var_SetString(vout, "video-filter", type.isEmpty() ? "" : "transform");
+        QStringList filters = takeString(var_GetString(vout, "video-filter")).split(QLatin1Char(','), Qt::SkipEmptyParts);
+        filters.removeAll(QStringLiteral("transform"));
+        if (!type.isEmpty())
+            filters.append(QStringLiteral("transform"));
+        const QString filterChain = filters.join(QLatin1Char(','));
+        var_SetString(vout, "video-filter", filterChain.toUtf8().constData());
         vlc_object_release(vout);
     }
     void setDeinterlace(bool enabled) override
@@ -443,14 +517,29 @@ public:
             return;
         }
         const QByteArray name = preset.toUtf8();
+        // Seed the 10-band value before enabling the VLC 3 filter; otherwise
+        // VLC's initial preset callback leaves its band variable empty.
+        static constexpr const char *flatBands = "0 0 0 0 0 0 0 0 0 0";
         var_Create(m_playlist, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
         var_SetString(m_playlist, "equalizer-preset", name.constData());
+        var_Create(m_playlist, "equalizer-bands", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+        var_SetString(m_playlist, "equalizer-bands", flatBands);
         if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
             var_Create(aout, "equalizer-preset", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
             var_SetString(aout, "equalizer-preset", name.constData());
+            var_Create(aout, "equalizer-bands", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+            var_SetString(aout, "equalizer-bands", flatBands);
             vlc_object_release(aout);
         }
         playlist_EnableAudioFilter(m_playlist, "equalizer", true);
+        if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+            // The filter now has its callback; toggle a valid preset so it
+            // replaces the seed bands with the selected profile's real curve.
+            const char *alternate = preset == QLatin1String("flat") ? "rock" : "flat";
+            var_SetString(aout, "equalizer-preset", alternate);
+            var_SetString(aout, "equalizer-preset", name.constData());
+            vlc_object_release(aout);
+        }
     }
     bool snapshot() override
     {
@@ -480,6 +569,20 @@ public:
     {
         const QByteArray key = name.toUtf8();
         vlc_object_t *object = VLC_OBJECT(m_intf);
+        if (name == QLatin1String("equalizer-bands")
+            || name == QLatin1String("equalizer-preamp")) {
+            if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+                QVariant activeValue;
+                if (var_Type(aout, key.constData()) != 0) {
+                    activeValue = name == QLatin1String("equalizer-bands")
+                        ? QVariant(takeString(var_GetString(aout, key.constData())))
+                        : QVariant(double(var_GetFloat(aout, key.constData())));
+                }
+                vlc_object_release(aout);
+                if (activeValue.isValid())
+                    return activeValue;
+            }
+        }
         switch (config_GetType(key.constData())) {
         case VLC_VAR_BOOL: return bool(config_GetInt(object, key.constData()));
         case VLC_VAR_INTEGER: return qint64(config_GetInt(object, key.constData()));
@@ -489,18 +592,142 @@ public:
         }
     }
 
+    QString configType(const QString &name) const override
+    {
+        const QByteArray key = name.toUtf8();
+        switch (config_GetType(key.constData())) {
+        case VLC_VAR_BOOL: return QStringLiteral("bool");
+        case VLC_VAR_INTEGER: return QStringLiteral("integer");
+        case VLC_VAR_FLOAT: return QStringLiteral("float");
+        case VLC_VAR_STRING: return QStringLiteral("string");
+        default: return {};
+        }
+    }
+
+    QString configDescription(const QString &name) const override
+    {
+        const QByteArray key = name.toUtf8();
+        const module_config_t *config = config_FindConfig(key.constData());
+        if (!config)
+            return {};
+        const char *description = config->psz_longtext ? config->psz_longtext : config->psz_text;
+        return description ? QString::fromUtf8(description).trimmed() : QString();
+    }
+
+    QVariantMap configRange(const QString &name) const override
+    {
+        const QByteArray key = name.toUtf8();
+        const module_config_t *config = config_FindConfig(key.constData());
+        if (!config)
+            return {};
+
+        switch (config_GetType(key.constData())) {
+        case VLC_VAR_INTEGER:
+            if (config->min.i < config->max.i)
+                return {{QStringLiteral("minimum"), QVariant::fromValue<qlonglong>(config->min.i)},
+                        {QStringLiteral("maximum"), QVariant::fromValue<qlonglong>(config->max.i)}};
+            break;
+        case VLC_VAR_FLOAT:
+            if (config->min.f < config->max.f)
+                return {{QStringLiteral("minimum"), double(config->min.f)},
+                        {QStringLiteral("maximum"), double(config->max.f)}};
+            break;
+        default:
+            break;
+        }
+        return {};
+    }
+
     void setConfig(const QString &name, const QVariant &value) override
     {
         const QByteArray key = name.toUtf8();
         vlc_object_t *object = VLC_OBJECT(m_intf);
-        switch (config_GetType(key.constData())) {
+        if (name == QLatin1String("http-proxy") || name == QLatin1String("http-proxy-pwd")) {
+            config_PutPsz(object, key.constData(), value.toString().toUtf8().constData());
+            syncHttpProxyEnvironment();
+            config_SaveConfigFile(m_intf);
+            return;
+        }
+        const QString previousAudioFilters = name == QLatin1String("audio-filter")
+            ? takeString(config_GetPsz(object, key.constData())) : QString();
+        const int configType = config_GetType(key.constData());
+        switch (configType) {
         case VLC_VAR_BOOL:
         case VLC_VAR_INTEGER: config_PutInt(object, key.constData(), value.toLongLong()); break;
         case VLC_VAR_FLOAT: config_PutFloat(object, key.constData(), value.toFloat()); break;
         case VLC_VAR_STRING: config_PutPsz(object, key.constData(), value.toString().toUtf8().constData()); break;
         default: return;
         }
+        if (name == QLatin1String("audio-filter")) {
+            const auto filterNames = [](const QString &chain) {
+                QStringList names;
+                for (const QString &name : chain.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+                    const QString cleaned = name.trimmed();
+                    if (!cleaned.isEmpty() && !names.contains(cleaned))
+                        names.append(cleaned);
+                }
+                return names;
+            };
+            const QStringList previous = filterNames(previousAudioFilters);
+            const QStringList next = filterNames(value.toString());
+            for (const QString &filter : previous) {
+                if (!next.contains(filter))
+                    playlist_EnableAudioFilter(m_playlist, filter.toUtf8().constData(), false);
+            }
+            for (const QString &filter : next) {
+                if (!previous.contains(filter))
+                    playlist_EnableAudioFilter(m_playlist, filter.toUtf8().constData(), true);
+            }
+        } else if (name.startsWith(QLatin1String("equalizer-"))
+                   || name.startsWith(QLatin1String("spatializer-"))
+                   || name.startsWith(QLatin1String("stereowiden-"))) {
+            const auto setRuntimeValue = [&](vlc_object_t *target) {
+                switch (configType) {
+                case VLC_VAR_BOOL:
+                    var_Create(target, key.constData(), VLC_VAR_BOOL | VLC_VAR_DOINHERIT);
+                    var_SetBool(target, key.constData(), value.toBool());
+                    break;
+                case VLC_VAR_INTEGER:
+                    var_Create(target, key.constData(), VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+                    var_SetInteger(target, key.constData(), int(value.toLongLong()));
+                    break;
+                case VLC_VAR_FLOAT:
+                    var_Create(target, key.constData(), VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
+                    var_SetFloat(target, key.constData(), value.toFloat());
+                    break;
+                case VLC_VAR_STRING:
+                    var_Create(target, key.constData(), VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+                    var_SetString(target, key.constData(), value.toString().toUtf8().constData());
+                    break;
+                default: break;
+                }
+            };
+            setRuntimeValue(VLC_OBJECT(m_playlist));
+            if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+                setRuntimeValue(VLC_OBJECT(aout));
+                vlc_object_release(aout);
+            }
+        }
+        // VLC 3 listens for the "visual" variable on the active audio output.
+        // Updating the global audio-visual config alone only affects the next
+        // audio output, so forward the selection through VLC's own callback.
+        if (name == QLatin1String("audio-visual")) {
+            if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
+                const QString visualization = value.toString();
+                const QString mode = visualization == QLatin1String("none")
+                    ? QStringLiteral("none")
+                    : takeString(config_GetPsz(object, "effect-list"));
+                if (!mode.isEmpty() && var_Type(aout, "visual") != 0)
+                    var_SetString(aout, "visual", mode.toUtf8().constData());
+                vlc_object_release(aout);
+            }
+        }
         config_SaveConfigFile(m_intf);
+    }
+
+    void sendHotkey(int vlcKey) override
+    {
+        var_SetInteger(m_intf->obj.libvlc, "key-pressed", vlcKey);
     }
 
     bool forwardKey(int qtKey, int qtModifiers, const QString &text) override
@@ -542,7 +769,351 @@ public:
         return true;
     }
 
+    bool forwardWheel(int deltaX, int deltaY, int qtModifiers) override
+    {
+        uint32_t code = deltaY > 0 ? KEY_MOUSEWHEELUP
+                       : deltaY < 0 ? KEY_MOUSEWHEELDOWN
+                       : deltaX > 0 ? KEY_MOUSEWHEELRIGHT
+                       : deltaX < 0 ? KEY_MOUSEWHEELLEFT : 0;
+        if (!code)
+            return false;
+        if (qtModifiers & Qt::ShiftModifier)
+            code |= KEY_MODIFIER_SHIFT;
+        if (qtModifiers & Qt::ControlModifier)
+            code |= KEY_MODIFIER_CTRL;
+        if (qtModifiers & Qt::AltModifier)
+            code |= KEY_MODIFIER_ALT;
+        if (qtModifiers & Qt::MetaModifier)
+            code |= KEY_MODIFIER_META;
+        var_SetInteger(m_intf->obj.libvlc, "key-pressed", code);
+        return true;
+    }
+
+    QVariantList addons() const override
+    {
+        QVariantList result;
+        QStringList ids = m_addons.keys();
+        std::sort(ids.begin(), ids.end(), [this](const QString &a, const QString &b) {
+            return m_addons.value(a).value(QStringLiteral("name")).toString().localeAwareCompare(
+                       m_addons.value(b).value(QStringLiteral("name")).toString()) < 0;
+        });
+        result.reserve(ids.size());
+        for (const QString &id : ids)
+            result.append(m_addons.value(id));
+        return result;
+    }
+    bool addonsLoading() const override { return m_addonsLoading; }
+    void loadAddons() override
+    {
+        if (!m_addonsManager) {
+            const addons_manager_owner owner = {
+                this, addonFoundCallback, addonsDiscoveryEndedCallback, addonChangedCallback
+            };
+            m_addonsManager = addons_manager_New(VLC_OBJECT(m_intf), &owner);
+        }
+        if (!m_addonsManager || m_addonsLoaded)
+            return;
+        setAddonsLoading(true);
+        m_addonsLoaded = addons_manager_LoadCatalog(m_addonsManager) == VLC_SUCCESS;
+        setAddonsLoading(false);
+    }
+    void findAddons(const QString &source) override
+    {
+        loadAddons();
+        if (!m_addonsManager)
+            return;
+        setAddonsLoading(true);
+        const QByteArray uri = source.isEmpty() ? QByteArrayLiteral("repo://") : source.toUtf8();
+        addons_manager_Gather(m_addonsManager, uri.constData());
+        QTimer::singleShot(30000, this, [this] { setAddonsLoading(false); });
+    }
+    bool installAddon(const QString &uuid) override
+    {
+        if (!m_addonsManager)
+            loadAddons();
+        const auto addon = m_addons.constFind(uuid);
+        if (!m_addonsManager || addon == m_addons.cend()
+            || !addon->value(QStringLiteral("manageable")).toBool()
+            || addon->value(QStringLiteral("installed")).toBool())
+            return false;
+        addon_uuid_t id{};
+        return parseVlcAddonUuid(uuid, id)
+            && addons_manager_Install(m_addonsManager, id) == VLC_SUCCESS;
+    }
+    bool removeAddon(const QString &uuid) override
+    {
+        if (!m_addonsManager)
+            loadAddons();
+        const auto addon = m_addons.constFind(uuid);
+        if (!m_addonsManager || addon == m_addons.cend()
+            || !addon->value(QStringLiteral("manageable")).toBool()
+            || !addon->value(QStringLiteral("installed")).toBool())
+            return false;
+        addon_uuid_t id{};
+        return parseVlcAddonUuid(uuid, id)
+            && addons_manager_Remove(m_addonsManager, id) == VLC_SUCCESS;
+    }
+
+    QVariantList rendererDevices() const override
+    {
+        QMutexLocker locker(&m_rendererMutex);
+        QVariantList devices;
+        devices.reserve(m_renderers.size());
+        for (auto it = m_renderers.cbegin(); it != m_renderers.cend(); ++it) {
+            devices.append(QVariantMap{
+                {QStringLiteral("id"), it.key()},
+                {QStringLiteral("name"), QString::fromUtf8(vlc_renderer_item_name(it.value()))},
+                {QStringLiteral("selected"), it.key() == m_activeRendererId}
+            });
+        }
+        std::sort(devices.begin(), devices.end(), [](const QVariant &a, const QVariant &b) {
+            return a.toMap().value(QStringLiteral("name")).toString().localeAwareCompare(
+                       b.toMap().value(QStringLiteral("name")).toString()) < 0;
+        });
+        return devices;
+    }
+    bool rendererDiscoverySupported() const override
+    {
+        char **names = nullptr;
+        char **longNames = nullptr;
+        const int result = vlc_rd_get_names(VLC_OBJECT(m_intf), &names, &longNames);
+        bool supported = false;
+        if (result == VLC_SUCCESS) {
+            for (char **name = names; name && *name; ++name)
+                supported = supported || isLocalRendererDiscoveryModule(*name);
+        }
+        freeRendererNames(names, longNames);
+        return supported;
+    }
+    bool discoverRenderers(bool enabled) override
+    {
+        if (!enabled) {
+            QList<vlc_renderer_discovery_t *> discoveries;
+            discoveries.swap(m_rendererDiscoveries);
+            for (vlc_renderer_discovery_t *discovery : discoveries)
+                vlc_rd_release(discovery);
+            clearRenderers();
+            return true;
+        }
+        if (!m_rendererDiscoveries.isEmpty())
+            return true;
+
+        char **names = nullptr;
+        char **longNames = nullptr;
+        if (vlc_rd_get_names(VLC_OBJECT(m_intf), &names, &longNames) != VLC_SUCCESS)
+            return false;
+        const vlc_renderer_discovery_owner owner = {this, onRendererAdded, onRendererRemoved};
+        for (char **name = names; name && *name; ++name) {
+            if (!isLocalRendererDiscoveryModule(*name))
+                continue;
+            vlc_renderer_discovery_t *discovery = vlc_rd_new(VLC_OBJECT(m_intf), *name, &owner);
+            if (discovery)
+                m_rendererDiscoveries.append(discovery);
+        }
+        freeRendererNames(names, longNames);
+        return !m_rendererDiscoveries.isEmpty();
+    }
+    bool setRenderer(const QString &id) override
+    {
+        vlc_renderer_item_t *item = nullptr;
+        if (!id.isEmpty()) {
+            QMutexLocker locker(&m_rendererMutex);
+            const auto found = m_renderers.constFind(id);
+            if (found == m_renderers.cend())
+                return false;
+            item = vlc_renderer_item_hold(found.value());
+        }
+        const int result = playlist_SetRenderer(m_playlist, item);
+        if (item)
+            vlc_renderer_item_release(item);
+        if (result != VLC_SUCCESS)
+            return false;
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            m_activeRendererId = id;
+        }
+        emit rendererDevicesChanged();
+        return true;
+    }
+
+    static void addonFoundCallback(addons_manager_t *manager, addon_entry_t *entry)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(manager->owner.sys);
+        const QSharedPointer<addon_entry_t> held(addon_entry_Hold(entry), addon_entry_Release);
+        QMetaObject::invokeMethod(self, [self, held] {
+            self->acceptAddon(held.data());
+        }, Qt::QueuedConnection);
+    }
+    static void addonChangedCallback(addons_manager_t *manager, addon_entry_t *entry)
+    {
+        addonFoundCallback(manager, entry);
+    }
+    static void addonsDiscoveryEndedCallback(addons_manager_t *manager)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(manager->owner.sys);
+        QMetaObject::invokeMethod(self, [self] { self->setAddonsLoading(false); }, Qt::QueuedConnection);
+    }
+
 private:
+    void restoreEnvironment(const char *name, bool wasSet, const QByteArray &value)
+    {
+        if (wasSet)
+            qputenv(name, value);
+        else
+            qunsetenv(name);
+    }
+
+    void syncHttpProxyEnvironment()
+    {
+        const QString proxy = takeString(config_GetPsz(VLC_OBJECT(m_intf), "http-proxy")).trimmed();
+        if (proxy.isEmpty()) {
+            restoreEnvironment("http_proxy", m_hadHttpProxy, m_originalHttpProxy);
+            restoreEnvironment("https_proxy", m_hadHttpsProxy, m_originalHttpsProxy);
+            return;
+        }
+
+        QString address = proxy;
+        if (!address.contains(QStringLiteral("://")))
+            address.prepend(QStringLiteral("http://"));
+        QUrl url(address);
+        if (!url.isValid() || url.scheme() != QLatin1String("http") || url.host().isEmpty()) {
+            restoreEnvironment("http_proxy", m_hadHttpProxy, m_originalHttpProxy);
+            restoreEnvironment("https_proxy", m_hadHttpsProxy, m_originalHttpsProxy);
+            return;
+        }
+
+        const QString password = takeString(config_GetPsz(VLC_OBJECT(m_intf), "http-proxy-pwd"));
+        if (!password.isEmpty())
+            url.setPassword(password);
+        const QByteArray proxyUrl = url.toString(QUrl::FullyEncoded).toUtf8();
+        qputenv("http_proxy", proxyUrl);
+        qputenv("https_proxy", proxyUrl);
+    }
+
+    static bool isLocalRendererDiscoveryModule(const char *name)
+    {
+        const QByteArray lower = QByteArray(name).toLower();
+        return lower.contains("avahi") || lower.contains("microdns");
+    }
+    static void freeRendererNames(char **names, char **longNames)
+    {
+        if (names) {
+            for (char **name = names; *name; ++name)
+                free(*name);
+            free(names);
+        }
+        if (longNames) {
+            for (char **name = longNames; *name; ++name)
+                free(*name);
+            free(longNames);
+        }
+    }
+    static QString rendererId(vlc_renderer_item_t *item)
+    {
+        return QString::number(reinterpret_cast<quintptr>(item), 16);
+    }
+    static void onRendererAdded(vlc_renderer_discovery_t *discovery, vlc_renderer_item_t *item)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(discovery->owner.sys);
+        if (!self || qstrcmp(vlc_renderer_item_type(item), "chromecast") != 0)
+            return;
+        const QSharedPointer<vlc_renderer_item_t> held(vlc_renderer_item_hold(item), vlc_renderer_item_release);
+        QMetaObject::invokeMethod(self, [self, held] { self->registerRenderer(held.data()); }, Qt::QueuedConnection);
+    }
+    static void onRendererRemoved(vlc_renderer_discovery_t *discovery, vlc_renderer_item_t *item)
+    {
+        auto *self = static_cast<Vlc3PlayerBackend *>(discovery->owner.sys);
+        if (!self || qstrcmp(vlc_renderer_item_type(item), "chromecast") != 0)
+            return;
+        const QString id = rendererId(item);
+        QMetaObject::invokeMethod(self, [self, id] { self->unregisterRenderer(id); }, Qt::QueuedConnection);
+    }
+    void registerRenderer(vlc_renderer_item_t *item)
+    {
+        const QString id = rendererId(item);
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            const auto existing = m_renderers.find(id);
+            if (existing != m_renderers.end())
+                vlc_renderer_item_release(existing.value());
+            m_renderers.insert(id, vlc_renderer_item_hold(item));
+        }
+        emit rendererDevicesChanged();
+    }
+    void unregisterRenderer(const QString &id)
+    {
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            auto item = m_renderers.find(id);
+            if (item == m_renderers.end())
+                return;
+            vlc_renderer_item_release(item.value());
+            m_renderers.erase(item);
+            if (m_activeRendererId == id) {
+                m_activeRendererId.clear();
+                playlist_SetRenderer(m_playlist, nullptr);
+            }
+        }
+        emit rendererDevicesChanged();
+    }
+    void clearRenderers()
+    {
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            for (vlc_renderer_item_t *item : std::as_const(m_renderers))
+                vlc_renderer_item_release(item);
+            m_renderers.clear();
+            if (!m_activeRendererId.isEmpty()) {
+                m_activeRendererId.clear();
+                playlist_SetRenderer(m_playlist, nullptr);
+            }
+        }
+        emit rendererDevicesChanged();
+    }
+    static QString addonTypeName(addon_type_t type)
+    {
+        switch (type) {
+        case ADDON_EXTENSION: return QStringLiteral("Extension");
+        case ADDON_PLAYLIST_PARSER: return QStringLiteral("Playlist parser");
+        case ADDON_SERVICE_DISCOVERY: return QStringLiteral("Service discovery");
+        case ADDON_SKIN2: return QStringLiteral("Skin");
+        case ADDON_PLUGIN: return QStringLiteral("Plugin");
+        case ADDON_INTERFACE: return QStringLiteral("Interface");
+        case ADDON_META: return QStringLiteral("Metadata provider");
+        default: return QStringLiteral("Add-on");
+        }
+    }
+    void setAddonsLoading(bool loading)
+    {
+        if (m_addonsLoading == loading)
+            return;
+        m_addonsLoading = loading;
+        emit addonsLoadingChanged();
+    }
+    void acceptAddon(addon_entry_t *entry)
+    {
+        char *rawId = addons_uuid_to_psz(&entry->uuid);
+        const QString id = QString::fromUtf8(rawId ? rawId : "");
+        free(rawId);
+        if (id.isEmpty())
+            return;
+        QVariantMap addon {
+            {QStringLiteral("uuid"), id},
+            {QStringLiteral("name"), QString::fromUtf8(entry->psz_name ? entry->psz_name : "")},
+            {QStringLiteral("summary"), QString::fromUtf8(entry->psz_summary ? entry->psz_summary : "")},
+            {QStringLiteral("description"), QString::fromUtf8(entry->psz_description ? entry->psz_description : "")},
+            {QStringLiteral("author"), QString::fromUtf8(entry->psz_author ? entry->psz_author : "")},
+            {QStringLiteral("version"), QString::fromUtf8(entry->psz_version ? entry->psz_version : "")},
+            {QStringLiteral("type"), addonTypeName(entry->e_type)},
+            {QStringLiteral("installing"), entry->e_state == ADDON_INSTALLING},
+            {QStringLiteral("installed"), entry->e_state == ADDON_INSTALLED},
+            {QStringLiteral("removing"), entry->e_state == ADDON_UNINSTALLING},
+            {QStringLiteral("manageable"), bool(entry->e_flags & ADDON_MANAGEABLE)},
+            {QStringLiteral("source"), QString::fromUtf8(entry->psz_source_uri ? entry->psz_source_uri : "")}
+        };
+        m_addons.insert(id, addon);
+        emit addonsChanged();
+    }
     vout_thread_t *currentVout() const { return m_input ? input_GetVout(m_input) : nullptr; }
 
     static void collectLeaves(playlist_item_t *node, QList<MediaQueueEntry> &out)
@@ -566,7 +1137,19 @@ private:
 
     intf_thread_t *m_intf;
     playlist_t *m_playlist;
+    const bool m_hadHttpProxy = qEnvironmentVariableIsSet("http_proxy");
+    const QByteArray m_originalHttpProxy = qgetenv("http_proxy");
+    const bool m_hadHttpsProxy = qEnvironmentVariableIsSet("https_proxy");
+    const QByteArray m_originalHttpsProxy = qgetenv("https_proxy");
     input_thread_t *m_input = nullptr; // owns the reference returned by playlist_CurrentInput
+    addons_manager_t *m_addonsManager = nullptr;
+    QHash<QString, QVariantMap> m_addons;
+    bool m_addonsLoaded = false;
+    bool m_addonsLoading = false;
+    QList<vlc_renderer_discovery_t *> m_rendererDiscoveries;
+    mutable QMutex m_rendererMutex;
+    QHash<QString, vlc_renderer_item_t *> m_renderers;
+    QString m_activeRendererId;
 };
 
 } // namespace

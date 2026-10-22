@@ -44,10 +44,17 @@ QSGNode *VideoItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 {
     auto *node = static_cast<QSGImageNode *>(old);
 
-    bool changed = FrameStore::instance().take(m_serial, m_frame, m_sampleAspect);
+    bool changed = FrameStore::instance().take(m_serial, m_frame, m_sampleAspect, m_frameRate);
     if (m_frame.isNull()) {
-        if (changed)
+        if (changed) {
             setFrameInfo(false, QSize());
+            QMetaObject::invokeMethod(this, [this] {
+                if (m_propertyFrameRate != 0.0) {
+                    m_propertyFrameRate = 0.0;
+                    emit frameRateChanged();
+                }
+            }, Qt::QueuedConnection);
+        }
         delete node;
         return nullptr;
     }
@@ -64,6 +71,12 @@ QSGNode *VideoItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         node->setTexture(texture);
         const QSize display(qRound(m_frame.width() * m_sampleAspect), m_frame.height());
         setFrameInfo(true, display);
+        QMetaObject::invokeMethod(this, [this, rate = m_frameRate] {
+            if (!qFuzzyCompare(m_propertyFrameRate, rate)) {
+                m_propertyFrameRate = rate;
+                emit frameRateChanged();
+            }
+        }, Qt::QueuedConnection);
     }
 
     // Fit (letterbox) or fill (crop) the frame inside the item.

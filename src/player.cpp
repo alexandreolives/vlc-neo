@@ -2,12 +2,54 @@
 #include "subtitle_matcher.hpp"
 
 #include <QFutureWatcher>
+#include <QCryptographicHash>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QSet>
+#include <QStringList>
 #include <QtConcurrent/QtConcurrentRun>
 
+#include <cmath>
+#include <algorithm>
 #include <utility>
+
+namespace {
+const QStringList &profileOptionNames()
+{
+    static const QStringList names = {
+        QStringLiteral("audio-language"), QStringLiteral("sub-language"),
+        QStringLiteral("file-caching"), QStringLiteral("disc-caching"),
+        QStringLiteral("network-caching"), QStringLiteral("live-caching"),
+        QStringLiteral("avcodec-hw"), QStringLiteral("deinterlace"),
+        QStringLiteral("deinterlace-mode"), QStringLiteral("video-filter"),
+        QStringLiteral("audio-filter"), QStringLiteral("play-and-pause"),
+        QStringLiteral("play-and-exit"), QStringLiteral("freetype-font"),
+        QStringLiteral("freetype-color"), QStringLiteral("freetype-opacity"),
+        QStringLiteral("freetype-bold"), QStringLiteral("freetype-outline-thickness"),
+        QStringLiteral("freetype-shadow-opacity"), QStringLiteral("freetype-rel-fontsize")
+    };
+    return names;
+}
+
+QList<QUrl> parseNetworkUrls(const QString &lines)
+{
+    QList<QUrl> urls;
+    for (const QString &line : lines.split(QLatin1Char('\n'))) {
+        const QString value = line.trimmed();
+        if (value.isEmpty() || value.startsWith(QLatin1Char('#')))
+            continue;
+        const QUrl url = QUrl::fromUserInput(value);
+        if (!url.isValid() || url.scheme().isEmpty() || url.isLocalFile())
+            return {};
+        urls.append(url);
+    }
+    return urls;
+}
+} // namespace
 
 // -------------------------------------------------------------------- Player
 
@@ -44,12 +86,28 @@ Player::Player(std::unique_ptr<PlayerBackend> backend, QObject *parent)
         if (!m_queueTimer.isActive())
             m_queueTimer.start();
     });
+    connect(m_backend.get(), &PlayerBackend::addonsChanged, this, &Player::addonsChanged);
+    connect(m_backend.get(), &PlayerBackend::addonsLoadingChanged, this, &Player::addonsLoadingChanged);
+    connect(m_backend.get(), &PlayerBackend::rendererDevicesChanged, this, &Player::rendererDevicesChanged);
+
+    // VLC 3 marks these options obsolete on POSIX and does not write them to
+    // vlcrc. Restore Neo's saved values before any media can start playback.
+    if (m_stateStore.hasHttpProxySettings()) {
+        m_backend->setConfig(QStringLiteral("http-proxy"), m_stateStore.httpProxy());
+        m_backend->setConfig(QStringLiteral("http-proxy-pwd"), m_stateStore.httpProxyPassword());
+    }
+    // VLC treats core verbosity as a command-line option and omits it from
+    // vlcrc. Keep Neo's visible verbosity preference in its own settings.
+    if (m_stateStore.hasCoreVerbosity())
+        m_backend->setConfig(QStringLiteral("verbose"), m_stateStore.coreVerbosity());
 
     if (!m_backend->syncCurrentInput())
         refreshCurrentInput();
     refreshVolume();
     refreshModes();
     rebuildQueue();
+    const QString equalizer = m_stateStore.equalizerPreset();
+    m_backend->setEqualizerEnabled(equalizer, !equalizer.isEmpty() && equalizer != QLatin1String("off"));
 }
 
 Player::~Player()
@@ -60,6 +118,8 @@ Player::~Player()
 void Player::onBackendInputChanged()
 {
     saveResumePoint();
+    const QString equalizer = m_stateStore.equalizerPreset();
+    m_backend->setEqualizerEnabled(equalizer, !equalizer.isEmpty() && equalizer != QLatin1String("off"));
     m_presetPending = true;
     m_subsLinkedApplied = false;
     m_linkedSubtitleFile.clear();
@@ -116,7 +176,7 @@ void Player::refreshCurrentInput()
         emit bookmarksChanged();
         emit chaptersChanged();
         const qint64 point = resumePoint();
-        if (point > 0)
+        if (point > 0 && m_stateStore.resumeEnabled())
             emit resumeAvailable(point);
     }
 
@@ -181,8 +241,18 @@ void Player::refreshMeta()
     m_mediaUrl = url;
     m_folderPath = folderPath;
     m_folderName = folderPath.isEmpty() ? QString() : QDir(folderPath).dirName();
-    if (newMedia && !url.isEmpty())
-        rememberRecent(url.toString());
+    if (newMedia && !url.isEmpty() && m_backend->config(QStringLiteral("qt-recentplay")).toBool()) {
+        const QString filter = m_backend->config(QStringLiteral("qt-recentplay-filter")).toString();
+        bool filtered = false;
+        for (const QString &term : filter.split(QLatin1Char('|'), Qt::SkipEmptyParts)) {
+            if (url.toString().contains(term.trimmed(), Qt::CaseInsensitive)) {
+                filtered = true;
+                break;
+            }
+        }
+        if (!filtered)
+            rememberRecent(url.toString());
+    }
     emit mediaChanged();
 }
 
@@ -264,7 +334,7 @@ void Player::setRate(double rate)
 
 void Player::setVolume(double volume)
 {
-    m_backend->setVolume(qBound(0.0, volume, 1.25));
+    m_backend->setVolume(qBound(0.0, volume, 3.0));
     if (m_muted && volume > 0.0)
         m_backend->setMuted(false);
 }
@@ -280,7 +350,28 @@ void Player::frameStep()
 
 void Player::openUrls(const QList<QUrl> &urls, bool playNow)
 {
+    static const QSet<QString> playlistExtensions = {
+        QStringLiteral("m3u"), QStringLiteral("m3u8"), QStringLiteral("pls"), QStringLiteral("xspf")
+    };
+    QString playlistName;
+    if (playNow && urls.size() == 1) {
+        const QUrl &url = urls.constFirst();
+        const QFileInfo fileInfo(url.path());
+        if (playlistExtensions.contains(fileInfo.suffix().toLower()))
+            playlistName = fileInfo.completeBaseName();
+    }
+    if (playNow && m_requestedPlaylistName != playlistName) {
+        m_requestedPlaylistName = playlistName;
+        emit mediaChanged();
+    }
     m_backend->openUrls(urls, playNow);
+}
+
+void Player::openNetworkUrls(const QString &urlLines, bool playNow)
+{
+    const QList<QUrl> urls = parseNetworkUrls(urlLines);
+    if (!urls.isEmpty())
+        openUrls(urls, playNow);
 }
 
 void Player::openLocation(const QString &mrl, bool playNow)
@@ -307,6 +398,7 @@ void Player::clearQueue() { m_backend->clearQueue(); }
 void Player::rememberRecent(const QString &mrl)
 {
     m_stateStore.rememberRecentMedia(mrl);
+    emit recentMediaChanged();
 }
 
 QStringList Player::recentMedia() const
@@ -314,7 +406,22 @@ QStringList Player::recentMedia() const
     return m_stateStore.recentMedia();
 }
 
-void Player::clearRecentMedia() { m_stateStore.clearRecentMedia(); }
+void Player::clearRecentMedia()
+{
+    m_stateStore.clearRecentMedia();
+    emit recentMediaChanged();
+}
+
+void Player::clearPlaybackHistory()
+{
+    m_stateStore.clearRecentMedia();
+    m_stateStore.clearResumePoints();
+    emit recentMediaChanged();
+}
+
+bool Player::resumeEnabled() const { return m_stateStore.resumeEnabled(); }
+
+void Player::setResumeEnabled(bool enabled) { m_stateStore.setResumeEnabled(enabled); }
 
 // ------------------------------------------------------------------- tracks
 
@@ -348,6 +455,37 @@ bool Player::addSubtitleFile(const QUrl &url)
     }
     emit notify(ok ? tr("Subtitle added") : tr("Could not load subtitle"));
     return ok;
+}
+
+QVariantList Player::subtitleFilesForMedia(const QUrl &folder) const
+{
+    QVariantList out;
+    if (!m_mediaUrl.isLocalFile() || !folder.isLocalFile()
+        || !QFileInfo(folder.toLocalFile()).isDir())
+        return out;
+
+    const QString mediaPath = m_mediaUrl.toLocalFile();
+    const QString wantedKey = SubtitleMatcher::episodeKey(mediaPath);
+    const QString mediaBase = QFileInfo(mediaPath).completeBaseName();
+    const QStringList filters = {QStringLiteral("*.srt"), QStringLiteral("*.ass"),
+                                 QStringLiteral("*.ssa"), QStringLiteral("*.sub"),
+                                 QStringLiteral("*.vtt"), QStringLiteral("*.smi")};
+    const QStringList files = QDir(folder.toLocalFile()).entryList(filters, QDir::Files, QDir::Name);
+    for (const QString &name : files) {
+        const QString key = SubtitleMatcher::episodeKey(name);
+        const bool episodeMatch = !wantedKey.isEmpty() && key == wantedKey;
+        const bool prefixMatch = QFileInfo(name).completeBaseName().startsWith(mediaBase, Qt::CaseInsensitive);
+        if (!episodeMatch && !prefixMatch)
+            continue;
+        const QString path = QDir(folder.toLocalFile()).filePath(name);
+        out.append(QVariantMap{
+            {QStringLiteral("name"), name},
+            {QStringLiteral("url"), QUrl::fromLocalFile(path)},
+            {QStringLiteral("path"), path},
+            {QStringLiteral("selected"), path == m_manualSubtitlePath}
+        });
+    }
+    return out;
 }
 
 QVariantList Player::audioDevices() const
@@ -391,6 +529,13 @@ int Player::subtitleMargin() const { return m_backend->subtitleMargin(); }
 void Player::setAspectRatio(const QString &ratio) { m_backend->setAspectRatio(ratio); }
 
 QString Player::aspectRatio() const { return m_backend->aspectRatio(); }
+
+bool Player::setVideoFilterChain(const QString &filters) { return m_backend->setVideoFilterChain(filters); }
+
+bool Player::setVideoAdjustment(const QString &option, double value)
+{
+    return std::isfinite(value) && m_backend->setVideoAdjustment(option, value);
+}
 
 void Player::setTransform(const QString &type) { m_backend->setTransform(type); }
 
@@ -513,6 +658,8 @@ void Player::applyPendingPreset()
 
 void Player::saveResumePoint()
 {
+    if (!m_stateStore.resumeEnabled())
+        return;
     if (m_mediaUrl.isEmpty() || m_lengthMs <= 0)
         return;
     m_lastSavedResume = m_timeMs;
@@ -522,6 +669,16 @@ void Player::saveResumePoint()
 qint64 Player::resumePoint() const
 {
     return m_stateStore.resumePoint(m_mediaUrl);
+}
+
+qint64 Player::resumePointFor(const QUrl &media) const
+{
+    return m_stateStore.resumePoint(media);
+}
+
+qint64 Player::resumeDurationFor(const QUrl &media) const
+{
+    return m_stateStore.resumeDuration(media);
 }
 
 void Player::resume()
@@ -586,10 +743,38 @@ const QStringList kSubtitleFilters = {
     QStringLiteral("*.srt"), QStringLiteral("*.ass"), QStringLiteral("*.ssa"),
     QStringLiteral("*.sub"), QStringLiteral("*.vtt"), QStringLiteral("*.smi")};
 
+QStringList playlistMediaFolders(const QList<MediaQueueEntry> &entries);
+
+QString playlistSubtitleKey(const QList<MediaQueueEntry> &entries)
+{
+    QStringList folders = playlistMediaFolders(entries);
+    std::sort(folders.begin(), folders.end());
+    return QString::fromLatin1(QCryptographicHash::hash(folders.join(QLatin1Char('\n')).toUtf8(),
+                                                          QCryptographicHash::Sha256).toHex());
+}
+
+QStringList playlistMediaFolders(const QList<MediaQueueEntry> &entries)
+{
+    QStringList folders;
+    for (const MediaQueueEntry &entry : entries) {
+        const QUrl url(entry.uri);
+        if (!url.isLocalFile())
+            continue;
+        const QString folder = QFileInfo(url.toLocalFile()).absolutePath();
+        if (!folders.contains(folder))
+            folders.append(folder);
+    }
+    return folders;
+}
+
 } // namespace
 
 int Player::linkSubtitleFolder(const QUrl &folder)
 {
+    if (!folder.isLocalFile() || !QFileInfo(folder.toLocalFile()).isDir()) {
+        emit notify(tr("Choose a local folder containing subtitles"));
+        return 0;
+    }
     if (m_folderPath.isEmpty()) {
         emit notify(tr("Open a local file first"));
         return 0;
@@ -614,6 +799,57 @@ int Player::linkSubtitleFolder(const QUrl &folder)
     return matched;
 }
 
+QUrl Player::activeSubtitleFile() const
+{
+    return m_subtitleTimelineSource.isEmpty()
+        ? QUrl{}
+        : QUrl::fromLocalFile(m_subtitleTimelineSource);
+}
+
+int Player::activeSubtitleTrackId() const
+{
+    const QVariantList subtitleTracks = tracks(QStringLiteral("spu"));
+    for (const QVariant &entry : subtitleTracks) {
+        const QVariantMap track = entry.toMap();
+        const int id = track.value(QStringLiteral("id")).toInt();
+        if (id >= 0 && track.value(QStringLiteral("selected")).toBool())
+            return id;
+    }
+    return -1;
+}
+
+int Player::linkSubtitleFolderToPlaylist(const QUrl &folder)
+{
+    if (!folder.isLocalFile() || !QFileInfo(folder.toLocalFile()).isDir()) {
+        emit notify(tr("Choose a local folder containing subtitles"));
+        return 0;
+    }
+    const QStringList mediaFolders = playlistMediaFolders(m_queue.entries());
+    if (mediaFolders.isEmpty()) {
+        emit notify(tr("The playlist has no local video files"));
+        return 0;
+    }
+
+    QString subtitleFolder = QFileInfo(folder.toLocalFile()).canonicalFilePath();
+    if (subtitleFolder.isEmpty())
+        subtitleFolder = QDir::cleanPath(folder.toLocalFile());
+    const QStringList files = QDir(subtitleFolder).entryList(kSubtitleFilters, QDir::Files, QDir::Name);
+    m_stateStore.linkSubtitleFoldersToPlaylist(playlistSubtitleKey(m_queue.entries()), mediaFolders, subtitleFolder);
+    m_subsLinkedApplied = false;
+    applyLinkedSubtitles();
+
+    int matched = 0;
+    for (const MediaQueueEntry &entry : m_queue.entries()) {
+        const QUrl media(entry.uri);
+        if (media.isLocalFile()
+            && !SubtitleMatcher::bestMatch(media.toLocalFile(), files).isEmpty())
+            ++matched;
+    }
+    emit notify(tr("Subtitles linked to playlist: %1 of %2 item(s) matched")
+                    .arg(matched).arg(m_queue.entries().size()));
+    return matched;
+}
+
 void Player::unlinkSubtitleFolder()
 {
     if (!m_folderPath.isEmpty())
@@ -621,9 +857,42 @@ void Player::unlinkSubtitleFolder()
     emit notify(tr("Subtitle folder unlinked"));
 }
 
+void Player::unlinkSubtitleFolderFromPlaylist()
+{
+    m_stateStore.unlinkSubtitleFoldersFromPlaylist(playlistSubtitleKey(m_queue.entries()));
+    m_subsLinkedApplied = false;
+    m_linkedSubtitleFile.clear();
+    emit notify(tr("Playlist subtitle links removed"));
+}
+
 QString Player::linkedSubtitleFolder() const
 {
     return m_stateStore.linkedSubtitleFolder(m_folderPath);
+}
+
+QVariantList Player::subtitleFolderMatches(const QUrl &folder, const QString &target) const
+{
+    QVariantList matches;
+    if (!folder.isLocalFile() || !QFileInfo(folder.toLocalFile()).isDir())
+        return matches;
+    const QStringList files = QDir(folder.toLocalFile()).entryList(kSubtitleFilters, QDir::Files, QDir::Name);
+    for (const MediaQueueEntry &entry : m_queue.entries()) {
+        const QUrl media(entry.uri);
+        if (!media.isLocalFile())
+            continue;
+        const QString mediaPath = media.toLocalFile();
+        if (target == QLatin1String("folder")
+            && QFileInfo(mediaPath).absolutePath() != m_folderPath)
+            continue;
+        const QString best = SubtitleMatcher::bestMatch(mediaPath, files);
+        matches.append(QVariantMap {
+            {QStringLiteral("media"), entry.title},
+            {QStringLiteral("uri"), entry.uri},
+            {QStringLiteral("subtitle"), best},
+            {QStringLiteral("matched"), !best.isEmpty()}
+        });
+    }
+    return matches;
 }
 
 void Player::applyLinkedSubtitles()
@@ -742,16 +1011,93 @@ QVariant Player::config(const QString &name) const
     return m_backend->config(name);
 }
 
+QString Player::configType(const QString &name) const
+{
+    return m_backend->configType(name);
+}
+
+QString Player::configDescription(const QString &name) const
+{
+    return m_backend->configDescription(name);
+}
+
+QVariantMap Player::configRange(const QString &name) const
+{
+    return m_backend->configRange(name);
+}
+
 void Player::setConfig(const QString &name, const QVariant &value)
 {
     m_backend->setConfig(name, value);
+    if (name == QLatin1String("http-proxy"))
+        m_stateStore.setHttpProxy(value.toString());
+    else if (name == QLatin1String("http-proxy-pwd"))
+        m_stateStore.setHttpProxyPassword(value.toString());
+    else if (name == QLatin1String("verbose"))
+        m_stateStore.setCoreVerbosity(value.toInt());
+    ++m_configRevision;
+    emit configRevisionChanged();
+    emit configChanged(name);
 }
+
+QVariantMap Player::profileOptions() const
+{
+    QVariantMap options;
+    for (const QString &name : profileOptionNames()) {
+        if (!m_backend->configType(name).isEmpty()) {
+            const QVariant value = m_backend->config(name);
+            if (value.isValid())
+                options.insert(name, value);
+        }
+    }
+    return options;
+}
+
+bool Player::applyProfileOptions(const QVariantMap &options)
+{
+    bool applied = false;
+    for (const QString &name : profileOptionNames()) {
+        const auto it = options.constFind(name);
+        if (it == options.cend() || m_backend->configType(name).isEmpty())
+            continue;
+        m_backend->setConfig(name, it.value());
+        if (name == QLatin1String("video-filter"))
+            m_backend->setVideoFilterChain(it.value().toString());
+        ++m_configRevision;
+        emit configChanged(name);
+        applied = true;
+    }
+    if (applied)
+        emit configRevisionChanged();
+    return applied;
+}
+
+QVariantList Player::addons() const { return m_backend->addons(); }
+bool Player::addonsLoading() const { return m_backend->addonsLoading(); }
+void Player::loadAddons() { m_backend->loadAddons(); }
+void Player::findAddons(const QString &source) { m_backend->findAddons(source); }
+bool Player::installAddon(const QString &uuid) { return m_backend->installAddon(uuid); }
+bool Player::removeAddon(const QString &uuid) { return m_backend->removeAddon(uuid); }
+QVariantList Player::rendererDevices() const { return m_backend->rendererDevices(); }
+bool Player::rendererDiscoverySupported() const { return m_backend->rendererDiscoverySupported(); }
+bool Player::discoverRenderers(bool enabled) { return m_backend->discoverRenderers(enabled); }
+bool Player::setRenderer(const QString &id) { return m_backend->setRenderer(id); }
 
 // ------------------------------------------------------------- hotkeys
 
 bool Player::forwardKey(int qtKey, int qtModifiers, const QString &text)
 {
     return m_backend->forwardKey(qtKey, qtModifiers, text);
+}
+
+bool Player::forwardWheel(int deltaX, int deltaY, int qtModifiers)
+{
+    return m_backend->forwardWheel(deltaX, deltaY, qtModifiers);
+}
+
+void Player::sendHotkey(int vlcKey)
+{
+    m_backend->sendHotkey(vlcKey);
 }
 
 bool Player::saveQueueAs(const QUrl &file)
@@ -762,6 +1108,78 @@ bool Player::saveQueueAs(const QUrl &file)
     const bool ok = m_backend->exportQueue(path);
     emit notify(ok ? tr("Playlist saved") : tr("Could not save playlist"));
     return ok;
+}
+
+bool Player::savePlaylist(const QString &name, const QList<QUrl> &media, const QUrl &cover)
+{
+    QString safeName = name.trimmed();
+    safeName.replace(QRegularExpression(QStringLiteral("[/\\\\\\x00-\\x1f]")), QStringLiteral("_"));
+    safeName = safeName.replace(QRegularExpression(QStringLiteral("\\s+")), QStringLiteral(" "));
+    if (safeName.isEmpty() || media.isEmpty()) {
+        emit notify(tr("Add a name and at least one media file"));
+        return false;
+    }
+
+    const QString directory = QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                                  .filePath(QStringLiteral("Playlists"));
+    if (!QDir().mkpath(directory)) {
+        emit notify(tr("Could not create playlist folder"));
+        return false;
+    }
+    const QString playlistPath = QDir(directory).filePath(safeName + QStringLiteral(".m3u8"));
+    QSaveFile playlist(playlistPath);
+    if (!playlist.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit notify(tr("Could not save playlist"));
+        return false;
+    }
+    QByteArray contents("#EXTM3U\n");
+    for (const QUrl &url : media) {
+        if (!url.isValid() || url.isEmpty())
+            continue;
+        const QString title = QFileInfo(url.isLocalFile() ? url.toLocalFile() : url.toString()).fileName();
+        contents += "#EXTINF:-1," + title.toUtf8().replace('\n', ' ').replace('\r', ' ') + '\n';
+        contents += url.toString(QUrl::FullyEncoded).toUtf8() + '\n';
+    }
+    if (contents == QByteArray("#EXTM3U\n") || playlist.write(contents) != contents.size() || !playlist.commit()) {
+        playlist.cancelWriting();
+        emit notify(tr("Could not save playlist"));
+        return false;
+    }
+
+    if (cover.isLocalFile()) {
+        QFile image(cover.toLocalFile());
+        if (image.open(QIODevice::ReadOnly)) {
+            const QByteArray imageData = image.read(12 * 1024 * 1024 + 1);
+            const QByteArray signature = imageData.left(8);
+            QString extension;
+            if (signature.startsWith(QByteArray::fromHex("89504e470d0a1a0a"))) extension = QStringLiteral("png");
+            else if (signature.startsWith(QByteArray::fromHex("ffd8ff"))) extension = QStringLiteral("jpg");
+            else if (signature.startsWith("GIF8")) extension = QStringLiteral("gif");
+            else if (imageData.startsWith("RIFF") && imageData.mid(8, 4) == "WEBP") extension = QStringLiteral("webp");
+            if (!extension.isEmpty() && imageData.size() <= 12 * 1024 * 1024) {
+                const QString coverName = safeName + QStringLiteral(".cover.") + extension;
+                QSaveFile coverFile(QDir(directory).filePath(coverName));
+                if (coverFile.open(QIODevice::WriteOnly) && coverFile.write(imageData) == imageData.size() && coverFile.commit()) {
+                    for (const QString &oldCover : QDir(directory).entryList({safeName + QStringLiteral(".cover.*")}, QDir::Files)) {
+                        if (oldCover != coverName)
+                            QFile::remove(QDir(directory).filePath(oldCover));
+                    }
+                }
+            }
+        }
+    }
+    emit notify(tr("Playlist saved"));
+    return true;
+}
+
+bool Player::saveNetworkPlaylist(const QString &name, const QString &urlLines)
+{
+    const QList<QUrl> urls = parseNetworkUrls(urlLines);
+    if (urls.isEmpty()) {
+        emit notify(tr("Add at least one valid network URL"));
+        return false;
+    }
+    return savePlaylist(name, urls);
 }
 
 QString Player::formatTime(qint64 ms) const

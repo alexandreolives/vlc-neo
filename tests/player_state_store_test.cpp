@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QSettings>
+#include <QTemporaryDir>
 
 #include <cstdio>
 
@@ -19,6 +20,11 @@ bool expect(bool condition, const char *message)
 
 int main(int argc, char **argv)
 {
+    QTemporaryDir configDir;
+    if (!configDir.isValid())
+        return 1;
+    qputenv("XDG_CONFIG_HOME", configDir.path().toUtf8());
+
     QCoreApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("vlc-neo"));
     QCoreApplication::setApplicationName(QStringLiteral("neo"));
@@ -45,8 +51,10 @@ int main(int argc, char **argv)
     ok &= expect(store.resumePoint(media) == 0, "resume point near the start is ignored");
     store.saveResumePoint(media, 45000, 120000);
     ok &= expect(store.resumePoint(media) == 45000, "resume point in the middle is saved");
+    ok &= expect(store.resumeDuration(media) == 120000, "resume duration is saved with the resume point");
     store.saveResumePoint(media, 119000, 120000);
     ok &= expect(store.resumePoint(media) == 0, "resume point near the end is cleared");
+    ok &= expect(store.resumeDuration(media) == 0, "clearing a resume point also clears its duration");
 
     store.addBookmark(media, 60000);
     store.addBookmark(media, 15000);
@@ -68,11 +76,45 @@ int main(int argc, char **argv)
 
     store.setEqualizerPreset(QStringLiteral("rock"));
     ok &= expect(store.equalizerPreset() == QStringLiteral("rock"), "equalizer preset round-trips");
+    store.setHttpProxy(QStringLiteral("http://127.0.0.1:18987"));
+    store.setHttpProxyPassword(QStringLiteral("proxy-secret"));
+    PlayerStateStore reloadedStore;
+    ok &= expect(reloadedStore.hasHttpProxySettings(), "saved proxy preferences are detected after store recreation");
+    ok &= expect(reloadedStore.httpProxy() == QStringLiteral("http://127.0.0.1:18987")
+                     && reloadedStore.httpProxyPassword() == QStringLiteral("proxy-secret"),
+                 "HTTP proxy address and password round-trip through persistent settings");
+    ok &= expect(!store.hasCoreVerbosity(), "core verbosity is unset before the user changes it");
+    store.setCoreVerbosity(2);
+    PlayerStateStore reloadedVerbosityStore;
+    ok &= expect(reloadedVerbosityStore.hasCoreVerbosity() && reloadedVerbosityStore.coreVerbosity() == 2,
+                 "core verbosity round-trips through persistent settings");
+    store.setCoreVerbosity(0);
+    ok &= expect(PlayerStateStore().coreVerbosity() == 0,
+                 "an explicit default verbosity remains distinguishable from an unset preference");
     const QString subtitleFolder = QStringLiteral("/tmp/subtitles");
     store.linkSubtitleFolder(folder, subtitleFolder);
     ok &= expect(store.linkedSubtitleFolder(folder) == subtitleFolder, "subtitle folder link round-trips");
     store.unlinkSubtitleFolder(folder);
     ok &= expect(store.linkedSubtitleFolder(folder).isEmpty(), "subtitle folder link can be removed");
+
+    const QString secondFolder = QStringLiteral("/tmp/other-season");
+    const QString playlistKey = QStringLiteral("playlist-test");
+    store.linkSubtitleFoldersToPlaylist(playlistKey, {folder, secondFolder, folder}, subtitleFolder);
+    ok &= expect(store.linkedSubtitleFolder(folder) == subtitleFolder
+                     && store.linkedSubtitleFolder(secondFolder) == subtitleFolder,
+                 "playlist subtitle link is saved for each unique media folder");
+    const QString replacementSubtitleFolder = QStringLiteral("/tmp/replacement-subtitles");
+    store.linkSubtitleFoldersToPlaylist(playlistKey, {secondFolder}, replacementSubtitleFolder);
+    ok &= expect(store.linkedSubtitleFolder(folder).isEmpty()
+                     && store.linkedSubtitleFolder(secondFolder) == replacementSubtitleFolder,
+                 "updating a playlist target removes associations from folders no longer included");
+    store.linkSubtitleFoldersToPlaylist(playlistKey, {folder, secondFolder}, subtitleFolder);
+    const QString manualSubtitleFolder = QStringLiteral("/tmp/manual-subtitles");
+    store.linkSubtitleFolder(folder, manualSubtitleFolder);
+    store.unlinkSubtitleFoldersFromPlaylist(playlistKey);
+    ok &= expect(store.linkedSubtitleFolder(folder) == manualSubtitleFolder
+                     && store.linkedSubtitleFolder(secondFolder).isEmpty(),
+                 "removing playlist links preserves a replacement folder link");
 
     return ok ? 0 : 1;
 }

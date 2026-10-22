@@ -29,6 +29,7 @@ class Player : public QObject
     Q_PROPERTY(double rate READ rate NOTIFY rateChanged)
     Q_PROPERTY(QString title READ title NOTIFY mediaChanged)
     Q_PROPERTY(QString artist READ artist NOTIFY mediaChanged)
+    Q_PROPERTY(QString playlistName READ playlistName NOTIFY mediaChanged)
     Q_PROPERTY(QString artworkUrl READ artworkUrl NOTIFY mediaChanged)
     Q_PROPERTY(QString folderPath READ folderPath NOTIFY mediaChanged)
     Q_PROPERTY(QString folderName READ folderName NOTIFY mediaChanged)
@@ -43,7 +44,14 @@ class Player : public QObject
     Q_PROPERTY(int sleepRemaining READ sleepRemaining NOTIFY sleepChanged)
     Q_PROPERTY(bool presetActive READ presetActive NOTIFY presetChanged)
     Q_PROPERTY(QVariantList subtitleCues READ subtitleCues NOTIFY subtitleTimelineChanged)
+    Q_PROPERTY(QUrl activeSubtitleFile READ activeSubtitleFile NOTIFY subtitleTimelineChanged)
+    Q_PROPERTY(int activeSubtitleTrackId READ activeSubtitleTrackId NOTIFY subtitleTimelineChanged)
     Q_PROPERTY(QObject *queue READ queue CONSTANT)
+    Q_PROPERTY(QVariantList addons READ addons NOTIFY addonsChanged)
+    Q_PROPERTY(bool addonsLoading READ addonsLoading NOTIFY addonsLoadingChanged)
+    Q_PROPERTY(QVariantList rendererDevices READ rendererDevices NOTIFY rendererDevicesChanged)
+    Q_PROPERTY(bool rendererDiscoverySupported READ rendererDiscoverySupported CONSTANT)
+    Q_PROPERTY(quint64 configRevision READ configRevision NOTIFY configRevisionChanged)
 
 public:
     explicit Player(std::unique_ptr<PlayerBackend> backend, QObject *parent = nullptr);
@@ -61,6 +69,10 @@ public:
     double rate() const { return m_rate; }
     QString title() const { return m_title; }
     QString artist() const { return m_artist; }
+    QString playlistName() const
+    {
+        return m_requestedPlaylistName.isEmpty() ? m_backend->playlistName() : m_requestedPlaylistName;
+    }
     QString artworkUrl() const { return m_artworkUrl; }
     QString folderPath() const { return m_folderPath; }
     QString folderName() const { return m_folderName; }
@@ -76,6 +88,8 @@ public:
     bool presetActive() const { return m_presetActive; }
     QObject *queue() { return &m_queue; }
     QVariantList subtitleCues() const { return m_subtitleCues; }
+    QUrl activeSubtitleFile() const;
+    int activeSubtitleTrackId() const;
 
     // Transport
     Q_INVOKABLE void togglePause();
@@ -92,17 +106,22 @@ public:
 
     // Media
     Q_INVOKABLE void openUrls(const QList<QUrl> &urls, bool playNow);
+    Q_INVOKABLE void openNetworkUrls(const QString &urlLines, bool playNow);
     Q_INVOKABLE void openLocation(const QString &mrl, bool playNow);
     Q_INVOKABLE void playItem(int id);
     Q_INVOKABLE void removeItem(int id);
     Q_INVOKABLE void clearQueue();
     Q_INVOKABLE QStringList recentMedia() const;
     Q_INVOKABLE void clearRecentMedia();
+    Q_INVOKABLE void clearPlaybackHistory();
+    Q_INVOKABLE bool resumeEnabled() const;
+    Q_INVOKABLE void setResumeEnabled(bool enabled);
 
     // Tracks: category is "video", "audio" or "spu"
     Q_INVOKABLE QVariantList tracks(const QString &category) const;
     Q_INVOKABLE void selectTrack(const QString &category, int id);
     Q_INVOKABLE bool addSubtitleFile(const QUrl &url);
+    Q_INVOKABLE QVariantList subtitleFilesForMedia(const QUrl &folder) const;
     Q_INVOKABLE QVariantList audioDevices() const;
     Q_INVOKABLE void setAudioDevice(const QString &id);
 
@@ -115,6 +134,8 @@ public:
     Q_INVOKABLE int subtitleMargin() const;
     Q_INVOKABLE void setAspectRatio(const QString &ratio);
     Q_INVOKABLE QString aspectRatio() const;
+    Q_INVOKABLE bool setVideoFilterChain(const QString &filters);
+    Q_INVOKABLE bool setVideoAdjustment(const QString &option, double value);
     Q_INVOKABLE void setTransform(const QString &type);
     Q_INVOKABLE void setDeinterlace(bool on);
     Q_INVOKABLE void setEqualizerPreset(const QString &preset);
@@ -127,6 +148,7 @@ public:
     // Tools
     Q_INVOKABLE void snapshot();
     Q_INVOKABLE void toggleRecord();
+    Q_INVOKABLE void sendHotkey(int vlcKey);
     Q_INVOKABLE void setFullscreenState(bool fs);
 
     // Per-folder presets ("show presets")
@@ -135,6 +157,8 @@ public:
 
     // Resume, bookmarks, chapters
     Q_INVOKABLE qint64 resumePoint() const;
+    Q_INVOKABLE qint64 resumePointFor(const QUrl &media) const;
+    Q_INVOKABLE qint64 resumeDurationFor(const QUrl &media) const;
     Q_INVOKABLE void resume();
     Q_INVOKABLE void addBookmark();
     Q_INVOKABLE QVariantList bookmarks() const;
@@ -145,24 +169,48 @@ public:
 
     // Subtitles for a whole folder: matched to episodes by number.
     Q_INVOKABLE int linkSubtitleFolder(const QUrl &folder);
+    Q_INVOKABLE int linkSubtitleFolderToPlaylist(const QUrl &folder);
     Q_INVOKABLE void unlinkSubtitleFolder();
+    Q_INVOKABLE void unlinkSubtitleFolderFromPlaylist();
     Q_INVOKABLE QString linkedSubtitleFolder() const;
+    Q_INVOKABLE QVariantList subtitleFolderMatches(const QUrl &folder, const QString &target) const;
     // File name of the subtitle attached from the linked folder to the current media.
     Q_INVOKABLE QString linkedSubtitleFile() const { return m_linkedSubtitleFile; }
 
     // VLC core configuration (persisted in vlcrc)
     Q_INVOKABLE QVariant config(const QString &name) const;
+    Q_INVOKABLE QString configType(const QString &name) const;
+    Q_INVOKABLE QString configDescription(const QString &name) const;
+    Q_INVOKABLE QVariantMap configRange(const QString &name) const;
     Q_INVOKABLE void setConfig(const QString &name, const QVariant &value);
+    // A curated, secret-free set of VLC playback, decoding, buffering and subtitle options.
+    Q_INVOKABLE QVariantMap profileOptions() const;
+    Q_INVOKABLE bool applyProfileOptions(const QVariantMap &options);
+    Q_INVOKABLE QVariantList addons() const;
+    Q_INVOKABLE bool addonsLoading() const;
+    Q_INVOKABLE void loadAddons();
+    Q_INVOKABLE void findAddons(const QString &source);
+    Q_INVOKABLE bool installAddon(const QString &uuid);
+    Q_INVOKABLE bool removeAddon(const QString &uuid);
+    QVariantList rendererDevices() const;
+    bool rendererDiscoverySupported() const;
+    quint64 configRevision() const { return m_configRevision; }
+    Q_INVOKABLE bool discoverRenderers(bool enabled);
+    Q_INVOKABLE bool setRenderer(const QString &id);
 
     // Hotkeys: forward a Qt key event to VLC's hotkey engine.
     Q_INVOKABLE bool forwardKey(int qtKey, int qtModifiers, const QString &text);
+    Q_INVOKABLE bool forwardWheel(int deltaX, int deltaY, int qtModifiers);
     Q_INVOKABLE bool saveQueueAs(const QUrl &file);
+    Q_INVOKABLE bool savePlaylist(const QString &name, const QList<QUrl> &media, const QUrl &cover = {});
+    Q_INVOKABLE bool saveNetworkPlaylist(const QString &name, const QString &urlLines);
 
     Q_INVOKABLE QString formatTime(qint64 ms) const;
 
 signals:
     void stateChanged();
     void mediaChanged();
+    void recentMediaChanged();
     void timeChanged();
     void volumeChanged();
     void rateChanged();
@@ -176,6 +224,11 @@ signals:
     void sleepChanged();
     void presetChanged();
     void subtitleTimelineChanged();
+    void addonsChanged();
+    void addonsLoadingChanged();
+    void rendererDevicesChanged();
+    void configChanged(const QString &name);
+    void configRevisionChanged();
     void fullscreenRequested(bool fullscreen);
     void notify(const QString &message);
 
@@ -200,6 +253,7 @@ private:
     void rememberRecent(const QString &mrl);
 
     std::unique_ptr<PlayerBackend> m_backend;
+    QString m_requestedPlaylistName;
     QueueModel m_queue;
     PlayerStateStore m_stateStore;
     QTimer m_queueTimer;
@@ -221,6 +275,7 @@ private:
     int m_subtitleDelayMs = 0;
     bool m_recording = false;
     bool m_loop = false, m_repeatOne = false, m_random = false;
+    quint64 m_configRevision = 0;
     int m_sleepRemaining = 0;
     bool m_presetActive = false;
     bool m_presetPending = false;

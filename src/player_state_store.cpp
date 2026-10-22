@@ -45,6 +45,27 @@ void PlayerStateStore::clearRecentMedia()
     m_settings.remove(QStringLiteral("recent"));
 }
 
+void PlayerStateStore::clearResumePoints()
+{
+    const QStringList keys = m_settings.allKeys();
+    for (const QString &key : keys) {
+        if (key.startsWith(QStringLiteral("resume/")))
+            m_settings.remove(key);
+    }
+}
+
+bool PlayerStateStore::resumeEnabled() const
+{
+    return m_settings.value(QStringLiteral("resumeEnabled"), true).toBool();
+}
+
+void PlayerStateStore::setResumeEnabled(bool enabled)
+{
+    m_settings.setValue(QStringLiteral("resumeEnabled"), enabled);
+    if (!enabled)
+        clearResumePoints();
+}
+
 QString PlayerStateStore::equalizerPreset() const
 {
     return m_settings.value(QStringLiteral("equalizer"), QStringLiteral("off")).toString();
@@ -53,6 +74,47 @@ QString PlayerStateStore::equalizerPreset() const
 void PlayerStateStore::setEqualizerPreset(const QString &preset)
 {
     m_settings.setValue(QStringLiteral("equalizer"), preset);
+}
+
+bool PlayerStateStore::hasHttpProxySettings() const
+{
+    return m_settings.contains(QStringLiteral("network/httpProxy"))
+        || m_settings.contains(QStringLiteral("network/httpProxyPassword"));
+}
+
+QString PlayerStateStore::httpProxy() const
+{
+    return m_settings.value(QStringLiteral("network/httpProxy")).toString();
+}
+
+QString PlayerStateStore::httpProxyPassword() const
+{
+    return m_settings.value(QStringLiteral("network/httpProxyPassword")).toString();
+}
+
+void PlayerStateStore::setHttpProxy(const QString &proxy)
+{
+    m_settings.setValue(QStringLiteral("network/httpProxy"), proxy);
+}
+
+void PlayerStateStore::setHttpProxyPassword(const QString &password)
+{
+    m_settings.setValue(QStringLiteral("network/httpProxyPassword"), password);
+}
+
+bool PlayerStateStore::hasCoreVerbosity() const
+{
+    return m_settings.contains(QStringLiteral("coreVerbosity"));
+}
+
+int PlayerStateStore::coreVerbosity() const
+{
+    return m_settings.value(QStringLiteral("coreVerbosity"), 0).toInt();
+}
+
+void PlayerStateStore::setCoreVerbosity(int verbosity)
+{
+    m_settings.setValue(QStringLiteral("coreVerbosity"), verbosity);
 }
 
 QString PlayerStateStore::mediaKey(const QString &group, const QUrl &media) const
@@ -69,16 +131,25 @@ void PlayerStateStore::saveResumePoint(const QUrl &media, qint64 timeMs, qint64 
         return;
 
     const qint64 tail = qMin(kResumeMaxTailMs, lengthMs / 10);
-    if (timeMs < kResumeMinMs || timeMs > lengthMs - tail)
+    if (timeMs < kResumeMinMs || timeMs > lengthMs - tail) {
         m_settings.remove(key);
-    else
+        m_settings.remove(key + QStringLiteral("/length"));
+    } else {
         m_settings.setValue(key, timeMs);
+        m_settings.setValue(key + QStringLiteral("/length"), lengthMs);
+    }
 }
 
 qint64 PlayerStateStore::resumePoint(const QUrl &media) const
 {
     const QString key = mediaKey(QStringLiteral("resume"), media);
     return key.isEmpty() ? 0 : m_settings.value(key, 0).toLongLong();
+}
+
+qint64 PlayerStateStore::resumeDuration(const QUrl &media) const
+{
+    const QString key = mediaKey(QStringLiteral("resume"), media);
+    return key.isEmpty() ? 0 : m_settings.value(key + QStringLiteral("/length"), 0).toLongLong();
 }
 
 QList<qint64> PlayerStateStore::bookmarks(const QUrl &media) const
@@ -180,4 +251,38 @@ void PlayerStateStore::unlinkSubtitleFolder(const QString &mediaFolder)
 {
     if (!mediaFolder.isEmpty())
         m_settings.remove(SubtitleMatcher::folderSettingsKey(mediaFolder));
+}
+
+void PlayerStateStore::linkSubtitleFoldersToPlaylist(const QString &playlistKey,
+                                                     const QStringList &mediaFolders,
+                                                     const QString &subtitleFolder)
+{
+    if (playlistKey.isEmpty() || subtitleFolder.isEmpty())
+        return;
+    QStringList uniqueFolders = mediaFolders;
+    uniqueFolders.removeDuplicates();
+    const QString key = hashKey(QStringLiteral("subtitlePlaylists/"), playlistKey);
+    const QString oldSource = m_settings.value(key + QStringLiteral("/source")).toString();
+    const QStringList oldFolders = m_settings.value(key + QStringLiteral("/folders")).toStringList();
+    for (const QString &folder : oldFolders) {
+        if (!uniqueFolders.contains(folder) && !oldSource.isEmpty()
+            && linkedSubtitleFolder(folder) == oldSource)
+            unlinkSubtitleFolder(folder);
+    }
+    for (const QString &folder : uniqueFolders)
+        linkSubtitleFolder(folder, subtitleFolder);
+    m_settings.setValue(key + QStringLiteral("/folders"), uniqueFolders);
+    m_settings.setValue(key + QStringLiteral("/source"), subtitleFolder);
+}
+
+void PlayerStateStore::unlinkSubtitleFoldersFromPlaylist(const QString &playlistKey)
+{
+    const QString key = hashKey(QStringLiteral("subtitlePlaylists/"), playlistKey);
+    const QStringList folders = m_settings.value(key + QStringLiteral("/folders")).toStringList();
+    const QString source = m_settings.value(key + QStringLiteral("/source")).toString();
+    for (const QString &folder : folders) {
+        if (!source.isEmpty() && linkedSubtitleFolder(folder) == source)
+            unlinkSubtitleFolder(folder);
+    }
+    m_settings.remove(key);
 }

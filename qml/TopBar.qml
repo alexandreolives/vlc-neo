@@ -7,33 +7,50 @@ Rectangle {
     id: root
     signal menuRequested(Item source)
     signal action(string id, Item source)
+    signal onboardingHoverChanged(bool hovered)
+    property bool onboardingMode: false
+    property bool compactPreview: false
+    property alias titleLabel: appTitle
+    property alias pipButton: pipButtonControl
+    property alias minimizeButton: minimizeButtonControl
+    property alias maximizeButton: maximizeButtonControl
+    property alias fullscreenButton: fullscreenButtonControl
+    property alias quitButton: quitButtonControl
     color: Theme.bar
-    implicitHeight: Theme.topHeight
+    implicitHeight: compactPreview ? 24 : Math.max(Theme.topHeight, Math.round(win.width * 0.021))
 
     // Drag the window by its title bar (works on Wayland through xdg move).
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         onPressed: win.startSystemMove()
-        onDoubleClicked: root.action("maximize", root)
+        onDoubleClicked: root.action(win.pip ? "pip" : "maximize", root)
+    }
+
+    HoverHandler {
+        onHoveredChanged: if (root.onboardingMode && !root.compactPreview)
+                              root.onboardingHoverChanged(hovered)
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 6
+        anchors.leftMargin: root.compactPreview ? 6 : 10
+        anchors.rightMargin: root.compactPreview ? 4 : 6
         spacing: 2
 
-        Icon { name: "cone"; size: 16; Layout.rightMargin: 6 }
-        IconButton { icon: "ellipsis"; tip: "Menu"; onClicked: root.menuRequested(this) }
+        Icon { name: "cone"; size: root.compactPreview ? 12 : 16; Layout.rightMargin: root.compactPreview ? 3 : 6 }
+        IconButton { visible: !root.onboardingMode && !win.pip; icon: "ellipsis"; tip: "Menu"; onClicked: root.menuRequested(this) }
         IconButton {
+            visible: !root.onboardingMode && !win.pip
             icon: "panel-left"; tip: "Library (L)"
             checked: win.libraryOpen
             onClicked: root.action("library", this)
         }
-        Rectangle { width: 1; height: 16; color: Theme.border; Layout.leftMargin: 4; Layout.rightMargin: 4 }
+        Rectangle { visible: !root.onboardingMode && !win.pip; width: 1; height: 16; color: Theme.border; Layout.leftMargin: 4; Layout.rightMargin: 4 }
         Rectangle {
             id: folderChip
+            objectName: "folder-chip"
+            visible: !root.onboardingMode && !win.pip
             implicitWidth: folderRow.implicitWidth + 12
             implicitHeight: 24
             radius: Theme.radiusSmall
@@ -44,7 +61,9 @@ Rectangle {
                 spacing: 6
                 Icon { name: "folder"; size: 15; anchors.verticalCenter: parent.verticalCenter }
                 NText {
-                    text: player.folderName.length ? player.folderName : "Library"
+                    text: player.hasMedia && (!player.hasVideo || win.audioVisualizerActive)
+                          ? "My Songs"
+                          : (player.folderName.length ? player.folderName : "Library")
                     dim: true
                     font.pixelSize: 12
                     anchors.verticalCenter: parent.verticalCenter
@@ -55,23 +74,25 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.action("library", folderChip)
+                onClicked: root.action(player.hasMedia && (!player.hasVideo || win.audioVisualizerActive)
+                                       ? "music-library" : "folder-sidebar", folderChip)
             }
         }
         Item { Layout.fillWidth: true }
-        IconButton { icon: "picture-in-picture-2"; tip: "Picture in picture"; checked: win.pip; onClicked: root.action("pip", this) }
-        IconButton { icon: "minus"; tip: "Minimize"; onClicked: root.action("minimize", this) }
-        IconButton { icon: "square"; iconSize: 14; tip: "Maximize"; onClicked: root.action("maximize", this) }
-        IconButton { icon: win.fullscreen ? "minimize-2" : "maximize"; tip: "Fullscreen (F)"; onClicked: root.action("fullscreen", this) }
-        IconButton { icon: "x"; tip: "Quit"; onClicked: root.action("quit", this) }
+        IconButton { id: pipButtonControl; objectName: "topbar-pip"; visible: !root.onboardingMode; implicitWidth: root.compactPreview ? 18 : 30; implicitHeight: root.compactPreview ? 18 : 28; iconSize: root.compactPreview ? 12 : 18; icon: "picture-in-picture-2"; tip: win.pip ? "Exit picture in picture" : "Picture in picture"; checked: win.pip; onClicked: root.action("pip", this) }
+        IconButton { id: minimizeButtonControl; objectName: "topbar-minimize"; visible: !win.pip; implicitWidth: root.compactPreview ? 18 : 30; implicitHeight: root.compactPreview ? 18 : 28; iconSize: root.compactPreview ? 12 : 18; icon: "minimize"; tip: "Minimize"; onClicked: root.action("minimize", this) }
+        IconButton { id: maximizeButtonControl; objectName: "topbar-maximize"; visible: !win.pip; implicitWidth: root.compactPreview ? 18 : 30; implicitHeight: root.compactPreview ? 18 : 28; iconSize: root.compactPreview ? 12 : 14; icon: "square"; tip: "Maximize"; onClicked: root.action("maximize", this) }
+        IconButton { id: fullscreenButtonControl; objectName: "topbar-fullscreen"; visible: !win.pip; implicitWidth: root.compactPreview ? 18 : 30; implicitHeight: root.compactPreview ? 18 : 28; iconSize: root.compactPreview ? 12 : 18; icon: win.fullscreen ? "minimize-2" : "maximize"; tip: "Fullscreen (F)"; onClicked: root.action("fullscreen", this) }
+        IconButton { id: quitButtonControl; objectName: "topbar-quit"; implicitWidth: root.compactPreview ? 18 : 30; implicitHeight: root.compactPreview ? 18 : 28; iconSize: root.compactPreview ? 12 : 18; icon: "x"; tip: "Quit"; onClicked: root.action("quit", this) }
     }
 
     NText {
+        id: appTitle
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width * 0.42)
         horizontalAlignment: Text.AlignHCenter
-        text: player.title.length ? player.title : "VLC Media Player"
-        font.pixelSize: 12
+        text: win.showMediaTitle && player.hasMedia && player.title.length ? player.title : "VLC Media Player"
+        font.pixelSize: root.compactPreview ? 9 : 12
         dim: true
     }
 }

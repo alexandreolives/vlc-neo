@@ -46,7 +46,9 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         double sar = 1.0;
         if (geo.i_sar_num > 0 && geo.i_sar_den > 0)
             sar = (double)geo.i_sar_num / (double)geo.i_sar_den;
-        FrameStore::instance().publish(std::move(frame), sar);
+        const double frameRate = src.i_frame_rate > 0 && src.i_frame_rate_base > 0
+            ? (double)src.i_frame_rate / (double)src.i_frame_rate_base : 0.0;
+        FrameStore::instance().publish(std::move(frame), sar, frameRate);
     }
 
     picture_Release(pic);

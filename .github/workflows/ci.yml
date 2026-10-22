@@ -17,6 +17,7 @@ jobs:
           pacman -Syu --noconfirm --needed \
             base-devel git cmake ninja pkgconf \
             vlc libvlc vlc-plugins-all \
+            dbus \
             qt6-base qt6-declarative qt6-svg \
             ffmpeg ttf-dejavu imagemagick
       - uses: actions/checkout@v5
@@ -26,7 +27,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --output-on-failure --parallel 2
           test -f build/libneo_plugin.so
       # VLC refuses to run as root, and the container runs as root.
       - name: Create test user
@@ -36,6 +37,16 @@ jobs:
       - name: Plugin is loadable by VLC
         run: |
           su tester -c "VLC_PLUGIN_PATH='$GITHUB_WORKSPACE/build' vlc --no-plugins-cache --list 2>/dev/null" | tee /tmp/modules.txt | grep -E '^\s+neo\s'
+      - name: Audit every declared VLC preference mapping
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-mapping.sh"
+      - name: Verify alternate VLC preference values survive relaunch
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-alternate-values.sh"
+      - name: Verify VLC video adjustment changes decoded output
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_BUILD_DIR='$GITHUB_WORKSPACE/build' bash scripts/test-vlc-video-filter-render.sh"
+      - name: Verify waveforms on real audio from three genres
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-waveform-variety.sh"
+      - name: Verify the 110-item media library browser
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-library-110-items.sh"
       - name: Smoke test (headless, real VLC core)
         run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_SMOKE_DIR='$GITHUB_WORKSPACE/test-artifacts/neo-smoke' scripts/smoke-test.sh"
       - name: Upload smoke screenshots
@@ -58,7 +69,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qt6-base-dev qt6-declarative-dev qt6-svg-dev \
-            vlc libvlc-dev libvlccore-dev ffmpeg
+            vlc libvlc-dev libvlccore-dev dbus-daemon ffmpeg
           dpkg-query -W -f='${Version}' qt6-base-dev > /tmp/system-qt-before
           if [ -f /usr/share/applications/vlc.desktop ]; then
             sha256sum /usr/share/applications/vlc.desktop | cut -d' ' -f1 > /tmp/system-desktop-before
@@ -77,7 +88,12 @@ jobs:
       - name: Smoke test playback, UI captures and persisted settings
         run: |
           export NEO_QT_ROOT="$HOME/Qt/6.8.3/gcc_64"
-          ctest --test-dir build --output-on-failure
+          ctest --test-dir build --output-on-failure --parallel 2
+          bash scripts/test-preference-mapping.sh
+          bash scripts/test-preference-alternate-values.sh
+          NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" bash scripts/test-vlc-video-filter-render.sh
+          bash scripts/test-waveform-variety.sh
+          bash scripts/test-library-110-items.sh
           NEO_SMOKE_DIR="$GITHUB_WORKSPACE/test-artifacts/neo-smoke" scripts/smoke-test.sh
       - name: Uninstall and verify system Qt remains unchanged
         if: always()

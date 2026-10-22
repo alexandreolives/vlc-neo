@@ -6,17 +6,21 @@ import Neo 1.0
 // Video / Audio / Subtitles quick picker that opens from the control bar.
 Popup {
     id: root
+    parent: currentAnchor && currentAnchor.parent ? currentAnchor.parent : keyCatcher
     property string tab: "spu"
     property Item currentAnchor: null
     signal showPreferences(string tab)
     signal addSubtitles()
 
     width: 340
-    height: Math.min(440, content.implicitHeight + 24, parent ? parent.height - 16 : 440)
+    height: Math.min(440, content.implicitHeight + 24, win.height - 16)
     padding: 0
     modal: false
     focus: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    // Treat the whole control row that opened this popup as its parent. This
+    // keeps a press on the trigger available for toggle/switch handling while
+    // clicks elsewhere in the window dismiss the popup.
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
     function openFor(tabName, triggerItem) {
         if (visible && tab === tabName && currentAnchor === triggerItem) {
@@ -35,7 +39,10 @@ Popup {
             return
         const p = currentAnchor.mapToItem(parent, currentAnchor.width / 2, 0)
         x = Math.max(8, Math.min(p.x - width / 2, parent.width - width - 8))
-        y = Math.max(8, Math.min(p.y - height - 10, parent.height - height - 8))
+        y = p.y - height - 10
+        const popupTop = parent.mapToItem(keyCatcher, 0, y).y
+        if (popupTop < 8)
+            y += 8 - popupTop
     }
     function schedulePlace() { Qt.callLater(place) }
     onClosed: currentAnchor = null
@@ -61,6 +68,13 @@ Popup {
     }
     Connections {
         target: root.currentAnchor
+        function onXChanged() { root.schedulePlace() }
+        function onYChanged() { root.schedulePlace() }
+        function onWidthChanged() { root.schedulePlace() }
+        function onHeightChanged() { root.schedulePlace() }
+    }
+    Connections {
+        target: root.parent
         function onXChanged() { root.schedulePlace() }
         function onYChanged() { root.schedulePlace() }
         function onWidthChanged() { root.schedulePlace() }

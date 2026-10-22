@@ -8,23 +8,51 @@ import Neo 1.0
 // Local media browser with a full-window mode and a compact embedded mode.
 Rectangle {
     id: root
-    color: root.wide ? Theme.window : Theme.panel
+    color: root.wide && !root.compactFolderSidebar && !root.compactMusicSidebar ? Theme.window : Theme.panel
     property bool wide: false
+    property bool compactMusicSidebar: false
+    property bool compactFolderSidebar: false
+    property bool musicSearchOpen: false
+    property bool folderSearchOpen: false
+    property alias folderSearchButton: compactFolderSearchButton
+    property alias folderPinButton: compactFolderPinButton
+    property alias compactFolderToolbar: compactFolderToolbarItem
+    property alias folderActionsRow: folderActionsRowItem
+    property alias musicItemCountText: musicItemCountLabel.text
     property url folder: player.folderPath.length ? platform.fileUrl(player.folderPath)
                                                   : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
-    property string section: "folder"   // home | folder | recent
+    property string section: "folder"   // home | folder | recent | music
     property string sortBy: "name"
+    property string folderViewMode: "grid"
     property string mediaType: "all"   // all | video | audio
     property string searchText: ""
     property int filteredCount: 0
+    property int recentRevision: 0
     property alias miniVideoHost: miniVideoSurface
+    property alias miniPlayerItem: miniPlayer
+    property alias folderViewToggleItem: folderViewToggleButton
+    property alias folderListingItem: listing
+    property alias indexedListing: musicListing
+    property alias albumViewButton: musicViewAlbums
     signal openFiles()
+    signal indexFolder()
+
+    function recentItems() {
+        recentRevision
+        return player.recentMedia()
+    }
+    Connections {
+        target: player
+        function onRecentMediaChanged() { root.recentRevision++ }
+    }
 
     readonly property var mediaFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav",
         "*.wma", "*.alac", "*.ape", "*.m3u", "*.m3u8", "*.pls", "*.xspf", "*.iso"]
     readonly property var videoFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.iso"]
+    readonly property var videoExtensions: ["mkv", "mp4", "avi", "mov", "webm", "m4v", "wmv", "flv", "ts",
+        "m2ts", "mpg", "mpeg", "3gp", "ogv", "iso"]
     readonly property var audioFilters: ["*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav", "*.wma", "*.alac", "*.ape"]
     readonly property var audioExt: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "wav", "wma", "alac", "ape"]
 
@@ -49,6 +77,62 @@ Rectangle {
     }
     function matchingFiles() { return filteredCount }
     function fileCount() { return files.count }
+    function extension(name) { return name.slice(name.lastIndexOf(".") + 1).toLowerCase() }
+    function hasFileName(name) {
+        for (let i = 0; i < files.count; ++i)
+            if (files.get(i, "fileName") === name) return true
+        return false
+    }
+    function videoThumbnailReady(name) {
+        for (let i = 0; i < files.count; ++i) {
+            if (files.get(i, "fileName") !== name) continue
+            const cell = listing.itemAtIndex(i)
+            return !!cell && cell.videoThumbnailReady
+        }
+        return false
+    }
+    function videoThumbnailState(name) {
+        for (let i = 0; i < files.count; ++i) {
+            if (files.get(i, "fileName") !== name) continue
+            const cell = listing.itemAtIndex(i)
+            return cell ? cell.videoThumbnailState : "missing-cell"
+        }
+        return "missing-file"
+    }
+    function visibleVideoThumbnailSummary() {
+        let visible = 0, ready = 0, loading = 0, error = 0
+        const viewportTop = listing.contentY
+        const viewportBottom = viewportTop + listing.height
+        for (let i = 0; i < files.count; ++i) {
+            const cell = listing.itemAtIndex(i)
+            if (!cell || !cell.visible || cell.y + cell.height <= viewportTop || cell.y >= viewportBottom)
+                continue
+            ++visible
+            if (cell.videoThumbnailState === "ready") ++ready
+            else if (cell.videoThumbnailState === "loading") ++loading
+            else if (cell.videoThumbnailState === "error") ++error
+        }
+        return visible + "/" + ready + "/" + loading + "/" + error
+    }
+    function folderListGeometry() {
+        const cell = listing.itemAtIndex(0)
+        if (!cell) return "missing"
+        const frame = cell.mapToItem(win.contentItem, cell.thumbnailRect.x, cell.thumbnailRect.y)
+        return Math.round(listing.mapToItem(win.contentItem, 0, 0).y) + "/"
+             + Math.round(frame.x) + "/" + Math.round(frame.y) + "/"
+             + Math.round(cell.thumbnailRect.width) + "/" + Math.round(cell.thumbnailRect.height) + "/"
+             + Math.round(miniPlayer.mapToItem(win.contentItem, 0, 0).x) + "/"
+             + Math.round(miniPlayer.mapToItem(win.contentItem, 0, 0).y) + "/"
+             + Math.round(miniPlayer.width) + "/" + Math.round(miniPlayer.height)
+    }
+    function videoProgress(name) {
+        for (let i = 0; i < files.count; ++i) {
+            if (files.get(i, "fileName") !== name) continue
+            const cell = listing.itemAtIndex(i)
+            return cell ? cell.progressRatio : 0
+        }
+        return 0
+    }
     function crumbs() {
         const path = platform.localPath(root.folder)
         const home = platform.homePath()
@@ -69,6 +153,7 @@ Rectangle {
         nameFilters: root.mediaType === "video" ? root.videoFilters
                    : (root.mediaType === "audio" ? root.audioFilters : root.mediaFilters)
         showDirsFirst: true
+        showHidden: Theme.store.showHiddenFiles
         showDotAndDotDot: false
         caseSensitive: false
         sortField: root.sortBy === "date" ? FolderListModel.Time : (root.sortBy === "size" ? FolderListModel.Size : FolderListModel.Name)
@@ -82,6 +167,11 @@ Rectangle {
         interval: 180
         onTriggered: root.refreshFilteredCount()
     }
+    Timer {
+        id: musicSearchTimer
+        interval: 160
+        onTriggered: mediaLibrary.model.search = librarySearch.text
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -90,9 +180,10 @@ Rectangle {
         // Header: navigation, breadcrumbs and local search.
         RowLayout {
             Layout.fillWidth: true
+            Layout.topMargin: root.compactFolderSidebar ? 18 : (root.wide && root.section === "folder" ? 8 : 0)
             Layout.leftMargin: 8
             Layout.rightMargin: 8
-            implicitHeight: 42
+            implicitHeight: root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42
             spacing: 2
             IconButton { icon: "chevron-left"; tip: "Up"; visible: root.section === "folder"; onClicked: root.openFolder(files.parentFolder) }
             Chips {
@@ -104,27 +195,87 @@ Rectangle {
             NText {
                 visible: root.wide
                 text: root.section === "folder" ? root.crumbs().map(c => c.name).join("  ›  ")
-                      : (root.section === "recent" ? "Recent media" : "Home")
+                      : (root.section === "recent" ? "Recent media" : (root.section === "music" ? (root.compactMusicSidebar ? "Songs  ›  My Songs" : "Music library") : "Home"))
                 font.pixelSize: 12
                 Layout.leftMargin: 8
                 Layout.fillWidth: true
             }
             Item { Layout.fillWidth: true }
-            NText { visible: root.wide; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
+            NText { visible: root.wide && root.section === "folder" && !root.compactFolderSidebar; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
+            NText { id: musicItemCountLabel; visible: root.wide && root.section === "music"; text: mediaLibrary.model.count + " items" + (mediaLibrary.scanning ? " · Indexing…" : ""); dim: true; font.pixelSize: 11 }
+            IconButton { objectName: "library-index-folder"; visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "folder"; tip: "Add folder to library"; onClicked: root.indexFolder() }
+            IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "refresh"; tip: "Rescan library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.refresh() }
+            IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "trash-2"; tip: "Clear indexed library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.clearLibrary() }
+            IconButton {
+                icon: "arrow-up"; tip: "Sort: " + root.sortBy
+                visible: root.section !== "music" && !root.compactFolderSidebar
+                onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
+            }
+            IconButton {
+                id: folderViewToggleButton
+                objectName: "library-folder-view-toggle"
+                visible: root.wide && root.section === "folder" && !root.compactFolderSidebar
+                icon: root.folderViewMode === "grid" ? "list" : "grid"
+                tip: root.folderViewMode === "grid" ? "List view" : "Grid view"
+                Accessible.name: tip
+                onClicked: root.folderViewMode = root.folderViewMode === "grid" ? "list" : "grid"
+            }
+            NField {
+                id: librarySearch
+                visible: root.wide && ((!root.compactMusicSidebar && !root.compactFolderSidebar)
+                                       || (root.compactMusicSidebar && root.musicSearchOpen)
+                                       || (root.compactFolderSidebar && root.folderSearchOpen))
+                objectName: "library-search"
+                Layout.preferredWidth: root.compactFolderSidebar ? 105 : (root.compactMusicSidebar ? 125 : 190)
+                text: root.section === "music" ? mediaLibrary.model.search : root.searchText
+                placeholderText: "Search"
+                onTextEdited: root.section === "music" ? musicSearchTimer.restart() : (root.searchText = text)
+            }
+            IconButton { visible: root.compactMusicSidebar && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
+            IconButton { visible: root.compactMusicSidebar && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
+            IconButton { visible: root.wide && !root.compactFolderSidebar; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
+            IconButton { icon: "x"; tip: "Close"; onClicked: {
+                if (root.compactMusicSidebar) win.musicSidebarOpen = false
+                else if (root.compactFolderSidebar) win.folderSidebarOpen = false
+                else win.libraryOpen = false
+            } }
+        }
+
+        // The compact player sidebar follows Figma's two-row folder header:
+        // breadcrumbs above, then item count and sort/view/search controls.
+        RowLayout {
+            id: compactFolderToolbarItem
+            objectName: "library-compact-folder-toolbar"
+            visible: root.compactFolderSidebar && root.section === "folder"
+            Layout.fillWidth: true
+            Layout.topMargin: 15
+            Layout.leftMargin: 10
+            Layout.rightMargin: 10
+            Layout.bottomMargin: 35
+            implicitHeight: 28
+            spacing: 4
+            NText { text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
+            Item { Layout.fillWidth: true }
             IconButton {
                 icon: "arrow-up"; tip: "Sort: " + root.sortBy
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
-            NField {
-                visible: root.wide
-                objectName: "library-search"
-                Layout.preferredWidth: 190
-                text: root.searchText
-                placeholderText: "Search"
-                onTextEdited: root.searchText = text
+            IconButton {
+                objectName: "library-folder-view-toggle"
+                icon: root.folderViewMode === "grid" ? "list" : "grid"
+                tip: root.folderViewMode === "grid" ? "List view" : "Grid view"
+                Accessible.name: tip
+                onClicked: root.folderViewMode = root.folderViewMode === "grid" ? "list" : "grid"
             }
-            IconButton { visible: root.wide; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
-            IconButton { icon: "x"; tip: "Close"; onClicked: win.libraryOpen = false }
+            IconButton {
+                id: compactFolderPinButton
+                objectName: "library-folder-pin"
+                icon: "bookmark"; tip: "Pin this folder"
+                checked: root.pinnedList().indexOf(platform.localPath(root.folder)) >= 0
+                onClicked: root.togglePin(platform.localPath(root.folder))
+            }
+            IconButton { id: compactFolderSearchButton; objectName: "library-folder-search-open"; visible: !root.folderSearchOpen; icon: "search"; tip: "Search this folder"; onClicked: root.folderSearchOpen = true }
+            IconButton { objectName: "library-folder-search-close"; visible: root.folderSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.folderSearchOpen = false; root.searchText = "" } }
         }
 
         // Address line (clickable segments)
@@ -159,7 +310,9 @@ Rectangle {
             }
         }
         RowLayout {
-            visible: root.section === "folder" && !root.wide
+            id: folderActionsRowItem
+            visible: root.section === "folder" && (!root.wide || root.compactFolderSidebar)
+                    && !root.compactFolderSidebar
             Layout.fillWidth: true
             Layout.leftMargin: 10
             Layout.rightMargin: 10
@@ -168,12 +321,45 @@ Rectangle {
             NButton { text: "Play folder"; icon: "play"; Layout.fillWidth: true; onClicked: player.openUrls([root.folder], true) }
             NButton { text: "Queue all"; icon: "plus"; Layout.fillWidth: true; onClicked: player.openUrls([root.folder], false) }
             IconButton {
+                objectName: "library-folder-pin-full"
+                visible: !root.compactFolderSidebar
                 icon: "bookmark"; tip: "Pin this folder"
                 checked: root.pinnedList().indexOf(platform.localPath(root.folder)) >= 0
                 onClicked: root.togglePin(platform.localPath(root.folder))
             }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+        RowLayout {
+            visible: root.section === "music" && !root.compactMusicSidebar
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.topMargin: 8
+            Layout.bottomMargin: 8
+            spacing: 6
+            NButton { objectName: "music-view-tracks"; text: "Tracks"; primary: mediaLibrary.model.view === "tracks"; onClicked: mediaLibrary.model.view = "tracks" }
+            NButton { id: musicViewAlbums; objectName: "music-view-albums"; text: "Albums"; primary: mediaLibrary.model.view === "albums"; onClicked: mediaLibrary.model.view = "albums" }
+            NButton { objectName: "music-view-artists"; text: "Artists"; primary: mediaLibrary.model.view === "artists"; onClicked: mediaLibrary.model.view = "artists" }
+            NButton { objectName: "music-view-genres"; text: "Genres"; primary: mediaLibrary.model.view === "genres"; onClicked: mediaLibrary.model.view = "genres" }
+            NButton { objectName: "music-view-videos"; text: "Videos"; primary: mediaLibrary.model.view === "videos"; onClicked: mediaLibrary.model.view = "videos" }
+            NButton { visible: mediaLibrary.model.grouped; text: "← Tracks"; flat: true; onClicked: mediaLibrary.model.clearGroup() }
+        }
+
+        NText {
+            objectName: "music-library-query-status"
+            visible: root.section === "music" && (mediaLibrary.model.loading || mediaLibrary.model.loadError.length > 0)
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            Layout.bottomMargin: 6
+            wrapMode: Text.Wrap
+            dim: true
+            text: mediaLibrary.model.loadError.length > 0
+                  ? "Could not refresh library results: " + mediaLibrary.model.loadError
+                    + (mediaLibrary.model.stale ? " Showing previous results." : "")
+                  : (mediaLibrary.model.stale ? "Updating library results; showing previous results…" : "Loading library…")
+        }
 
         // Folder listing
         GridView {
@@ -183,11 +369,15 @@ Rectangle {
             Layout.fillHeight: true
             Layout.leftMargin: root.wide ? 12 : 0
             Layout.rightMargin: root.wide ? 12 : 0
+            Layout.topMargin: root.wide && !root.compactFolderSidebar ? 58 : 0
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds
-            cellWidth: root.wide ? Math.max(180, Math.floor(width / 4)) : width
-            cellHeight: root.wide ? 36 : 34
+            cellWidth: root.wide && !root.compactFolderSidebar
+                       ? Math.max(180, Math.floor(width / (root.folderViewMode === "grid" ? 5 : 4))) : width
+            cellHeight: root.compactFolderSidebar ? 38 : (root.wide
+                ? (root.folderViewMode === "grid" ? Math.max(154, Math.min(244, Math.round(cellWidth * 0.72))) : 44)
+                : 34)
             ScrollBar.vertical: ScrollBar {}
             delegate: Rectangle {
                 id: mediaCell
@@ -200,20 +390,74 @@ Rectangle {
                 visible: root.matches(fileName)
                 radius: Theme.radiusSmall
                 property bool playing: !fileIsDir && player.mediaUrl.toString() === fileUrl.toString()
-                color: playing ? Theme.accentSoft : (cellMouse.containsMouse ? Theme.hover : "transparent")
+                property string extension: root.extension(fileName)
+                property bool videoFile: !fileIsDir && root.videoExtensions.indexOf(extension) >= 0
+                property bool gridCard: root.wide && !root.compactFolderSidebar && root.folderViewMode === "grid"
+                property real savedDuration: player.resumeDurationFor(fileUrl)
+                property real savedPoint: player.resumePointFor(fileUrl)
+                property real progressRatio: playing
+                    ? (player.length > 0 ? Math.max(0, Math.min(1, player.time / player.length)) : 0)
+                    : (savedDuration > 0 ? Math.max(0, Math.min(1, savedPoint / savedDuration)) : 0)
+                property bool videoThumbnailReady: videoThumbnail.status === Image.Ready
+                property rect thumbnailRect: Qt.rect(thumbnailFrame.x, thumbnailFrame.y,
+                                                      thumbnailFrame.width, thumbnailFrame.height)
+                property string videoThumbnailState: videoThumbnail.status === Image.Null ? "null" :
+                                                      videoThumbnail.status === Image.Loading ? "loading" :
+                                                      videoThumbnail.status === Image.Ready ? "ready" :
+                                                      videoThumbnail.status === Image.Error ? "error" : "unknown"
+                color: root.folderViewMode === "list" && playing ? Theme.accentSoft
+                     : (cellMouse.containsMouse ? Theme.hover : "transparent")
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: root.wide ? 8 : 12
-                    anchors.rightMargin: 5
-                    spacing: root.wide ? 7 : 10
-                    Icon { name: mediaCell.fileIsDir ? "folder" : (root.audioExt.indexOf(mediaCell.fileSuffix.toLowerCase()) >= 0 ? "music" : "file-video"); size: root.wide ? 15 : 16; color: mediaCell.playing ? Theme.accent : Theme.icon }
-                    NText { text: mediaCell.fileName; Layout.fillWidth: true; font.pixelSize: root.wide ? 11 : Theme.fontBody; color: mediaCell.playing ? Theme.accent : Theme.text }
-                    IconButton {
-                        visible: cellMouse.containsMouse || hovered
-                        icon: "plus"; iconSize: 13; tip: "Add to queue"
-                        onClicked: player.openUrls([mediaCell.fileUrl], false)
+                Item {
+                    id: thumbnailFrame
+                    x: mediaCell.gridCard ? 8 : (root.wide ? 15 : 12)
+                    y: mediaCell.gridCard ? 8 : Math.round((parent.height - height) / 2)
+                    width: mediaCell.gridCard ? parent.width - 16 : (root.wide && mediaCell.videoFile ? 32 : 16)
+                    height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.wide ? 32 : 18)
+                    Image {
+                        id: videoThumbnail
+                        objectName: "library-video-thumbnail-" + mediaCell.fileName
+                        anchors.fill: parent
+                        source: root.wide && mediaCell.videoFile
+                                ? "image://thumbnail/frame?path=" + encodeURIComponent(platform.localPath(mediaCell.fileUrl)) + "&t=0"
+                                : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                        visible: status === Image.Ready
                     }
+                    Icon {
+                        anchors.centerIn: parent
+                        name: mediaCell.fileIsDir ? "folder" : (root.audioExt.indexOf(mediaCell.extension) >= 0 ? "music" : "video")
+                        size: root.wide ? 15 : 16
+                        color: mediaCell.playing ? Theme.accent : Theme.icon
+                        visible: !mediaCell.videoFile || videoThumbnail.status !== Image.Ready
+                    }
+                }
+                Rectangle {
+                    visible: mediaCell.gridCard && mediaCell.progressRatio > 0
+                    x: thumbnailFrame.x
+                    y: thumbnailFrame.y + thumbnailFrame.height - 3
+                    width: thumbnailFrame.width * mediaCell.progressRatio
+                    height: 3
+                    color: Theme.accent
+                }
+                NText {
+                    text: mediaCell.fileName
+                    x: mediaCell.gridCard ? 8 : thumbnailFrame.x + thumbnailFrame.width + (root.wide ? 7 : 10)
+                    y: mediaCell.gridCard ? thumbnailFrame.y + thumbnailFrame.height + 8 : Math.round((parent.height - height) / 2)
+                    width: mediaCell.gridCard ? parent.width - 16 : Math.max(20, parent.width - x - 36)
+                    font.pixelSize: root.wide ? (mediaCell.gridCard ? 13 : 11) : Theme.fontBody
+                    color: root.folderViewMode === "list" && mediaCell.playing ? Theme.accent : Theme.text
+                    elide: Text.ElideRight
+                }
+                IconButton {
+                    z: 2
+                    x: parent.width - width - 5
+                    y: mediaCell.gridCard ? thumbnailFrame.y + 4 : Math.round((parent.height - height) / 2)
+                    visible: cellMouse.containsMouse || hovered
+                    icon: "plus"; iconSize: 13; tip: "Add to queue"
+                    onClicked: player.openUrls([mediaCell.fileUrl], false)
                 }
                 MouseArea {
                     id: cellMouse
@@ -236,6 +480,91 @@ Rectangle {
                 anchors.centerIn: parent
                 visible: root.matchingFiles() === 0
                 text: root.searchText.length ? "No matching media" : "No media in this folder"
+                dim: true
+            }
+        }
+
+        ListView {
+            id: musicListing
+            objectName: "music-library-list"
+            visible: root.section === "music"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.leftMargin: root.wide ? 12 : 0
+            Layout.rightMargin: root.wide ? 12 : 0
+            clip: true
+            model: mediaLibrary.model
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar {}
+            delegate: Rectangle {
+                objectName: isGroup ? "music-library-group-" + index : "music-library-item-" + index
+                required property int index
+                required property string title
+                required property string artist
+                required property string album
+                required property string genre
+                required property string path
+                required property string artwork
+                required property int duration
+                required property int count
+                required property string kind
+                required property bool isGroup
+                width: ListView.view.width
+                height: 52
+                radius: Theme.radiusSmall
+                color: musicRowMouse.containsMouse ? Theme.hover : "transparent"
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 6
+                    spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 38
+                        Layout.preferredHeight: 38
+                        radius: 4
+                        color: Theme.raised
+                        Image { id: cover; anchors.fill: parent; source: artwork; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
+                        Icon { anchors.centerIn: parent; name: kind === "video" ? "video-file" : (isGroup ? "album" : "music"); size: 17; color: Theme.icon; visible: cover.status !== Image.Ready }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        NText { text: title; Layout.fillWidth: true; elide: Text.ElideRight }
+                        NText {
+                            text: isGroup ? (mediaLibrary.model.view === "albums" ? artist : "")
+                                          : [artist, album, genre].filter(value => value.length).join(" · ")
+                            visible: text.length > 0
+                            dim: true
+                            font.pixelSize: 10
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                    }
+                    NText { text: isGroup ? count + " tracks" : (duration > 0 ? player.formatTime(duration * 1000) : ""); dim: true; font.pixelSize: 10 }
+                }
+                MouseArea {
+                    id: musicRowMouse
+                    anchors.fill: parent
+                    anchors.rightMargin: 36
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: isGroup ? mediaLibrary.model.selectGroup(index) : player.openUrls([platform.fileUrl(path)], true)
+                    onDoubleClicked: if (!isGroup) player.openUrls([platform.fileUrl(path)], true)
+                }
+                IconButton {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: musicRowMouse.containsMouse || hovered
+                    icon: "plus"
+                    iconSize: 14
+                    tip: "Add to queue"
+                    onClicked: isGroup ? mediaLibrary.model.selectGroup(index) : player.openUrls([platform.fileUrl(path)], false)
+                }
+            }
+            NText {
+                anchors.centerIn: parent
+                visible: musicListing.count === 0
+                text: mediaLibrary.scanning ? "Indexing local media…" : (mediaLibrary.roots.length ? "No matching media" : "Add a folder to build your media library")
                 dim: true
             }
         }
@@ -267,16 +596,41 @@ Rectangle {
                 Repeater {
                     model: root.pinnedList()
                     delegate: LibraryRow {
+                        required property int index
                         required property string modelData
+                        objectName: "pinned-library-folder-" + index
                         label: modelData.split("/").pop(); iconName: "bookmark"; url: platform.fileUrl(modelData); isDir: true
                     }
                 }
                 NText { text: "Recent"; dim: true; font.pixelSize: 11; Layout.leftMargin: 14; Layout.topMargin: 10 }
                 Repeater {
-                    model: root.visible && root.section === "home" ? player.recentMedia() : []
+                    model: root.visible && root.section === "home" ? root.recentItems() : []
                     delegate: LibraryRow {
                         required property string modelData
                         label: decodeURIComponent(modelData.split("/").pop()); iconName: "history"; url: modelData; isDir: false
+                    }
+                }
+                NText { text: "Music library"; dim: true; font.pixelSize: 11; Layout.leftMargin: 14; Layout.topMargin: 10 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
+                    NButton { objectName: "open-music-library"; text: "Browse music"; icon: "music"; Layout.fillWidth: true; onClicked: root.section = "music" }
+                    IconButton { objectName: "index-library-folder-home"; icon: "folder"; tip: "Index a folder"; onClicked: root.indexFolder() }
+                }
+                NText { text: mediaLibrary.indexedCount + " items in " + mediaLibrary.roots.length + " folders"; dim: true; font.pixelSize: 10; Layout.leftMargin: 14 }
+                Repeater {
+                    model: mediaLibrary.roots
+                    delegate: RowLayout {
+                        required property string modelData
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 14
+                        Layout.rightMargin: 8
+                        spacing: 7
+                        Icon { name: "folder"; size: 13; color: Theme.icon }
+                        NText { text: modelData.split("/").pop(); Layout.fillWidth: true; font.pixelSize: 10; elide: Text.ElideMiddle; ToolTip.visible: folderHover.hovered; ToolTip.text: modelData }
+                        HoverHandler { id: folderHover }
+                        IconButton { icon: "close"; iconSize: 12; tip: "Remove folder from library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.removeFolder(platform.fileUrl(modelData)) }
                     }
                 }
             }
@@ -293,7 +647,7 @@ Rectangle {
                 spacing: 2
                 NText { text: "Recently played"; dim: true; font.pixelSize: 11; Layout.leftMargin: 14; Layout.topMargin: 10; Layout.bottomMargin: 4 }
                 Repeater {
-                    model: root.visible && root.section === "recent" ? player.recentMedia() : []
+                    model: root.visible && root.section === "recent" ? root.recentItems() : []
                     delegate: LibraryRow {
                         required property string modelData
                         label: decodeURIComponent(modelData.split("/").pop())
@@ -303,7 +657,7 @@ Rectangle {
                     }
                 }
                 NText {
-                    visible: root.visible && root.section === "recent" && player.recentMedia().length === 0
+                    visible: root.visible && root.section === "recent" && root.recentItems().length === 0
                     text: "No recent media"
                     dim: true
                     Layout.leftMargin: 14
@@ -315,13 +669,12 @@ Rectangle {
 
     Rectangle {
         id: miniPlayer
-        visible: root.wide && player.hasVideo
-        anchors.right: parent.right
+        visible: root.wide && win.libraryOpen && player.hasVideo
         anchors.bottom: parent.bottom
-        anchors.rightMargin: 12
-        anchors.bottomMargin: 12
-        width: Math.min(270, root.width * 0.34)
-        height: 220
+        x: root.folderViewMode === "list" ? root.mapFromItem(win.contentItem, 6, 0).x : parent.width - width - 12
+        anchors.bottomMargin: 6
+        width: Math.min(390, root.width * 0.34)
+        height: width * 0.87
         radius: 12
         color: Theme.bar
         border.color: Theme.border
@@ -379,14 +732,14 @@ Rectangle {
             spacing: 6
             Icon { name: "folder"; size: 13; color: Theme.textDim }
             NText { text: player.folderName; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
-            IconButton { icon: "maximize"; tip: "Return to player"; onClicked: win.libraryOpen = false }
+            IconButton { objectName: "mini-player-return"; icon: "maximize"; tip: "Return to player"; onClicked: win.libraryOpen = false }
         }
     }
 
     component LibraryRow: Rectangle {
         id: row
         property string label
-        property string iconName: "file-video"
+        property string iconName: "video"
         property url url
         property bool isDir: false
         property bool playing: false

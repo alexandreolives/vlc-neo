@@ -12,16 +12,26 @@ endif()
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(VLCPLUGIN REQUIRED IMPORTED_TARGET vlc-plugin>=3.0.0)
-find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Core Gui Qml Quick QuickControls2 Svg)
+if(VLCPLUGIN_VERSION VERSION_GREATER_EQUAL 4.0.0)
+  message(FATAL_ERROR "VLC Neo targets VLC 3.x APIs; found VLC plugin development package ${VLCPLUGIN_VERSION}")
+endif()
+pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+pkg_check_modules(SQLITE3 REQUIRED IMPORTED_TARGET sqlite3)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Concurrent Core DBus Gui Network Qml Quick QuickControls2 Svg)
 
-file(GLOB NEO_QML RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
-file(GLOB NEO_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} icons/*.svg)
-file(GLOB NEO_FIGMA_ICONS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} assets/figma-icons/*.svg)
+file(GLOB NEO_QML CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} qml/*.qml qml/singletons/*.qml)
+file(GLOB NEO_ICONS CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} icons/*.svg)
+file(GLOB NEO_FIGMA_ICONS CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} assets/figma-icons/*.svg)
 
 add_library(neo_plugin MODULE
   src/module.cpp
   src/vout_display.cpp
   src/video_item.cpp
+  src/thumbnail_provider.cpp
+  src/vlc_tasks.cpp
+  src/status_notifier.cpp
+  src/media_library.cpp
+  src/open_subtitles_client.cpp
   src/player.cpp
   src/player_state_store.cpp
   src/vlc3_player_backend.cpp
@@ -36,11 +46,18 @@ add_library(neo_plugin MODULE
   src/player_state_store.hpp
   src/player_backend.hpp
   src/vlc3_player_backend.hpp
+  src/vlc_addon_uuid.hpp
   src/media_queue_entry.hpp
   src/queue_model.hpp
   src/subtitle_matcher.hpp
   src/subtitle_timeline.hpp
   src/video_item.hpp
+  src/bounded_image_cache.hpp
+  src/thumbnail_provider.hpp
+  src/vlc_tasks.hpp
+  src/status_notifier.hpp
+  src/media_library.hpp
+  src/open_subtitles_client.hpp
   src/vlc_headers.hpp
 )
 
@@ -51,11 +68,14 @@ qt_add_resources(neo_plugin neo_assets
 
 target_compile_definitions(neo_plugin PRIVATE
   MODULE_STRING="neo"
+  NEO_VERSION="${PROJECT_VERSION}"
 )
 target_compile_options(neo_plugin PRIVATE -Wall -Wno-deprecated-declarations)
+target_link_directories(neo_plugin PRIVATE ${TAGLIB_LIBRARY_DIRS} ${SQLITE3_LIBRARY_DIRS})
 target_link_libraries(neo_plugin PRIVATE
   PkgConfig::VLCPLUGIN
-  Qt6::Concurrent Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
+  PkgConfig::TAGLIB PkgConfig::SQLITE3
+  Qt6::Concurrent Qt6::Core Qt6::DBus Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
 )
 set_target_properties(neo_plugin PROPERTIES PREFIX "lib" OUTPUT_NAME "neo_plugin")
 
@@ -75,6 +95,46 @@ if(BUILD_TESTING)
   )
   target_link_libraries(subtitle_timeline_test PRIVATE Qt6::Core)
   add_test(NAME subtitle_timeline COMMAND subtitle_timeline_test)
+
+  add_executable(open_subtitles_client_test
+    tests/open_subtitles_client_test.cpp
+    src/open_subtitles_client.cpp
+    src/open_subtitles_client.hpp
+  )
+  target_link_libraries(open_subtitles_client_test PRIVATE Qt6::Concurrent Qt6::Core Qt6::Network)
+  add_test(NAME open_subtitles_client COMMAND open_subtitles_client_test)
+  set_tests_properties(open_subtitles_client PROPERTIES
+    ENVIRONMENT "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/open-subtitles-client-test-config")
+
+  add_executable(media_library_sidecar_test
+    tests/media_library_sidecar_test.cpp
+    src/media_library.cpp
+    src/media_library.hpp
+  )
+  target_include_directories(media_library_sidecar_test PRIVATE src)
+  target_link_libraries(media_library_sidecar_test PRIVATE
+    Qt6::Concurrent Qt6::Core PkgConfig::TAGLIB PkgConfig::SQLITE3
+  )
+  add_test(NAME media_library_sidecar COMMAND media_library_sidecar_test)
+
+  add_executable(media_library_query_failure_test
+    tests/media_library_query_failure_test.cpp
+    src/media_library.cpp
+    src/media_library.hpp
+  )
+  target_include_directories(media_library_query_failure_test PRIVATE src)
+  target_link_libraries(media_library_query_failure_test PRIVATE
+    Qt6::Concurrent Qt6::Core PkgConfig::TAGLIB PkgConfig::SQLITE3
+  )
+  add_test(NAME media_library_query_failure COMMAND media_library_query_failure_test)
+
+  add_executable(vlc_addon_uuid_test
+    tests/vlc_addon_uuid_test.cpp
+    src/vlc_addon_uuid.hpp
+  )
+  target_include_directories(vlc_addon_uuid_test PRIVATE src)
+  target_link_libraries(vlc_addon_uuid_test PRIVATE PkgConfig::VLCPLUGIN Qt6::Core)
+  add_test(NAME vlc_addon_uuid COMMAND vlc_addon_uuid_test)
 
   add_executable(player_facade_test
     tests/player_facade_test.cpp
@@ -119,6 +179,19 @@ if(BUILD_TESTING)
   target_link_libraries(icon_provider_test PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Svg)
   add_test(NAME icon_provider COMMAND icon_provider_test)
   set_tests_properties(icon_provider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+  add_executable(platform_pip_test tests/platform_pip_test.cpp src/platform.hpp)
+  target_include_directories(platform_pip_test PRIVATE src)
+  target_link_libraries(platform_pip_test PRIVATE Qt6::Core Qt6::Gui)
+  add_test(NAME platform_pip COMMAND platform_pip_test)
+
+  add_executable(bounded_image_cache_test
+    tests/bounded_image_cache_test.cpp
+    src/bounded_image_cache.hpp
+  )
+  target_include_directories(bounded_image_cache_test PRIVATE src)
+  target_link_libraries(bounded_image_cache_test PRIVATE Qt6::Core Qt6::Gui)
+  add_test(NAME bounded_image_cache COMMAND bounded_image_cache_test)
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")

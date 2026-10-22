@@ -8,7 +8,7 @@ Item {
     property bool compact: false
     implicitWidth: compact ? 50 : 88
     implicitHeight: compact ? 22 : 28
-    readonly property real maxVolume: 1.25
+    readonly property real maxVolume: Theme.store.maximumVolume
     readonly property real level: player.muted ? 0 : Math.min(player.volume / maxVolume, 1)
 
     Shape {

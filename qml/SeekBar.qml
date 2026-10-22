@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import Neo 1.0
 
 // Thick seek bar (Figma): dark track, dimmed-accent progress, narrow accent handle,
@@ -8,12 +9,14 @@ FocusScope {
     property real position: player.position
     property bool dragging: mouse.pressed
     property real dragPosition: 0
-    implicitHeight: 28
+    readonly property bool onboardingCompact: win.onboardingActive && onboarding.step === 1
+    implicitHeight: onboardingCompact ? 18 : 28
     activeFocusOnTab: true
     Accessible.name: "Seek position"
     Accessible.role: Accessible.Slider
 
     readonly property real shown: dragging ? dragPosition : position
+    readonly property bool pointerHovered: mouse.containsMouse
     function cueAt(timeMs) {
         const cues = player.subtitleCues
         let low = 0, high = cues.length
@@ -29,12 +32,79 @@ FocusScope {
     }
     readonly property var hoveredCue: mouse.containsMouse && player.length > 0
                                        ? cueAt(mouse.mouseX / root.width * player.length) : null
+    readonly property int hoveredTimeMs: player.length > 0
+                                        ? Math.round(mouse.mouseX / root.width * player.length) : 0
+    property string thumbnailSource: ""
+    property string waveformSource: ""
+    readonly property bool thumbnailPreviewEnabled: Theme.store.showSeekThumbnails
+    readonly property bool thumbnailReady: thumbnail.status === Image.Ready
+    readonly property bool waveformReady: waveform.status === Image.Ready
+
+    function requestThumbnail(timeMs) {
+        if (!thumbnailPreviewEnabled || !player.hasVideo || !player.mediaUrl.toString().startsWith("file:")) {
+            thumbnailSource = ""
+            return false
+        }
+        const path = platform.localPath(player.mediaUrl)
+        if (!path.length) {
+            thumbnailSource = ""
+            return false
+        }
+        const seconds = Math.max(0, Math.floor(timeMs / 1000))
+        thumbnailSource = "image://thumbnail/frame?path=" + encodeURIComponent(path) + "&t=" + seconds
+        return true
+    }
+
+    function requestWaveform() {
+        if (!player.hasMedia || !player.mediaUrl.toString().startsWith("file:") || player.length <= 0)
+            return false
+        const path = platform.localPath(player.mediaUrl)
+        if (!path.length)
+            return false
+        const duration = Math.ceil(player.length / 1000)
+        waveformSource = "image://thumbnail/wave?path=" + encodeURIComponent(path) + "&duration=" + duration
+        return true
+    }
+
+    Timer {
+        id: thumbnailDebounce
+        interval: 220
+        onTriggered: {
+            if (mouse.containsMouse && player.hasVideo && root.thumbnailPreviewEnabled)
+                root.requestThumbnail(root.hoveredTimeMs)
+        }
+    }
+    onHoveredTimeMsChanged: {
+        if (mouse.containsMouse && player.hasVideo && thumbnailPreviewEnabled)
+            thumbnailDebounce.restart()
+    }
+    Connections {
+        target: Theme.store
+        function onShowSeekThumbnailsChanged() {
+            if (!root.thumbnailPreviewEnabled) {
+                thumbnailDebounce.stop()
+                root.thumbnailSource = ""
+            }
+        }
+    }
+    Connections {
+        target: player
+        function onMediaChanged() {
+            thumbnailDebounce.stop()
+            root.thumbnailSource = ""
+            root.waveformSource = ""
+        }
+        function onTimeChanged() {
+            if (!root.waveformSource.length && player.length > 0)
+                root.requestWaveform()
+        }
+    }
 
     Rectangle {
         id: track
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width
-        height: 28
+        height: root.onboardingCompact ? 12 : 28
         radius: 6
         color: Theme.seekTrack
         border.width: root.activeFocus ? 1 : 0
@@ -42,14 +112,30 @@ FocusScope {
 
         Rectangle {
             x: 2
-            y: 2
+            y: root.onboardingCompact ? 1 : 2
             width: Math.max(0, root.shown * (parent.width - 4))
-            height: parent.height - 4
+            height: parent.height - (root.onboardingCompact ? 2 : 4)
             radius: 4
             color: Theme.seekProgress
         }
+        Image {
+            id: waveform
+            anchors.centerIn: parent
+            z: 3
+            width: parent.width - 4
+            height: root.onboardingCompact ? 8 : 20
+            source: root.waveformSource
+            sourceSize: Qt.size(768, 28)
+            fillMode: Image.Stretch
+            smooth: false
+            cache: false
+            asynchronous: true
+            opacity: 0.72
+            visible: status === Image.Ready
+        }
         Canvas {
             id: subtitleMarks
+            z: 2
             anchors.fill: parent
             onPaint: {
                 const ctx = getContext("2d")
@@ -100,11 +186,11 @@ FocusScope {
         }
     }
     Rectangle {
-        width: 8
-        height: 24
+        width: root.onboardingCompact ? 6 : 8
+        height: root.onboardingCompact ? 14 : 24
         radius: 4
         color: Theme.accent
-        y: 2
+        y: root.onboardingCompact ? 7 : 2
         x: Math.max(2, Math.min(track.width - width - 2, 2 + root.shown * (track.width - 4) - width / 2))
         visible: player.hasMedia
     }
@@ -115,20 +201,37 @@ FocusScope {
         color: Theme.surface
         border.color: Theme.border
         radius: Theme.radiusSmall
-        width: root.hoveredCue ? Math.min(294, root.width) : bubbleText.implicitWidth + 14
-        height: bubbleText.implicitHeight + 12
+        width: root.hoveredCue || thumbnail.visible ? Math.min(294, root.width) : bubbleText.implicitWidth + 14
+        height: bubbleColumn.implicitHeight + 12
         y: -height - 6
         x: Math.min(Math.max(mouse.mouseX - width / 2, 0), root.width - width)
-        NText {
-            id: bubbleText
-            anchors.centerIn: parent
-            width: Math.min(280, root.width - 14)
-            font.pixelSize: Theme.fontSmall
-            wrapMode: Text.Wrap
-            maximumLineCount: 4
-            text: {
-                const time = player.formatTime(Math.max(0, Math.min(1, mouse.mouseX / root.width)) * player.length)
-                return root.hoveredCue ? time + "\n" + root.hoveredCue.text : time
+        ColumnLayout {
+            id: bubbleColumn
+            anchors.fill: parent
+            anchors.margins: 6
+            spacing: 5
+            Image {
+                id: thumbnail
+                objectName: "seek-thumbnail-preview"
+                Layout.fillWidth: true
+                Layout.preferredHeight: 158
+                visible: root.thumbnailPreviewEnabled && root.thumbnailSource.length > 0 && status !== Image.Error
+                source: root.thumbnailSource
+                sourceSize: Qt.size(480, 270)
+                fillMode: Image.PreserveAspectFit
+                cache: false
+                asynchronous: true
+            }
+            NText {
+                id: bubbleText
+                Layout.fillWidth: true
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.Wrap
+                maximumLineCount: 4
+                text: {
+                    const time = player.formatTime(root.hoveredTimeMs)
+                    return root.hoveredCue ? time + "\n" + root.hoveredCue.text : time
+                }
             }
         }
     }
@@ -150,7 +253,12 @@ FocusScope {
         cursorShape: Qt.PointingHandCursor
         function posAt(x) { return Math.max(0, Math.min(1, x / root.width)) }
         onPressed: (e) => root.dragPosition = posAt(e.x)
-        onPositionChanged: (e) => { if (pressed) root.dragPosition = posAt(e.x) }
+        onEntered: if (player.hasVideo && root.thumbnailPreviewEnabled) thumbnailDebounce.restart()
+        onExited: thumbnailDebounce.stop()
+        onPositionChanged: (e) => {
+            if (pressed) root.dragPosition = posAt(e.x)
+            if (containsMouse && player.hasVideo && root.thumbnailPreviewEnabled) thumbnailDebounce.restart()
+        }
         onClicked: root.forceActiveFocus()
         onReleased: (e) => { player.seek(posAt(e.x)); root.forceActiveFocus() }
         onWheel: (e) => player.seekBy(e.angleDelta.y > 0 ? 5000 : -5000)

@@ -14,5 +14,15 @@ sharing and adapting the material when the creator is credited. See Figma's
 - **Changes:** selected icons are recolored at render time; the theme maps the
   exported paint styles to VLC Neo's UI colors.
 
+The separate `design/figma-assets/` collection from
+[SpeedyPete25/Juxtopposed-VLC-Rebuild at `08bdb004`](https://github.com/SpeedyPete25/Juxtopposed-VLC-Rebuild/tree/08bdb00457fbab934413ba1f7a79cdd65101e70d/design/figma-assets)
+was checked by Git blob hash against all 206 pinned SVGs above. None of its 64
+SVGs is byte-identical to a file in the canonical set; 32 share a filename,
+but all 32 have different bytes. Some also include non-icon content: its
+`volume-high.svg` contains a dark background and a selection-frame outline, and
+its `folder.svg` has different path geometry. The canonical Olmo exports remain
+the source for matching icons; matching filenames in this alternate set are
+not treated as proof of matching artwork.
+
 The rest of VLC Neo's bundled icons are Lucide icons, covered by
 [`icons/LICENSE.lucide`](../icons/LICENSE.lucide).

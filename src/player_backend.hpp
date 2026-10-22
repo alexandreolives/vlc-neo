@@ -95,6 +95,7 @@ public:
     virtual int currentQueueItemId() const = 0;
     virtual bool exportQueue(const QString &path) = 0;
     virtual BackendPlaylistState playlistState() const = 0;
+    virtual QString playlistName() const { return {}; }
     virtual bool syncCurrentInput() = 0;
     virtual BackendInputState inputState() const = 0;
     virtual bool hasInput() const = 0;
@@ -118,6 +119,8 @@ public:
     virtual int subtitleMargin() const = 0;
     virtual void setAspectRatio(const QString &ratio) = 0;
     virtual QString aspectRatio() const = 0;
+    virtual bool setVideoFilterChain(const QString &filters) = 0;
+    virtual bool setVideoAdjustment(const QString &option, double value) = 0;
     virtual void setTransform(const QString &type) = 0;
     virtual void setDeinterlace(bool enabled) = 0;
     virtual void setEqualizerEnabled(const QString &preset, bool enabled) = 0;
@@ -129,8 +132,23 @@ public:
     virtual void setFullscreen(bool enabled) = 0;
 
     virtual QVariant config(const QString &name) const = 0;
+    virtual QString configType(const QString &name) const = 0;
+    virtual QString configDescription(const QString &name) const = 0;
+    virtual QVariantMap configRange(const QString &) const { return {}; }
     virtual void setConfig(const QString &name, const QVariant &value) = 0;
+    virtual QVariantList addons() const = 0;
+    virtual bool addonsLoading() const = 0;
+    virtual void loadAddons() = 0;
+    virtual void findAddons(const QString &source) = 0;
+    virtual bool installAddon(const QString &uuid) = 0;
+    virtual bool removeAddon(const QString &uuid) = 0;
+    virtual QVariantList rendererDevices() const { return {}; }
+    virtual bool rendererDiscoverySupported() const { return false; }
+    virtual bool discoverRenderers(bool enabled) { Q_UNUSED(enabled); return false; }
+    virtual bool setRenderer(const QString &id) { Q_UNUSED(id); return false; }
+    virtual void sendHotkey(int vlcKey) = 0;
     virtual bool forwardKey(int qtKey, int qtModifiers, const QString &text) = 0;
+    virtual bool forwardWheel(int deltaX, int deltaY, int qtModifiers) = 0;
 
 signals:
     void inputChanged();
@@ -140,4 +158,7 @@ signals:
     void rateStateChanged();
     void playbackModesChanged();
     void queueChanged();
+    void addonsChanged();
+    void addonsLoadingChanged();
+    void rendererDevicesChanged();
 };

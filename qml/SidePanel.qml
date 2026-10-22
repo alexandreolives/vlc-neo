@@ -19,6 +19,17 @@ Rectangle {
         fullbass: "Bass Boost", fullbasstreble: "Bass + Treble", fulltreble: "Treble Boost", headphones: "Headphones",
         largehall: "Large Hall", live: "Live", party: "Party", pop: "Pop", reggae: "Reggae", rock: "Rock", ska: "Ska",
         soft: "Soft", softrock: "Soft Rock", techno: "Techno" })
+    readonly property var videoEffectTiles: [
+        { label: "Original", value: "", colors: ["#78A8C8", "#7F9A5A", "#C9B887"] },
+        { label: "Sepia", value: "sepia", colors: ["#B69A68", "#806B42", "#D4C08E"] },
+        { label: "Invert", value: "invert", colors: ["#875738", "#8065A5", "#36466A"] },
+        { label: "Posterize", value: "posterize", colors: ["#E55445", "#F0C33B", "#397CBE"] },
+        { label: "Old movie", value: "oldmovie", colors: ["#96855C", "#786D4F", "#D5C59A"] },
+        { label: "Gaussian blur", value: "gaussianblur", colors: ["#6A91B0", "#9A9D98", "#B6A078"] },
+        { label: "Sharpen", value: "sharpen", colors: ["#6387A6", "#758D58", "#BFAF84"] },
+        { label: "VHS", value: "vhs", colors: ["#B34D73", "#4A9AA1", "#D5B543"] },
+        { label: "Grain", value: "grain", colors: ["#92989D", "#727A81", "#B1A99D"] }
+    ]
 
     property var spuTracks: []
     property var audioTracks: []
@@ -31,6 +42,8 @@ Rectangle {
     property bool fillMode: false
     property string rotation_: ""
     property bool deinterlace: false
+    property string activeVideoEffect: ""
+    property int videoEffectPreviewSecond: 0
 
     function refresh() {
         spuTracks = player.tracks("spu")
@@ -41,8 +54,11 @@ Rectangle {
         subScale = player.subtitleScale()
         subMargin = player.subtitleMargin()
         aspect = player.aspectRatio()
+        syncVideoEffect()
+        updateVideoEffectPreviewFrame()
     }
     onVisibleChanged: if (visible) refresh()
+    onTabChanged: if (tab === "video") { syncVideoEffect(); updateVideoEffectPreviewFrame() }
     Connections {
         target: player
         enabled: root.visible
@@ -53,6 +69,45 @@ Rectangle {
     }
 
     function delayLabel(ms) { return (ms > 0 ? "+" : "") + (ms / 1000).toFixed(2) + " s" }
+    function videoFilterList() {
+        const filters = player.config("video-filter")
+        return (typeof filters === "string" ? filters : "").split(",").map(f => f.trim()).filter(f => f.length > 0)
+    }
+    function syncVideoEffect() {
+        const filters = videoFilterList()
+        for (const tile of videoEffectTiles) {
+            if (tile.value && filters.indexOf(tile.value) >= 0) {
+                activeVideoEffect = tile.value
+                return
+            }
+        }
+        activeVideoEffect = ""
+    }
+    function updateVideoEffectPreviewFrame() {
+        videoEffectPreviewSecond = Math.max(0, Math.floor(player.time / 1000))
+    }
+    function videoEffectPreviewSource(effect) {
+        if (!player.hasVideo || !player.mediaUrl.toString().startsWith("file:")) return ""
+        const path = platform.localPath(player.mediaUrl)
+        if (!path.length) return ""
+        return "image://thumbnail/filter?path=" + encodeURIComponent(path)
+                + "&t=" + videoEffectPreviewSecond + "&effect=preview-set"
+    }
+    function videoEffectPreviewLoaded(effect) {
+        const index = videoEffectTiles.findIndex(tile => tile.value === effect)
+        const tile = index >= 0 ? videoEffectRepeater.itemAt(index) : null
+        return tile ? tile.previewLoaded : false
+    }
+    function setVideoEffect(value) {
+        const effectNames = videoEffectTiles.map(tile => tile.value).filter(value => value.length > 0)
+        const filters = videoFilterList().filter(filter => effectNames.indexOf(filter) < 0)
+        if (value) filters.push(value)
+        const chain = filters.join(",")
+        player.setConfig("video-filter", chain)
+        const applied = player.setVideoFilterChain(chain)
+        if (applied) activeVideoEffect = value
+        return applied
+    }
     function focusTab(tabId) {
         for (let i = 0; i < tabButtons.count; ++i) {
             const button = tabButtons.itemAt(i)
@@ -62,6 +117,14 @@ Rectangle {
             }
         }
         return false
+    }
+    function scrollToVideoEffects() {
+        if (tab !== "video") return false
+        Qt.callLater(() => {
+            const target = videoEffectsTitle.mapToItem(scroll.contentItem.contentItem, 0, 0).y
+            scroll.contentItem.contentY = Math.max(0, target - 8)
+        })
+        return true
     }
 
     ColumnLayout {
@@ -200,7 +263,7 @@ Rectangle {
                         label: "Subtitle font"
                         NField {
                             width: 150
-                            text: player.config("freetype-font") || ""
+                            text: { player.configRevision; return player.config("freetype-font") || "" }
                             placeholderText: "Default"
                             onEditingFinished: player.setConfig("freetype-font", text)
                         }
@@ -216,7 +279,7 @@ Rectangle {
                                     width: 22; height: 22; radius: 3
                                     color: "#" + ("000000" + modelData.toString(16)).slice(-6)
                                     border.width: 2
-                                    border.color: player.config("freetype-color") === modelData ? Theme.accent : Theme.border
+                                    border.color: { player.configRevision; return player.config("freetype-color") === modelData ? Theme.accent : Theme.border }
                                     MouseArea { anchors.fill: parent; onClicked: { player.setConfig("freetype-color", modelData); parent.border.color = Theme.accent } }
                                 }
                             }
@@ -225,7 +288,7 @@ Rectangle {
                     SettingRow {
                         label: "Outline thickness"
                         Chips {
-                            property int cur: player.config("freetype-outline-thickness") || 4
+                            property int cur: { player.configRevision; return player.config("freetype-outline-thickness") || 4 }
                             model: [{ label: "None", value: 0 }, { label: "Thin", value: 2 }, { label: "Normal", value: 4 }, { label: "Thick", value: 6 }]
                             current: cur
                             onPicked: (v) => { player.setConfig("freetype-outline-thickness", v); cur = v }
@@ -235,7 +298,7 @@ Rectangle {
                         label: "Background box"
                         info: "Draw a dark box behind subtitle text."
                         NSwitch {
-                            checked: (player.config("freetype-background-opacity") || 0) > 0
+                            checked: { player.configRevision; return (player.config("freetype-background-opacity") || 0) > 0 }
                             onToggled: (on) => { player.setConfig("freetype-background-opacity", on ? 160 : 0); checked = on }
                         }
                     }
@@ -246,7 +309,7 @@ Rectangle {
                         info: "Comma separated language codes, e.g. ar,en. VLC picks this track automatically for every file."
                         NField {
                             width: 120
-                            text: player.config("sub-language") || ""
+                            text: { player.configRevision; return player.config("sub-language") || "" }
                             placeholderText: "ar,en"
                             onEditingFinished: player.setConfig("sub-language", text)
                         }
@@ -286,12 +349,53 @@ Rectangle {
                     NText { text: "Shortcuts: J earlier · K later"; dim: true; font.pixelSize: 11 }
 
                     SectionTitle { text: "Equalizer" }
-                    Chips {
+                    GridLayout {
                         Layout.fillWidth: true
-                        property string cur: player.equalizerPreset()
-                        model: root.eqPresets.map(p => ({ label: root.eqLabels[p], value: p }))
-                        current: cur
-                        onPicked: (v) => { player.setEqualizerPreset(v); cur = v }
+                        columns: 3
+                        rowSpacing: 6
+                        columnSpacing: 6
+                        Repeater {
+                            model: root.eqPresets
+                            delegate: Rectangle {
+                                id: equalizerPresetTile
+                                required property string modelData
+                                readonly property string previewIcon: ({ off: "eq", flat: "eq", fullbass: "eq-full-bass",
+                                                                        fullbasstreble: "eq-full-bass-and-treble", largehall: "eq-large-hall",
+                                                                        softrock: "eq-soft-rock" }[modelData] || "eq-" + modelData)
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 68
+                                radius: Theme.radiusSmall
+                                color: player.equalizerPreset() === modelData ? Theme.accentDim : Theme.surface
+                                border.width: 1
+                                border.color: player.equalizerPreset() === modelData ? Theme.accent : Theme.border
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 3
+                                    Image {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 46
+                                        height: 30
+                                        source: Theme.iconUrl(equalizerPresetTile.previewIcon, Theme.icon)
+                                        sourceSize: Qt.size(92, 60)
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+                                    NText {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: root.eqLabels[equalizerPresetTile.modelData]
+                                        font.pixelSize: 9
+                                        dim: player.equalizerPreset() !== equalizerPresetTile.modelData
+                                    }
+                                }
+                                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                TapHandler { onTapped: player.setEqualizerPreset(equalizerPresetTile.modelData) }
+                                Keys.onReturnPressed: player.setEqualizerPreset(equalizerPresetTile.modelData)
+                                Keys.onSpacePressed: player.setEqualizerPreset(equalizerPresetTile.modelData)
+                                activeFocusOnTab: true
+                                Accessible.role: Accessible.Button
+                                Accessible.name: root.eqLabels[modelData] + " equalizer preset"
+                            }
+                        }
                     }
 
                     SectionTitle { text: "Default language" }
@@ -300,7 +404,7 @@ Rectangle {
                         info: "Comma separated language codes, e.g. ja,en."
                         NField {
                             width: 120
-                            text: player.config("audio-language") || ""
+                            text: { player.configRevision; return player.config("audio-language") || "" }
                             placeholderText: "en"
                             onEditingFinished: player.setConfig("audio-language", text)
                         }
@@ -340,6 +444,88 @@ Rectangle {
                                 { label: "270°", value: "270" }, { label: "Flip H", value: "hflip" }, { label: "Flip V", value: "vflip" }]
                         current: root.rotation_
                         onPicked: (v) => { player.setTransform(v); root.rotation_ = v }
+                    }
+
+                    SectionTitle { id: videoEffectsTitle; text: "Video effects" }
+                    NText {
+                        visible: !player.hasVideo
+                        text: "Open a video to preview and apply effects."
+                        dim: true
+                        wrapMode: Text.Wrap
+                    }
+                    GridLayout {
+                        visible: player.hasVideo
+                        Layout.fillWidth: true
+                        columns: 3
+                        rowSpacing: 6
+                        columnSpacing: 6
+                        Repeater {
+                            id: videoEffectRepeater
+                            model: root.videoEffectTiles
+                            delegate: Rectangle {
+                                id: effectTile
+                                required property var modelData
+                                required property int index
+                                readonly property bool previewLoaded: effectPreviewImage.status === Image.Ready
+                                objectName: "video-effect-" + (modelData.value || "original")
+                                readonly property bool selected: root.activeVideoEffect === modelData.value
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 66
+                                radius: Theme.radiusSmall
+                                color: selected ? Theme.accentDim : Theme.surface
+                                border.width: activeFocus || selected ? 1 : 0
+                                border.color: selected || activeFocus ? Theme.accent : Theme.border
+                                activeFocusOnTab: true
+                                Accessible.role: Accessible.Button
+                                Accessible.name: modelData.label + " video effect"
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 4
+                                    Item {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: 57
+                                        height: 32
+                                        clip: true
+                                        Image {
+                                            id: effectPreviewImage
+                                            x: -effectTile.index * 57
+                                            y: 0
+                                            width: root.videoEffectTiles.length * 57
+                                            height: 32
+                                            source: root.videoEffectPreviewSource(effectTile.modelData.value)
+                                            sourceSize: Qt.size(root.videoEffectTiles.length * 480, 270)
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                            cache: true
+                                        }
+                                        Row {
+                                            anchors.fill: parent
+                                            visible: effectPreviewImage.status !== Image.Ready
+                                            Repeater {
+                                                model: effectTile.modelData.colors
+                                                delegate: Rectangle {
+                                                    required property string modelData
+                                                    width: 19
+                                                    height: 26
+                                                    color: modelData
+                                                }
+                                            }
+                                        }
+                                    }
+                                    NText {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: effectTile.modelData.label
+                                        font.pixelSize: 9
+                                        dim: !effectTile.selected
+                                    }
+                                }
+                                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                TapHandler { onTapped: root.setVideoEffect(effectTile.modelData.value) }
+                                Keys.onReturnPressed: root.setVideoEffect(effectTile.modelData.value)
+                                Keys.onSpacePressed: root.setVideoEffect(effectTile.modelData.value)
+                            }
+                        }
                     }
 
                     SectionTitle { text: "Picture" }
