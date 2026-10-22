@@ -45,7 +45,8 @@ for name in names:
     qname = json.dumps(name)
     control = json.dumps("vlc-option-" + name)
     meta_steps.append(
-        f"+1:'meta-{name}=' + JSON.stringify({{type:player.configType({qname}),"
+        f"+1:'meta-{name}=' + JSON.stringify({{available:!!player.configType({qname}),"
+        f"visible:settingsDialog.preferenceControl({control}).visible,type:player.configType({qname}),"
         f"kind:settingsDialog.preferenceControl({control}).kind,"
         f"choices:settingsDialog.preferenceControl({control}).choices,"
         f"bounds:player.configRange({qname}),current:player.config({qname})}})"
@@ -58,6 +59,11 @@ for line in meta_output.splitlines():
         metadata[match.group(1)] = json.loads(match.group(2))
 if set(metadata) != set(names):
     raise SystemExit(f"FAIL: got metadata for {len(metadata)}/{len(names)} declared options")
+unavailable = [name for name in names if not metadata[name]["available"]]
+visible_unavailable = [name for name in unavailable if metadata[name]["visible"]]
+if visible_unavailable:
+    raise SystemExit("FAIL: options missing from VLC but still shown: " + ", ".join(visible_unavailable))
+available_names = [name for name in names if metadata[name]["available"]]
 
 # Text options have no enumerable domain, so use documented, non-networking values.
 text_values = {
@@ -107,7 +113,7 @@ def candidate(name, item):
 
 values = {}
 missing = []
-for name in names:
+for name in available_names:
     value = candidate(name, metadata[name])
     if value is None:
         missing.append(name)
@@ -173,7 +179,9 @@ counts = {"bool": 0, "choice": 0, "numeric": 0, "color": 0, "text": 0}
 for name in values:
     kind = metadata[name]["kind"]
     counts["numeric" if kind in {"number", "slider"} else kind] += 1
-print(f"PASS {len(values)}/{len(names)} alternate VLC preference values, mapped controls, and relaunch persistence")
+print(f"PASS {len(values)}/{len(available_names)} available VLC preferences: alternate values, mappings and relaunch persistence")
+if unavailable:
+    print(f"HIDDEN {len(unavailable)} options absent from this VLC build: " + ", ".join(unavailable))
 print("Coverage: " + ", ".join(f"{key}={value}" for key, value in counts.items()))
 print("VLC relaunches ran in a private D-Bus session to isolate single-instance IPC from desktop VLC processes.")
 print("Secret text values are tested in an isolated VLC config and never printed.")

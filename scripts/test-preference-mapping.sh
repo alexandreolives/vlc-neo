@@ -8,7 +8,7 @@ NEO_SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/neo-preference-mapping.XXXXXX")"
 export NEO_SANDBOX
 trap 'python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" "$NEO_SANDBOX"' EXIT
 
-python3 - "$HERE" "$NEO_SANDBOX/audit.py" <<'PY'
+python3 - "$HERE" "$NEO_SANDBOX/audit.py" "$NEO_SANDBOX/unavailable-options.json" <<'PY'
 import json
 import re
 import sys
@@ -21,7 +21,7 @@ Path(sys.argv[2]).write_text(json.dumps(names))
 print(f"Auditing {len(names)} unique declared VLC options")
 PY
 
-output="$(python3 - "$HERE" "$NEO_SANDBOX/audit.py" <<'PY'
+output="$(python3 - "$HERE" "$NEO_SANDBOX/audit.py" "$NEO_SANDBOX/unavailable-options.json" <<'PY'
 import json
 import os
 import subprocess
@@ -37,8 +37,10 @@ for name in names:
     control = "settingsDialog.preferenceControl(" + control_name + ")"
     steps.append(
         "+1:'audit-" + name + "=' + player.configType(" + quoted + ") + '/' + "
-        + control + ".kind + '/' + (String(" + control + ".effectiveInfo).trim().length>0) + '/' + "
-        "(String(" + control + ".current)===String(player.config(" + quoted + ")))"
+        + "(" + control + " ? " + control + ".kind : 'missing') + '/' + "
+        + "(!!" + control + " && String(" + control + ".effectiveInfo).trim().length>0) + '/' + "
+        + "(!!" + control + " && String(" + control + ".current)===String(player.config(" + quoted + "))) + '/' + "
+        + "(!!" + control + " && " + control + ".visible)"
     )
 steps.append("+100:quit")
 environment = os.environ.copy()
@@ -54,25 +56,36 @@ if result.returncode:
 PY
 )"
 
-python3 - "$HERE" "$output" <<'PY'
+python3 - "$HERE" "$output" "$NEO_SANDBOX/unavailable-options.json" <<'PY'
 import collections
+import json
 import re
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
 output = sys.argv[2]
+unavailable_path = Path(sys.argv[3])
 names = sorted(set(re.findall(r'\boption:\s*"([^"]+)"',
                               (root / "qml/SettingsDialog.qml").read_text())))
 results = {}
 for line in output.splitlines():
-    match = re.search(r"neo test: .*?=> audit-([^=]+)=([^/]+)/([^/]+)/([^/]+)/([^/]+)$", line)
+    match = re.search(r"neo test: .*?=> audit-([^=]+)=([^\s]+)$", line)
     if match:
-        results[match.group(1)] = match.groups()[1:]
+        results[match.group(1)] = match.group(2).split("/")
 
 failures = []
 if len(results) != len(names):
     failures.append(f"received {len(results)} results for {len(names)} options")
+unavailable = []
+for name, result in results.items():
+    if result[0] == "":
+        unavailable.append(name)
+        if len(result) != 5 or result[4] != "false":
+            failures.append(f"{name}: VLC does not expose this option but its control is not hidden")
+
+available_names = [name for name in names if name not in unavailable]
+unavailable_path.write_text(json.dumps(unavailable))
 compatible = {
     "bool": {"bool", "choice"},
     "integer": {"number", "slider", "choice", "color"},
@@ -80,12 +93,15 @@ compatible = {
     "string": {"text", "choice"},
 }
 types = collections.Counter()
-for name in names:
+for name in available_names:
     result = results.get(name)
     if not result:
         failures.append(f"{name}: no runtime audit result")
         continue
-    value_type, kind, has_help, control_matches = result
+    if len(result) != 5:
+        failures.append(f"{name}: malformed runtime audit result")
+        continue
+    value_type, kind, has_help, control_matches, _visible = result
     types[value_type] += 1
     if value_type not in compatible:
         failures.append(f"{name}: missing/unknown VLC type {value_type!r}")
@@ -100,13 +116,15 @@ if failures:
     print("FAIL preference mapping audit")
     print("\n".join(f"  {failure}" for failure in failures))
     raise SystemExit(1)
-print(f"PASS {len(names)} VLC preferences: controls, VLC types, help and current-value mapping")
+print(f"PASS {len(available_names)}/{len(names)} available VLC preferences: controls, types, help and current-value mapping")
+if unavailable:
+    print(f"HIDDEN {len(unavailable)} options absent from this VLC build: " + ", ".join(unavailable))
 print("VLC types: " + ", ".join(f"{key}={types[key]}" for key in sorted(types)))
 PY
 
 # Write each control through VLC (toggle ordinary booleans, retain other current
 # values), then compare persisted values and mapped controls after relaunch.
-python3 - "$HERE" "$NEO_SANDBOX/audit.py" <<'PY'
+python3 - "$HERE" "$NEO_SANDBOX/audit.py" "$NEO_SANDBOX/unavailable-options.json" <<'PY'
 import json
 import os
 import re
@@ -116,6 +134,8 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 names = json.loads(Path(sys.argv[2]).read_text())
+unavailable = set(json.loads(Path(sys.argv[3]).read_text()))
+names = [name for name in names if name not in unavailable]
 runner = str(root / "scripts/run-offscreen.sh")
 environment = os.environ.copy()
 environment["NEO_TIMEOUT"] = "90"
@@ -169,5 +189,5 @@ if len(results) != len(names):
 failures = [name for name in names if results[name] != ("true", "true")]
 if failures:
     raise SystemExit("FAIL preference persistence after VLC relaunch: " + ", ".join(failures))
-print(f"PASS {len(names)} VLC preferences: saved values and controls survive a VLC relaunch")
+print(f"PASS {len(names)} available VLC preferences: saved values and controls survive a VLC relaunch")
 PY
