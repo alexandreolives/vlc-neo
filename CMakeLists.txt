@@ -112,6 +112,9 @@ if(BUILD_TESTING)
     src/media_library.hpp
   )
   target_include_directories(media_library_sidecar_test PRIVATE src)
+  target_compile_definitions(media_library_sidecar_test PRIVATE
+    NEO_TEST_AUDIO_FIXTURE=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/waveform-electronic.ogg\"
+  )
   target_link_libraries(media_library_sidecar_test PRIVATE
     Qt6::Concurrent Qt6::Core PkgConfig::TAGLIB PkgConfig::SQLITE3
   )

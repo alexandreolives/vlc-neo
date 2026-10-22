@@ -38,6 +38,22 @@ bool waitForScan(MediaLibrary &library, QCoreApplication &application)
     return !library.scanning();
 }
 
+bool waitForScanAndModel(MediaLibrary &library, MediaLibraryModel &model,
+                         QCoreApplication &application)
+{
+    if (!waitForScan(library, application))
+        return false;
+
+    QElapsedTimer timeout;
+    timeout.start();
+    while (model.loading() && timeout.elapsed() < 5000) {
+        application.processEvents(QEventLoop::AllEvents, 25);
+        QThread::msleep(5);
+    }
+    application.processEvents(QEventLoop::AllEvents, 25);
+    return !model.loading();
+}
+
 bool writeFile(const QString &path, const QByteArray &contents)
 {
     QFile file(path);
@@ -79,9 +95,11 @@ int main(int argc, char **argv)
 
     const QString music = QDir(temporary.path()).filePath(QStringLiteral("music"));
     QDir().mkpath(music);
-    const QString track = QDir(music).filePath(QStringLiteral("unchanged.mp3"));
+    const QString track = QDir(music).filePath(QStringLiteral("unchanged.ogg"));
     const QString cover = QDir(music).filePath(QStringLiteral("cover.png"));
-    if (!writeFile(track, QByteArray("not an audio stream")))
+    QFile audioFixture(QStringLiteral(NEO_TEST_AUDIO_FIXTURE));
+    if (!audioFixture.open(QIODevice::ReadOnly)
+        || !writeFile(track, audioFixture.readAll()))
         return 2;
     const QByteArray firstCover = QByteArray::fromHex("89504e470d0a1a0a") + QByteArray(32, 'A');
     const QByteArray secondCover = QByteArray::fromHex("89504e470d0a1a0a") + QByteArray(32, 'B');
@@ -96,7 +114,8 @@ int main(int argc, char **argv)
         auto *model = qobject_cast<MediaLibraryModel *>(library.model());
         ok &= expect(model != nullptr, "media model is available");
         ok &= expect(library.addFolder(QUrl::fromLocalFile(music)), "add temporary music folder");
-        ok &= expect(waitForScan(library, application), "initial sidecar scan completes");
+        ok &= expect(model && waitForScanAndModel(library, *model, application),
+                     "initial sidecar scan and model load complete");
         if (model && model->itemCount() == 1)
             originalArtwork = model->itemAt(0).value(QStringLiteral("artwork")).toString();
         ok &= expect(!originalArtwork.isEmpty() && QFileInfo::exists(originalArtwork),
@@ -111,7 +130,8 @@ int main(int argc, char **argv)
         coverFile.close();
 
         library.refresh();
-        ok &= expect(waitForScan(library, application), "updated sidecar scan completes");
+        ok &= expect(model && waitForScanAndModel(library, *model, application),
+                     "updated sidecar scan and model load complete");
         if (model && model->itemCount() == 1)
             updatedArtwork = model->itemAt(0).value(QStringLiteral("artwork")).toString();
         ok &= expect(!updatedArtwork.isEmpty() && updatedArtwork != originalArtwork,
@@ -119,7 +139,8 @@ int main(int argc, char **argv)
 
         QFile::remove(cover);
         library.refresh();
-        ok &= expect(waitForScan(library, application), "removed sidecar scan completes");
+        ok &= expect(model && waitForScanAndModel(library, *model, application),
+                     "removed sidecar scan and model load complete");
         const QString removedArtwork = model && model->itemCount() == 1
             ? model->itemAt(0).value(QStringLiteral("artwork")).toString() : QStringLiteral("unexpected");
         ok &= expect(removedArtwork.isEmpty(), "removed sidecar clears the indexed artwork");
