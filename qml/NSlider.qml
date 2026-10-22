@@ -10,6 +10,7 @@ Item {
     property real stepSize: 0
     property real origin: from          // fill starts here (use 0 for bipolar sliders)
     property int trackHeight: 12
+    property int tickCount: 0
     readonly property bool pressed: mouse.pressed
     signal moved(real value)
 
@@ -41,6 +42,18 @@ Item {
             height: parent.height
             radius: 3
             color: Theme.accentDim
+        }
+        Repeater {
+            model: root.tickCount > 0 ? root.tickCount + 1 : 0
+            delegate: Rectangle {
+                required property int index
+                width: 1
+                height: Math.max(2, root.trackHeight - 2)
+                y: 1
+                x: index / root.tickCount * (track.width - width)
+                color: Theme.textFaint
+                opacity: 0.55
+            }
         }
     }
     Rectangle {

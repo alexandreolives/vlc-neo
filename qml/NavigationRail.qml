@@ -11,7 +11,8 @@ Rectangle {
     property bool expanded: false
     signal navigate(string page)
 
-    width: expanded ? 112 : 30
+    width: expanded ? Math.max(112, Math.min(210, Math.round(win.width * 0.11)))
+                    : Math.max(30, Math.min(52, Math.round(win.width * 0.027)))
     color: Theme.rail
 
     function focusPage(page) {
@@ -30,22 +31,30 @@ Rectangle {
         }
         return ""
     }
+    function expandedRowCenters() {
+        const centers = []
+        for (const button of buttonList.children) {
+            if (button.objectName && button.objectName.indexOf("navigation-") === 0)
+                centers.push(Math.round(button.mapToItem(win.contentItem, 0, button.height / 2).y))
+        }
+        return centers.join("/")
+    }
 
     ColumnLayout {
         id: buttonList
         anchors.top: parent.top
-        anchors.topMargin: 30
+        anchors.topMargin: root.expanded ? 54 : 30
         anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 3
+        spacing: root.expanded ? 2 : 3
 
         RailButton { iconName: "home"; label: "Home"; page: "home" }
         RailButton { iconName: "videos"; label: "Videos"; page: "videos" }
-        RailButton { iconName: "folder"; label: "Browse"; page: "folder" }
+        RailButton { iconName: "music"; label: "Music"; page: "music" }
         RailButton { iconName: "streaming"; label: "Network"; page: "streaming" }
-        RailButton { iconName: "playlist"; label: "Queue"; page: "playlist" }
+        RailButton { iconName: "playlist"; label: "Playlists"; page: "playlist" }
         RailButton { iconName: "recent"; label: "Recent"; page: "recent" }
 
-        Item { Layout.preferredHeight: 1 }
+        Item { visible: !root.expanded; Layout.preferredHeight: 1 }
         RailButton { iconName: "add"; label: "Add item"; page: "add" }
     }
 
@@ -59,7 +68,7 @@ Rectangle {
         objectName: "navigation-" + page
         Layout.alignment: Qt.AlignHCenter
         Layout.preferredWidth: root.expanded ? root.width - 10 : 26
-        Layout.preferredHeight: 26
+        Layout.preferredHeight: root.expanded ? 44 : 26
         Layout.leftMargin: root.expanded ? 5 : 0
         padding: 0
         focusPolicy: Qt.TabFocus
@@ -74,6 +83,7 @@ Rectangle {
             border.color: Theme.accent
         }
         contentItem: RowLayout {
+            Layout.leftMargin: root.expanded ? 16 : 0
             spacing: root.expanded ? 8 : 0
             Icon {
                 name: control.iconName
