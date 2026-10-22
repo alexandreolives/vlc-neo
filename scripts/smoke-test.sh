@@ -135,6 +135,9 @@ echo "== track popup dismissal"
 out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'tabFocus=' + tracksPopup.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
 check "track popup tabs accept keyboard focus" "$out" "tabFocus=true"
 check "Space activates the focused audio tab" "$out" "tabKeyboard=true"
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+150:'mainEscapeHandled=' + win.handleKey({key:Qt.Key_Escape, modifiers:Qt.NoModifier})|+100:'escapeClosed=' + !tracksPopup.visible|+100:quit" "$E1")
+check "Escape closes the track popup through the main window handler" "$out" "escapeClosed=true"
+check "the main window consumes Escape while closing the track popup" "$out" "mainEscapeHandled=true"
 out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'opened=' + tracksPopup.visible|+100:click:900,300|+100:'outsideClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'toggleClosed=' + !tracksPopup.visible|+100:tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:'switched=' + (tracksPopup.visible && tracksPopup.tab === 'audio')|+100:win.libraryOpen=true; tracksPopup.openFor('audio', controlBar.findControl('audio'))|+100:click:900,500|+100:'miniCloses=' + (!tracksPopup.visible && !libraryOpen)|+100:tracksPopup.close()|+100:quit" "$E1")
 check "track popup opens" "$out" "opened=true"
 check "clicking the video outside the track popup closes it" "$out" "outsideClosed=true"
