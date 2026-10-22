@@ -151,6 +151,7 @@ ApplicationWindow {
         else if (k === Qt.Key_Up) { const v = Math.min(1.25, player.volume + 0.05); player.setVolume(v); label = "↑"; text = "Volume " + Math.round(v * 100) + "%" }
         else if (k === Qt.Key_Down) { const v = Math.max(0, player.volume - 0.05); player.setVolume(v); label = "↓"; text = "Volume " + Math.round(v * 100) + "%" }
         else if (k === Qt.Key_Escape) {
+            if (tracksPopup.visible) { tracksPopup.close(); return true }
             if (fullscreen) setFullscreen(false)
             else if (pip) setPip(false)
             else if (uiHidden) uiHidden = false

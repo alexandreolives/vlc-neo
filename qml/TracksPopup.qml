@@ -101,6 +101,11 @@ Popup {
                         focusPolicy: Qt.TabFocus
                         Accessible.name: modelData.label
                         objectName: "track-tab-" + modelData.id
+                        Keys.onPressed: (event) => {
+                            if (event.key !== Qt.Key_Escape) return
+                            root.close()
+                            event.accepted = true
+                        }
                         onClicked: root.tab = modelData.id
                         background: Rectangle {
                             color: tabButton.hovered ? Theme.hover : "transparent"
