@@ -20,6 +20,8 @@ jobs:
             qt6-base qt6-declarative qt6-svg \
             ffmpeg ttf-dejavu imagemagick
       - uses: actions/checkout@v5
+      - name: Test installer dependency checks and Qt mirror fallback
+        run: bash scripts/test-installer.sh
       - name: Verify Figma export file identities
         run: sha256sum --check --quiet assets/figma-icons/SHA256SUMS
       - name: Build

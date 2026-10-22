@@ -19,6 +19,7 @@ MARK="# vlc-neo-managed"
 
 mode="install"
 assume_yes=0
+OS_RELEASE_FILE="${OS_RELEASE_FILE:-/etc/os-release}"
 for arg in "$@"; do
     case "$arg" in
         --default) mode="--default" ;;
@@ -75,13 +76,14 @@ package_is_installed() {
 
 install_system_dependencies() {
     local package missing=()
-    case " $ID $ID_LIKE " in
+    case " ${ID:-} ${ID_LIKE:-} " in
         *debian*|*ubuntu*)
             PACKAGE_MANAGER="apt"
             SYSTEM_PACKAGES=(build-essential cmake ninja-build pkg-config python3-venv libgl1-mesa-dev vlc libvlccore-dev libtag1-dev libsqlite3-dev)
             # QML modules are split into packages on Debian-family systems.
-            for package in qml6-module-qtquick-controls qml6-module-qtquick-dialogs \
-                qml6-module-qtquick-layouts qml6-module-qt-labs-folderlistmodel \
+            for package in qml6-module-qtquick qml6-module-qtquick-controls \
+                qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
+                qml6-module-qtquick-window qml6-module-qt-labs-folderlistmodel \
                 qml6-module-qtcore qml6-module-qtquick-shapes qml6-module-qtquick-effects; do
                 if apt-cache show "$package" >/dev/null 2>&1; then
                     SYSTEM_PACKAGES+=("$package")
@@ -129,11 +131,44 @@ install_system_dependencies() {
 
 qt_pkgconfig_ok() {
     local pkg_path="$1" module
-    local modules=(Qt6Core Qt6DBus Qt6Gui Qt6Qml Qt6Quick Qt6QuickControls2 Qt6Svg)
+    local modules=(Qt6Concurrent Qt6Core Qt6DBus Qt6Gui Qt6Network Qt6Qml Qt6Quick Qt6QuickControls2 Qt6Svg)
     for module in "${modules[@]}"; do
         PKG_CONFIG_PATH="$pkg_path" pkg-config --exists "$module" || return 1
     done
     PKG_CONFIG_PATH="$pkg_path" pkg-config --atleast-version=6.6 Qt6Core
+}
+
+qt_qml_imports_ok() {
+    local qt_root="$1" import module_dir root prefix paths
+    local imports=(QtCore QtQuick QtQuick/Controls/Basic QtQuick/Dialogs QtQuick/Effects \
+        QtQuick/Layouts QtQuick/Shapes QtQuick/Window Qt/labs/folderlistmodel)
+    local roots=() extra_roots=()
+    if [ -n "$qt_root" ]; then
+        # A private Qt installation must provide its own import plugins; the
+        # system Qt tree may have a different version and ABI.
+        roots+=("$qt_root/qml")
+    else
+        prefix="$(pkg-config --variable=prefix Qt6Core 2>/dev/null || true)"
+        [ -z "$prefix" ] || roots+=("$prefix/qml" "$prefix/lib/qt6/qml" "$prefix/lib64/qt6/qml")
+        roots+=(/usr/lib/qt6/qml /usr/lib64/qt6/qml /usr/local/lib/qt6/qml)
+        if command -v gcc >/dev/null 2>&1; then
+            roots+=("/usr/lib/$(gcc -dumpmachine 2>/dev/null)/qt6/qml")
+        fi
+    fi
+    for paths in "${QT_QML_IMPORT_PATH:-}" "${QML2_IMPORT_PATH:-}" "${QML_IMPORT_PATH:-}"; do
+        IFS=: read -r -a extra_roots <<< "$paths"
+        roots+=("${extra_roots[@]}")
+    done
+    for import in "${imports[@]}"; do
+        module_dir=""
+        for root in "${roots[@]}"; do
+            [ -n "$root" ] && [ -f "$root/$import/qmldir" ] && module_dir="$root/$import" && break
+        done
+        if [ -z "$module_dir" ]; then
+            echo "VLC Neo requires the Qt QML module '$import'; install the matching Qt 6 QML runtime package." >&2
+            return 1
+        fi
+    done
 }
 
 use_qt_root() {
@@ -141,6 +176,7 @@ use_qt_root() {
     [ -f "$root/lib/cmake/Qt6/Qt6Config.cmake" ] || return 1
     pkg_path="$root/lib/pkgconfig:$root/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
     qt_pkgconfig_ok "$pkg_path" || return 1
+    qt_qml_imports_ok "$root" || return 1
     QT_ROOT="$root"
     export QT_ROOT
     export PKG_CONFIG_PATH="$pkg_path"
@@ -182,7 +218,7 @@ install_qt_from_mirror() {
             --outputdir "$HOME/Qt" --timeout 30 --base "$mirror" \
             --archives qtbase qtdeclarative qtsvg icu; then
             QT_ROOT="$HOME/Qt/${VLC_NEO_QT_VERSION:-6.8.3}/gcc_64"
-            use_qt_root "$QT_ROOT" || die "Qt installed, but its required Core, Gui, Qml, Quick, QuickControls2 or Svg module is missing."
+            use_qt_root "$QT_ROOT" || die "Qt installed, but a required development module or QML runtime import is missing."
             return
         fi
         echo "Mirror failed; trying the next mirror." >&2
@@ -205,7 +241,7 @@ if [ "$mode" = "--uninstall" ]; then
     exit 0
 fi
 
-source /etc/os-release
+source "$OS_RELEASE_FILE"
 install_system_dependencies
 
 if ! command -v cmake >/dev/null 2>&1; then die "CMake was not installed."; fi
@@ -235,6 +271,8 @@ elif ! qt_pkgconfig_ok "${PKG_CONFIG_PATH:-}"; then
     if [ "$qt_found" -eq 0 ]; then
         install_qt_from_mirror
     fi
+elif ! qt_qml_imports_ok "$QT_ROOT"; then
+    install_qt_from_mirror
 fi
 
 SYSTEM_VLC="${SYSTEM_VLC:-/usr/bin/vlc}"
@@ -242,6 +280,8 @@ SYSTEM_VLC="${SYSTEM_VLC:-/usr/bin/vlc}"
 vlc_version="$("$SYSTEM_VLC" --version | sed -n '1p')"
 [[ "$vlc_version" =~ VLC\ version\ 3\.0\. ]] || die "VLC 3.0.x is required; found: $vlc_version"
 pkg-config --exists 'vlc-plugin >= 3.0.0' || die "VLC plugin headers are unavailable. Install the matching VLC development package."
+vlc_plugin_version="$(pkg-config --modversion vlc-plugin)"
+[[ "$vlc_plugin_version" =~ ^3\. ]] || die "VLC 3 plugin headers are required to match the VLC runtime; found $vlc_plugin_version."
 
 QT_CMAKE_ARGS=(-DQt6_DIR=)
 if [ -n "$QT_ROOT" ]; then
