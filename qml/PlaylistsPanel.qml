@@ -39,15 +39,16 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.leftMargin: 10
-            Layout.rightMargin: 7
-            implicitHeight: 38
-            spacing: 5
+            Layout.leftMargin: 18
+            Layout.rightMargin: 27
+            Layout.preferredHeight: 52
+            spacing: 2
             IconButton { icon: "arrow-left"; tip: "Back"; enabled: false }
             IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
             NText {
                 text: "Playlists"
-                font.pixelSize: 12
+                font.pixelSize: 14
+                color: Theme.librarySideTitle
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
@@ -57,10 +58,11 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.leftMargin: 12
-            Layout.rightMargin: 7
-            implicitHeight: 34
-            NText { visible: !root.searchOpen; text: root.fileCount() + (root.fileCount() === 1 ? " item" : " items"); dim: true; font.pixelSize: 10; Layout.fillWidth: true }
+            Layout.leftMargin: 20
+            Layout.rightMargin: 27
+            Layout.preferredHeight: 52
+            spacing: 4
+            NText { visible: !root.searchOpen; text: root.fileCount() + (root.fileCount() === 1 ? " item" : " items"); color: Theme.librarySideText; font.pixelSize: 12; Layout.fillWidth: true }
             NField {
                 visible: root.searchOpen
                 Layout.fillWidth: true
@@ -81,10 +83,12 @@ Rectangle {
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 10
-            Layout.topMargin: 8
-            Layout.preferredHeight: 30
+            Layout.topMargin: 16
+            Layout.preferredHeight: 36
             radius: Theme.radiusSmall
             color: createPlaylistMouse.containsMouse ? Theme.hover : "transparent"
+            border.width: activeFocus ? 1 : 0
+            border.color: Theme.accent
             activeFocusOnTab: true
             Accessible.name: "Create playlist"
             Accessible.role: Accessible.Button
@@ -97,11 +101,11 @@ Rectangle {
             }
             Row {
                 anchors.left: parent.left
-                anchors.leftMargin: 10
+                anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
-                Icon { name: "plus"; size: 14; color: createPlaylistMouse.containsMouse ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
-                NText { text: "Create playlist"; font.pixelSize: 11; dim: !createPlaylistMouse.containsMouse; anchors.verticalCenter: parent.verticalCenter }
+                spacing: 12
+                Icon { name: "plus"; size: 16; color: createPlaylistMouse.containsMouse ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
+                NText { text: "Create playlist"; font.pixelSize: 13; color: Theme.librarySideText; anchors.verticalCenter: parent.verticalCenter }
             }
             MouseArea {
                 id: createPlaylistMouse
@@ -123,27 +127,42 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
             delegate: Rectangle {
+                required property int index
                 required property string fileName
                 required property url fileUrl
+                objectName: "playlist-side-item-" + index
                 width: ListView.view.width
-                height: root.matches(fileName) ? (root.compactRows ? 28 : 34) : 0
+                height: root.matches(fileName) ? (root.compactRows ? 34 : 42) : 0
                 visible: height > 0
                 color: rowMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: activeFocus ? 1 : 0
+                border.color: Theme.accent
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: fileName.replace(/\.(m3u8?|pls|xspf)$/i, "") + ", playlist"
+                Accessible.focusable: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                        player.openUrls([fileUrl], true)
+                        event.accepted = true
+                    }
+                }
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 8
-                    spacing: 9
+                    anchors.leftMargin: 26
+                    anchors.rightMargin: 12
+                    spacing: 12
                     Item {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
                         Image { id: coverImage; anchors.fill: parent; source: platform.playlistCoverUrl(fileUrl); fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
-                        Icon { anchors.centerIn: parent; name: "playlist"; size: 14; color: rowMouse.containsMouse ? Theme.accent : Theme.icon; visible: coverImage.status !== Image.Ready }
+                        Icon { anchors.centerIn: parent; name: "playlist"; size: 20; color: rowMouse.containsMouse ? Theme.accent : Theme.icon; visible: coverImage.status !== Image.Ready }
                     }
                     NText {
                         text: fileName.replace(/\.(m3u8?|pls|xspf)$/i, "")
                         Layout.fillWidth: true
-                        font.pixelSize: 11
+                        font.pixelSize: 13
+                        color: Theme.librarySideText
                         elide: Text.ElideRight
                     }
                     IconButton {
@@ -160,7 +179,7 @@ Rectangle {
                     anchors.rightMargin: 34
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: player.openUrls([fileUrl], true)
+                    onClicked: { parent.forceActiveFocus(); player.openUrls([fileUrl], true) }
                     onDoubleClicked: player.openUrls([fileUrl], true)
                 }
             }
