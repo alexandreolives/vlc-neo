@@ -310,6 +310,8 @@ QtObject {
 
     readonly property color window: dark ? "#0E0E0E" : "#EDEDED"
     readonly property color librarySidePanel: dark ? "#0E0E0E" : "#E7E7E7" // Figma Dark/Light BG/B1
+    readonly property color librarySideTitle: dark ? "#8F8F8F" : "#2E2E2E" // Figma Dark/Light FG/A2
+    readonly property color librarySideText: "#6B6B6B" // Figma Dark/Light FG/A3
     readonly property color rail: dark ? "#191919" : Qt.rgba(0.835, 0.835, 0.835, 0.75) // Light/BG/A3 at 75%
     readonly property color bar: dark ? "#1B1B1B" : Qt.rgba(0.835, 0.835, 0.835, 0.75) // Light/BG/A3 at 75%
     readonly property color panel: dark ? "#151515" : Qt.rgba(0.906, 0.906, 0.906, 0.8) // Light/BG/B1 at 80%

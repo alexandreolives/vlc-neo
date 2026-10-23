@@ -356,6 +356,7 @@ Rectangle {
                       : root.section === "folder" ? root.crumbs().map(c => c.name).join("  ›  ")
                       : (root.section === "recent" ? "Recent media" : (root.section === "music" ? (root.compactMusicSidebar ? "Songs  ›  My Songs" : "Music library") : "Home"))
                 font.pixelSize: root.figmaSidePanel ? 14 : 12
+                color: root.figmaSidePanel ? Theme.librarySideTitle : Theme.text
                 Layout.leftMargin: 8
                 Layout.fillWidth: true
             }
@@ -437,7 +438,7 @@ Rectangle {
             Layout.bottomMargin: visible && !root.figmaSidePanel ? 35 : 0
             Layout.preferredHeight: root.figmaSidePanel ? 52 : 28
             spacing: 4
-            NText { visible: !root.folderSearchOpen; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 12 }
+            NText { visible: !root.folderSearchOpen; text: root.matchingFiles() + " items"; color: root.figmaSidePanel ? Theme.librarySideText : Theme.textDim; font.pixelSize: 12 }
             NField {
                 visible: root.figmaSidePanel && root.folderSearchOpen
                 Layout.fillWidth: true
@@ -529,7 +530,7 @@ Rectangle {
             Layout.topMargin: visible && root.figmaSidePanel ? 16 : 0
             Layout.leftMargin: 25
             Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
-            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
         }
 
@@ -541,7 +542,7 @@ Rectangle {
             Layout.topMargin: visible ? 16 : 0
             Layout.leftMargin: 25
             Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
-            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
         }
 
@@ -600,7 +601,7 @@ Rectangle {
             Layout.leftMargin: 62
             Layout.topMargin: 6
             text: "No music folders"
-            dim: true
+            color: Theme.librarySideText
             font.pixelSize: 12
         }
 
@@ -722,7 +723,8 @@ Rectangle {
                     y: mediaCell.gridCard ? thumbnailFrame.y + thumbnailFrame.height + 8 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : Math.max(20, parent.width - x - 36)
                     font.pixelSize: root.figmaSidePanel ? 13 : root.wide ? (mediaCell.gridCard ? 13 : 11) : Theme.fontBody
-                    color: root.folderViewMode === "list" && mediaCell.playing ? Theme.accent : Theme.text
+                    color: root.folderViewMode === "list" && mediaCell.playing ? Theme.accent
+                           : root.figmaSidePanel ? Theme.librarySideText : Theme.text
                     elide: Text.ElideRight
                 }
                 IconButton {
@@ -798,24 +800,24 @@ Rectangle {
                         Layout.preferredHeight: root.figmaSidePanel ? 32 : 38
                         radius: 4
                         color: Theme.raised
-                        Image { id: cover; anchors.fill: parent; source: artwork; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
+                        Image { id: cover; anchors.fill: parent; source: artwork.length ? platform.fileUrl(artwork) : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
                         Icon { anchors.centerIn: parent; name: kind === "video" ? "video-file" : (isGroup ? "album" : "music"); size: 17; color: Theme.icon; visible: cover.status !== Image.Ready }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 2
-                        NText { text: title; Layout.fillWidth: true; elide: Text.ElideRight }
+                        NText { text: title; color: root.figmaSidePanel ? Theme.librarySideText : Theme.text; Layout.fillWidth: true; elide: Text.ElideRight }
                         NText {
                             text: isGroup ? (mediaLibrary.model.view === "albums" ? artist : "")
                                           : [artist, album, genre].filter(value => value.length).join(" · ")
                             visible: text.length > 0
-                            dim: true
+                            color: root.figmaSidePanel ? Theme.librarySideText : Theme.textDim
                             font.pixelSize: 10
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
                     }
-                    NText { text: isGroup ? count + " tracks" : (duration > 0 ? player.formatTime(duration * 1000) : ""); dim: true; font.pixelSize: 10 }
+                    NText { text: isGroup ? count + " tracks" : (duration > 0 ? player.formatTime(duration * 1000) : ""); color: root.figmaSidePanel ? Theme.librarySideText : Theme.textDim; font.pixelSize: 10 }
                 }
                 MouseArea {
                     id: musicRowMouse
@@ -959,7 +961,7 @@ Rectangle {
             spacing: 2
             IconButton { icon: "arrow-left"; tip: "Back"; onClicked: root.goBackFromSidePanel() }
             IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
-            NText { text: root.sidePanelTitle(); font.pixelSize: 14; Layout.leftMargin: 8; Layout.fillWidth: true }
+            NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 8; Layout.fillWidth: true }
             IconButton { icon: "more"; tip: "More options" }
             IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
         }
@@ -973,7 +975,7 @@ Rectangle {
             NText {
                 visible: !root.musicSideSearchOpen
                 text: root.musicSideItemCount() + " items" + (mediaLibrary.scanning ? " · Indexing…" : "")
-                dim: true
+                color: Theme.librarySideText
                 font.pixelSize: 12
                 Layout.fillWidth: true
             }
@@ -998,7 +1000,7 @@ Rectangle {
             Layout.topMargin: 16
             Layout.leftMargin: 25
             Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
-            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
         }
 
@@ -1016,7 +1018,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: modelData.icon; size: 18; color: Theme.icon }
-                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; font.pixelSize: 13; color: Theme.text }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; font.pixelSize: 13; color: Theme.librarySideText }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openMusicSidePage(modelData.page) }
                 }
             }
@@ -1037,7 +1039,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
-                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: root.musicSideRootLabel(modelData); font.pixelSize: 13; color: Theme.text }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: root.musicSideRootLabel(modelData); font.pixelSize: 13; color: Theme.librarySideText }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
@@ -1055,7 +1057,7 @@ Rectangle {
             Layout.leftMargin: 62
             Layout.topMargin: 6
             text: "No music folders"
-            dim: true
+            color: Theme.librarySideText
             font.pixelSize: 12
         }
 
@@ -1070,31 +1072,32 @@ Rectangle {
                 required property var modelData
                 objectName: "music-sidepanel-track-" + modelData.title
                 width: ListView.view.width
-                height: 50
+                height: 44
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 20
                     anchors.rightMargin: 18
                     spacing: 10
                     Rectangle {
-                        Layout.preferredWidth: 34
-                        Layout.preferredHeight: 34
+                        Layout.preferredWidth: 32
+                        Layout.preferredHeight: 32
                         radius: 3
                         color: Theme.surface
                         Image {
                             id: trackCover
                             anchors.fill: parent
-                            source: modelData.artwork || ""
+                            source: modelData.artwork && modelData.artwork.length ? platform.fileUrl(modelData.artwork) : ""
                             fillMode: Image.PreserveAspectCrop
                             visible: status === Image.Ready
                         }
                         Icon { anchors.centerIn: parent; name: "music"; size: 17; color: Theme.icon; visible: trackCover.status !== Image.Ready }
                     }
-                    ColumnLayout {
+                    NText {
                         Layout.fillWidth: true
-                        spacing: 1
-                        NText { text: modelData.title; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
-                        NText { text: modelData.artist || "Unknown artist"; font.pixelSize: 11; dim: true; elide: Text.ElideRight; Layout.fillWidth: true }
+                        text: modelData.title + (modelData.artist.length ? " - " + modelData.artist : "")
+                        font.pixelSize: 12
+                        color: Theme.librarySideText
+                        elide: Text.ElideRight
                     }
                 }
                 MouseArea {
@@ -1107,7 +1110,7 @@ Rectangle {
                 anchors.centerIn: parent
                 visible: parent.visible && parent.count === 0
                 text: "No songs in this folder"
-                dim: true
+                color: Theme.librarySideText
                 font.pixelSize: 12
             }
         }
