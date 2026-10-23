@@ -813,6 +813,20 @@ Rectangle {
                 height: root.figmaSidePanel ? (root.musicSideCompactView ? 38 : 44) : 52
                 radius: Theme.radiusSmall
                 color: musicRowMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: activeFocus ? 1 : 0
+                border.color: Theme.accent
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: isGroup ? title + ", " + count + " tracks"
+                                         : [title, artist].filter(value => value.length).join(" - ")
+                Accessible.focusable: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                        if (isGroup) mediaLibrary.model.selectGroup(index)
+                        else player.openUrls([platform.fileUrl(path)], true)
+                        event.accepted = true
+                    }
+                }
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: root.figmaSidePanel ? 26 : 8
@@ -848,7 +862,10 @@ Rectangle {
                     anchors.rightMargin: 36
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: isGroup ? mediaLibrary.model.selectGroup(index) : player.openUrls([platform.fileUrl(path)], true)
+                    onClicked: {
+                        parent.forceActiveFocus()
+                        isGroup ? mediaLibrary.model.selectGroup(index) : player.openUrls([platform.fileUrl(path)], true)
+                    }
                     onDoubleClicked: if (!isGroup) player.openUrls([platform.fileUrl(path)], true)
                 }
                 IconButton {
