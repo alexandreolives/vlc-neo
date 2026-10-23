@@ -6,14 +6,19 @@ import Neo 1.0
 // Video / Audio / Subtitles quick picker that opens from the control bar.
 Popup {
     id: root
-    parent: currentAnchor && currentAnchor.parent ? currentAnchor.parent : keyCatcher
+    // Popups are positioned in the full player overlay coordinate space.
+    // Anchoring to the control's RowLayout gives the popup only that row's
+    // width/height and makes clamping fail on compact or resized windows.
+    parent: keyCatcher
     property string tab: "spu"
     property Item currentAnchor: null
     signal showPreferences(string tab)
     signal addSubtitles()
 
-    width: 340
-    height: Math.min(440, content.implicitHeight + 24, win.height - 16)
+    width: Math.min(340, Math.max(1, keyCatcher.width - 16))
+    height: Math.min(440,
+                     Math.max(content.implicitHeight + 24, root.tab === "audio" ? 400 : 280),
+                     Math.max(1, keyCatcher.height - 16))
     padding: 0
     modal: false
     focus: true
@@ -30,25 +35,41 @@ Popup {
         currentAnchor = triggerItem
         tab = tabName
         refresh()
-        place()
         open()
         Qt.callLater(place)
     }
     function place() {
-        if (!currentAnchor || !parent)
+        if (!currentAnchor || !keyCatcher)
             return
-        const p = currentAnchor.mapToItem(parent, currentAnchor.width / 2, 0)
-        x = Math.max(8, Math.min(p.x - width / 2, parent.width - width - 8))
-        y = p.y - height - 10
-        const popupTop = parent.mapToItem(keyCatcher, 0, y).y
-        if (popupTop < 8)
-            y += 8 - popupTop
+        const p = currentAnchor.mapToItem(keyCatcher, 0, 0)
+        const anchorTop = p.y
+        const anchorBottom = p.y + currentAnchor.height
+        const gap = 10
+        const margin = 8
+        const maxY = Math.max(margin, keyCatcher.height - height - margin)
+        const above = anchorTop - height - gap
+        const below = anchorBottom + gap
+        const fitsAbove = above >= margin
+        const fitsBelow = below + height <= keyCatcher.height - margin
+
+        x = Math.max(margin, Math.min(p.x + currentAnchor.width / 2 - width / 2,
+                                       keyCatcher.width - width - margin))
+        if (fitsAbove)
+            y = above
+        else if (fitsBelow)
+            y = below
+        else
+            y = Math.max(margin, Math.min(above, maxY))
     }
     function schedulePlace() { Qt.callLater(place) }
+    onWidthChanged: if (visible) schedulePlace()
+    onHeightChanged: if (visible) schedulePlace()
     onClosed: currentAnchor = null
     function refresh() {
         trackList.model = player.tracks(tab)
         deviceList.model = tab === "audio" ? player.audioDevices() : []
+        if (visible)
+            schedulePlace()
     }
     function focusTab(tabName) {
         for (let i = 0; i < tabButtons.count; ++i) {
@@ -60,7 +81,10 @@ Popup {
         }
         return false
     }
-    onTabChanged: refresh()
+    onTabChanged: {
+        refresh()
+        schedulePlace()
+    }
     Connections {
         target: win
         function onWidthChanged() { root.schedulePlace() }
@@ -75,8 +99,6 @@ Popup {
     }
     Connections {
         target: root.parent
-        function onXChanged() { root.schedulePlace() }
-        function onYChanged() { root.schedulePlace() }
         function onWidthChanged() { root.schedulePlace() }
         function onHeightChanged() { root.schedulePlace() }
     }
@@ -89,12 +111,14 @@ Popup {
     background: Rectangle { color: Theme.panel; radius: Theme.radius; border.color: Theme.border }
 
     contentItem: Flickable {
+        id: tracksFlickable
         clip: true
         contentWidth: width
-        contentHeight: content.implicitHeight
+        contentHeight: Math.max(content.implicitHeight, height)
         ColumnLayout {
             id: content
             width: root.width
+            height: tracksFlickable.contentHeight
             spacing: 0
 
             RowLayout {
@@ -109,7 +133,9 @@ Popup {
                         id: tabButton
                         required property var modelData
                         property string tabId: modelData.id
-                        Layout.fillWidth: true
+                        Layout.preferredWidth: content.width / 3
+                        Layout.minimumWidth: content.width / 3
+                        Layout.maximumWidth: content.width / 3
                         implicitHeight: 40
                         padding: 0
                         focusPolicy: Qt.TabFocus
@@ -180,6 +206,12 @@ Popup {
                     selected: modelData.selected
                     onClicked: { player.setAudioDevice(modelData.id); root.refresh() }
                 }
+            }
+
+            Item {
+                visible: root.tab === "audio"
+                Layout.fillHeight: true
+                Layout.minimumHeight: 8
             }
 
             RowLayout {

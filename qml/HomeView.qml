@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import Qt.labs.folderlistmodel
 import Neo 1.0
 
 // Figma's Home screen: resume local videos, replay indexed music, and reopen
@@ -9,10 +10,15 @@ Rectangle {
     id: root
     objectName: "home-screen"
     color: Theme.window
+    property alias miniVideoHost: homeMiniVideoSurface
     property int contentRevision: 0
     property string searchText: ""
     property bool sortByName: false
     property bool compactCards: false
+    property bool sidePanel: false
+    property bool searchOpen: false
+    signal indexFolder()
+    signal createPlaylist()
     function videoCardWidth() {
         return compactCards ? 190 : Math.min(320, Math.max(220, (pageScroll.availableWidth - 72) / 4))
     }
@@ -79,6 +85,14 @@ Rectangle {
         function onRecentMediaChanged() { root.refreshContent() }
         function onStateChanged() { root.refreshContent() }
     }
+    FolderListModel {
+        id: homePlaylists
+        folder: platform.fileUrl(platform.playlistLibraryDirectory())
+        nameFilters: ["*.m3u", "*.m3u8", "*.pls", "*.xspf"]
+        showDirs: false
+        showDotAndDotDot: false
+        caseSensitive: false
+    }
     Connections {
         target: mediaLibrary
         function onRootsChanged() { root.refreshContent() }
@@ -96,8 +110,225 @@ Rectangle {
             width: pageScroll.availableWidth
             spacing: 0
 
+            ColumnLayout {
+                visible: root.sidePanel
+                Layout.fillWidth: true
+                spacing: 0
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 8
+                    implicitHeight: 36
+                    spacing: 3
+                    IconButton { icon: "arrow-left"; tip: "Back"; onClicked: win.goBack() }
+                    IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
+                    NText { text: "Home"; font.pixelSize: 12; Layout.fillWidth: true }
+                    IconButton { icon: "more"; tip: "More options" }
+                    IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
+                }
+                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 8
+                    implicitHeight: 34
+                    NText { visible: !root.searchOpen; text: mediaLibrary.indexedCount + " items"; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
+                    NField {
+                        visible: root.searchOpen
+                        Layout.fillWidth: true
+                        placeholderText: "Search"
+                        text: root.searchText
+                        onTextEdited: { root.searchText = text; root.refreshContent() }
+                    }
+                    IconButton { icon: "sort"; tip: "Sort"; onClicked: { root.sortByName = !root.sortByName; root.refreshContent() } }
+                    IconButton { icon: "view"; tip: "Toggle compact view"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
+                    IconButton { icon: root.searchOpen ? "close" : "search"; tip: root.searchOpen ? "Close search" : "Search"; onClicked: { root.searchOpen = !root.searchOpen; if (!root.searchOpen) { root.searchText = ""; root.refreshContent() } } }
+                }
+
+                NText {
+                    text: "Continue Watching"
+                    font.pixelSize: 12
+                    Layout.leftMargin: 16
+                    Layout.topMargin: 18
+                    Layout.bottomMargin: 7
+                }
+                Repeater {
+                    model: root.videoItems.slice(0, 6)
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 16
+                        Layout.rightMargin: 12
+                        Layout.preferredHeight: 42
+                        spacing: 9
+                        Rectangle {
+                            width: 32; height: 32; radius: 3; color: Theme.raised; clip: true
+                            Image {
+                                anchors.fill: parent
+                                source: "image://thumbnail/frame?path=" + encodeURIComponent(modelData.path)
+                                       + "&t=" + Math.floor(modelData.point / 1000)
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+                            Rectangle {
+                                anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                                height: 2; color: Theme.bar
+                                Rectangle { width: parent.width * modelData.progress; height: parent.height; color: Theme.accent }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: { win.navigate("player"); player.openLocation(modelData.url, true); if (modelData.point > 0) player.jumpTo(modelData.point) }
+                            }
+                        }
+                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        TapHandler {
+                            onTapped: { win.navigate("player"); player.openLocation(modelData.url, true); if (modelData.point > 0) player.jumpTo(modelData.point) }
+                        }
+                    }
+                }
+                NText {
+                    visible: root.videoItems.length === 0
+                    text: "No recent videos"
+                    dim: true
+                    font.pixelSize: 10
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 4
+                }
+                NButton {
+                    visible: root.videoItems.length === 0
+                    text: "Browse videos"
+                    icon: "videos"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
+                    onClicked: win.navigateFromRail("videos")
+                }
+
+                NText {
+                    text: "Listen Again"
+                    font.pixelSize: 12
+                    Layout.leftMargin: 16
+                    Layout.topMargin: 18
+                    Layout.bottomMargin: 7
+                }
+                Repeater {
+                    model: root.musicItems.slice(0, 6)
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 16
+                        Layout.rightMargin: 12
+                        Layout.preferredHeight: 42
+                        spacing: 9
+                        Rectangle {
+                            width: 32; height: 32; radius: 3; color: Theme.raised
+                            Icon { anchors.centerIn: parent; name: "music"; size: 16; color: Theme.accent }
+                        }
+                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        NText { text: modelData.artist || ""; font.pixelSize: 10; dim: true; elide: Text.ElideRight; Layout.maximumWidth: 80 }
+                        TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(modelData.path)], true) } }
+                    }
+                }
+                NText {
+                    visible: root.musicItems.length === 0
+                    text: "No indexed music"
+                    dim: true
+                    font.pixelSize: 10
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 4
+                }
+                NButton {
+                    visible: root.musicItems.length === 0
+                    text: "Browse music"
+                    icon: "music"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
+                    onClicked: win.navigateFromRail("music")
+                }
+
+                NText {
+                    text: "Frequently Visited Folders"
+                    font.pixelSize: 12
+                    Layout.leftMargin: 16
+                    Layout.topMargin: 18
+                    Layout.bottomMargin: 7
+                }
+                Repeater {
+                    model: root.folderItems.slice(0, 6)
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 16
+                        Layout.rightMargin: 12
+                        Layout.preferredHeight: 34
+                        spacing: 9
+                        Icon { name: "folder"; size: 16; color: Theme.icon }
+                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        TapHandler { onTapped: win.openFolderSidePanel(modelData.path) }
+                    }
+                }
+                NText {
+                    visible: root.folderItems.length === 0
+                    text: "No indexed folders"
+                    dim: true
+                    font.pixelSize: 10
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 4
+                }
+                NButton {
+                    visible: root.folderItems.length === 0
+                    text: "Add a media folder"
+                    icon: "folder"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
+                    onClicked: root.indexFolder()
+                }
+                NText {
+                    text: "Frequently Visited Playlists"
+                    font.pixelSize: 12
+                    Layout.leftMargin: 16
+                    Layout.topMargin: 18
+                    Layout.bottomMargin: 7
+                }
+                Repeater {
+                    model: Math.min(homePlaylists.count, 6)
+                    delegate: RowLayout {
+                        required property int index
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 16
+                        Layout.rightMargin: 12
+                        Layout.preferredHeight: 34
+                        spacing: 9
+                        Icon { name: "playlist"; size: 16; color: Theme.icon }
+                        NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(homePlaylists.get(index, "filePath"))], true) } }
+                    }
+                }
+                NText {
+                    visible: homePlaylists.count === 0
+                    text: "No playlists yet"
+                    dim: true
+                    font.pixelSize: 10
+                    Layout.leftMargin: 16
+                    Layout.bottomMargin: 4
+                }
+                NButton {
+                    visible: homePlaylists.count === 0
+                    text: "Create playlist"
+                    icon: "playlist"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 12
+                    onClicked: root.createPlaylist()
+                }
+            }
+
             RowLayout {
                 objectName: "home-toolbar"
+                visible: !root.sidePanel
                 Layout.fillWidth: true
                 Layout.leftMargin: 18
                 Layout.rightMargin: 18
@@ -117,9 +348,10 @@ Rectangle {
                 IconButton { icon: "more"; tip: "More options" }
             }
 
-            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+            Rectangle { visible: !root.sidePanel; Layout.fillWidth: true; height: 1; color: Theme.border }
 
             ColumnLayout {
+                visible: !root.sidePanel
                 Layout.fillWidth: true
                 Layout.leftMargin: 18
                 Layout.rightMargin: 18
@@ -200,7 +432,7 @@ Rectangle {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                win.navigationPage = "player"
+                                                win.navigate("player")
                                                 player.openLocation(modelData.url, true)
                                                 if (modelData.point > 0) player.jumpTo(modelData.point)
                                             }
@@ -348,6 +580,84 @@ Rectangle {
                     NText { anchors.centerIn: parent; text: "Add a media folder to build your library"; dim: true }
                 }
             }
+        }
+    }
+
+    Rectangle {
+        id: homeMiniPlayer
+        objectName: "home-mini-player"
+        visible: root.visible && !root.sidePanel && player.hasVideo
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 16
+        anchors.bottomMargin: 16
+        width: Math.min(380, Math.max(220, root.width * 0.32))
+        height: homeMiniVideoSurface.height + 64
+        radius: 10
+        color: Theme.bar
+        border.color: Theme.border
+        z: 5
+
+        HoverHandler { id: miniPlayerHover }
+
+        Item {
+            id: homeMiniVideoSurface
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 8
+            height: width * 9 / 16
+            clip: true
+
+            MouseArea {
+                anchors.fill: parent
+                z: 1
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: (event) => {
+                    if (event.button === Qt.RightButton) {
+                        const point = homeMiniVideoSurface.mapToItem(keyCatcher, event.x, event.y)
+                        contextMenu.popup(point.x, point.y)
+                    } else {
+                        win.navigate("player")
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 8
+            anchors.bottomMargin: 4
+            spacing: 6
+            NText {
+                text: player.title.length ? player.title : "Now playing"
+                font.pixelSize: 11
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+            IconButton {
+                objectName: "home-mini-player-toggle"
+                icon: player.playing ? "pause" : "play"
+                tip: player.playing ? "Pause" : "Play"
+                onClicked: player.togglePause()
+            }
+        }
+        IconButton {
+            objectName: "home-mini-player-return"
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 8
+            anchors.rightMargin: 8
+            z: 2
+            visible: miniPlayerHover.hovered
+            icon: "maximize"
+            iconSize: 15
+            tip: "Expand player"
+            Accessible.name: "Expand player"
+            onClicked: win.navigate("player")
         }
     }
 }

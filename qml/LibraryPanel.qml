@@ -234,11 +234,7 @@ Rectangle {
             IconButton { visible: root.compactMusicSidebar && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
             IconButton { visible: root.compactMusicSidebar && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
             IconButton { visible: root.wide && !root.compactFolderSidebar; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
-            IconButton { icon: "x"; tip: "Close"; onClicked: {
-                if (root.compactMusicSidebar) win.musicSidebarOpen = false
-                else if (root.compactFolderSidebar) win.folderSidebarOpen = false
-                else win.libraryOpen = false
-            } }
+            IconButton { icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
         }
 
         // The compact player sidebar follows Figma's two-row folder header:
@@ -669,7 +665,7 @@ Rectangle {
 
     Rectangle {
         id: miniPlayer
-        visible: root.wide && win.libraryOpen && player.hasVideo
+        visible: root.wide && win.libraryFullPage && player.hasVideo
         anchors.bottom: parent.bottom
         x: root.folderViewMode === "list" ? root.mapFromItem(win.contentItem, 6, 0).x : parent.width - width - 12
         anchors.bottomMargin: 6
@@ -679,6 +675,8 @@ Rectangle {
         color: Theme.bar
         border.color: Theme.border
         z: 2
+
+        HoverHandler { id: miniPlayerHover }
 
         Item {
             id: miniVideoSurface
@@ -695,7 +693,7 @@ Rectangle {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onClicked: (event) => {
                     if (tracksPopup.visible) tracksPopup.close()
-                    if (event.button === Qt.LeftButton) win.libraryOpen = false
+                    if (event.button === Qt.LeftButton) win.navigate("player")
                     else {
                         const point = miniVideoSurface.mapToItem(keyCatcher, event.x, event.y)
                         contextMenu.popup(point.x, point.y)
@@ -732,7 +730,20 @@ Rectangle {
             spacing: 6
             Icon { name: "folder"; size: 13; color: Theme.textDim }
             NText { text: player.folderName; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
-            IconButton { objectName: "mini-player-return"; icon: "maximize"; tip: "Return to player"; onClicked: win.libraryOpen = false }
+        }
+        IconButton {
+            objectName: "mini-player-return"
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 8
+            anchors.rightMargin: 8
+            z: 3
+            visible: miniPlayerHover.hovered
+            icon: "maximize"
+            iconSize: 15
+            tip: "Expand player"
+            Accessible.name: "Expand player"
+            onClicked: win.navigate("player")
         }
     }
 

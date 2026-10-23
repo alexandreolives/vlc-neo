@@ -23,6 +23,7 @@
 #include <QQuickStyle>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QCursor>
 
 #include "icon_provider.hpp"
 #include "media_library.hpp"
@@ -40,6 +41,67 @@ namespace {
 QMutex g_appLock;
 QPointer<QGuiApplication> g_app;
 constexpr const char *kPreferredFont = "thmanyah sans";
+
+// QML cursor shapes can be replaced by cursors set by hovered child items.
+// Apply the fullscreen idle cursor on the window itself so it wins after all
+// scene-graph hover handling has run; any mouse input restores it immediately.
+class FullscreenCursorAutoHide final : public QObject
+{
+public:
+    explicit FullscreenCursorAutoHide(QQuickWindow *window)
+        : QObject(window), m_window(window)
+    {
+        m_timer.setSingleShot(true);
+        m_timer.setInterval(2000);
+        connect(&m_timer, &QTimer::timeout, this, [this] {
+            if (m_window && m_window->visibility() == QWindow::FullScreen)
+                m_window->setCursor(QCursor(Qt::BlankCursor));
+        });
+        if (window) {
+            window->installEventFilter(this);
+            connect(window, &QWindow::visibilityChanged, this, [this](QWindow::Visibility visibility) {
+                if (!m_window)
+                    return;
+                m_window->setCursor(QCursor(Qt::ArrowCursor));
+                if (visibility == QWindow::FullScreen)
+                    m_timer.start();
+                else
+                    m_timer.stop();
+            });
+            if (window->visibility() == QWindow::FullScreen)
+                m_timer.start();
+        }
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched == m_window && m_window) {
+            switch (event->type()) {
+            case QEvent::MouseMove:
+            case QEvent::MouseButtonPress:
+            case QEvent::MouseButtonRelease:
+            case QEvent::Wheel:
+                if (m_window->visibility() == QWindow::FullScreen) {
+                    m_window->setCursor(QCursor(Qt::ArrowCursor));
+                    m_timer.start();
+                }
+                break;
+            case QEvent::Leave:
+                m_timer.stop();
+                m_window->setCursor(QCursor(Qt::ArrowCursor));
+                break;
+            default:
+                break;
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    QPointer<QQuickWindow> m_window;
+    QTimer m_timer;
+};
 
 QUrl openSubtitlesApiBaseUrl()
 {
@@ -359,6 +421,8 @@ void NeoRunUi(intf_thread_t *intf, void (*ready)(void *), void *readyData)
     ready(readyData);
 
     if (!engine.rootObjects().isEmpty()) {
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        FullscreenCursorAutoHide cursorAutoHide(window);
         installTestHooks(engine.rootObjects().first());
         app.exec();
     }

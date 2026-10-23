@@ -74,8 +74,10 @@ public:
             if (legacyFile.open(QIODevice::ReadOnly))
                 svg = legacyFile.readAll();
         }
-        if (!isFigmaIcon && name != QLatin1String("cone"))
+        if (!isFigmaIcon && name != QLatin1String("cone")) {
+            svg.replace("currentColor", color.toLatin1());
             svg.replace("#ffffff", color.toLatin1());
+        }
 
         const QSize out(requestedSize.width() > 0 ? requestedSize.width() : kDefaultSize,
                         requestedSize.height() > 0 ? requestedSize.height() : kDefaultSize);

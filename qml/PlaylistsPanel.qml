@@ -8,7 +8,7 @@ Rectangle {
     id: root
     color: Theme.panel
     signal createPlaylist()
-    property bool expanded: false
+    signal openLibraryPage()
     property bool compactRows: false
     property bool searchOpen: false
     property string searchText: ""
@@ -52,7 +52,7 @@ Rectangle {
                 elide: Text.ElideRight
             }
             IconButton { icon: "more"; tip: "Playlist options" }
-            IconButton { objectName: "playlist-expand"; icon: root.expanded ? "minimize-2" : "open"; tip: root.expanded ? "Narrow panel" : "Expand panel"; onClicked: root.expanded = !root.expanded }
+            IconButton { objectName: "playlist-expand"; icon: "open"; tip: "Open full library page"; onClicked: root.openLibraryPage() }
         }
 
         RowLayout {
@@ -76,16 +76,40 @@ Rectangle {
 
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
-        NButton {
+        Rectangle {
             objectName: "create-playlist"
-            text: "Create playlist"
-            icon: "plus"
-            flat: true
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 10
             Layout.topMargin: 8
-            onClicked: root.createPlaylist()
+            Layout.preferredHeight: 30
+            radius: Theme.radiusSmall
+            color: createPlaylistMouse.containsMouse ? Theme.hover : "transparent"
+            activeFocusOnTab: true
+            Accessible.name: "Create playlist"
+            Accessible.role: Accessible.Button
+            Accessible.focusable: true
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (!event.isAutoRepeat) root.createPlaylist()
+                    event.accepted = true
+                }
+            }
+            Row {
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                Icon { name: "plus"; size: 14; color: createPlaylistMouse.containsMouse ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
+                NText { text: "Create playlist"; font.pixelSize: 11; dim: !createPlaylistMouse.containsMouse; anchors.verticalCenter: parent.verticalCenter }
+            }
+            MouseArea {
+                id: createPlaylistMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { parent.forceActiveFocus(); root.createPlaylist() }
+            }
         }
 
         ListView {

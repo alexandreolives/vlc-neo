@@ -29,8 +29,6 @@ Modal {
     property bool equalizerExpanded: true
     readonly property var equalizerFrequencies: ["60 Hz", "170 Hz", "310 Hz", "600 Hz", "1 kHz", "3 kHz", "6 kHz", "12 kHz", "14 kHz", "16 kHz"]
     property string videoFiltersState: ""
-    property bool castDiscoveryEnabled: false
-    property string activeRendererId: ""
     property var pictureValues: ({ hue: 0, brightness: 1, contrast: 1, saturation: 1, gamma: 1 })
     property int audioDeviceRevision: 0
     property bool reverseScrollDirection: false
@@ -504,7 +502,7 @@ Modal {
         for (const device of devices) if (device.selected) return device.id
         return ""
     }
-    onOpened: { syncSubtitleSizeMode(); readAudioFilters(); syncEqualizerSettings(); loadPictureValues(); syncPlaybackSettings(); syncScrollDirection(); syncPrivacySettings(); syncMetadataNetworkAccess(); syncBufferingProfile() }
+    onOpened: { syncSubtitleSizeMode(); readAudioFilters(); syncEqualizerSettings(); loadPictureValues(); syncPlaybackSettings(); syncScrollDirection(); syncPrivacySettings(); syncMetadataNetworkAccess(); syncBufferingProfile(); player.discoverRenderers(true) }
     onPageChanged: {
         if (page === "controls") syncScrollDirection()
         if (page === "privacy") syncPrivacySettings()
@@ -2149,62 +2147,25 @@ Modal {
                         info: "Prefer the original stream format when VLC can record it directly."
                     }
                     SectionTitle { text: "Casting" }
-                    SettingRow {
-                        objectName: "chromecast-discovery-row"
-                        label: "Discover cast devices"
-                        info: "Search your local network for Chromecast devices using VLC's renderer discovery."
-                        NSwitch {
-                            objectName: "chromecast-discovery-toggle"
-                            checked: root.castDiscoveryEnabled
-                            enabled: player.rendererDiscoverySupported
-                            onToggled: (on) => {
-                                root.castDiscoveryEnabled = on
-                                if (!player.discoverRenderers(on)) {
-                                    root.castDiscoveryEnabled = false
-                                    win.toast("", "VLC could not start Chromecast discovery")
-                                }
-                            }
-                        }
-                    }
-                    NText {
-                        visible: !player.rendererDiscoverySupported
-                        text: "This VLC build has no renderer discovery module."
-                        color: Theme.textFaint
-                    }
-                    ColumnLayout {
-                        objectName: "chromecast-discovered-devices"
-                        visible: root.castDiscoveryEnabled
+                    NText { text: "Choose a screen to play on. Neo keeps its playback controls connected to the selected device."; dim: true; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    RendererPicker {
+                        objectName: "cast-device-list"
                         Layout.fillWidth: true
-                        Repeater {
-                            model: player.rendererDevices
-                            delegate: NButton {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                text: (modelData.selected ? "Connected · " : "") + modelData.name
-                                onClicked: {
-                                    if (player.setRenderer(modelData.id))
-                                        root.activeRendererId = modelData.id
-                                }
-                            }
+                        onSelected: (id) => {
+                            if (!player.setRenderer(id))
+                                win.toast("Could not cast", "This media or device could not be played by VLC Neo.")
                         }
-                        NText {
-                            visible: player.rendererDevices.length === 0
-                            text: "Searching for Chromecast devices…"
-                            color: Theme.textFaint
-                        }
-                        NButton {
-                            visible: root.activeRendererId.length > 0
-                            text: "Disconnect cast device"
-                            onClicked: {
-                                if (player.setRenderer(""))
-                                    root.activeRendererId = ""
-                            }
-                        }
+                    }
+                    NButton {
+                        visible: player.rendererDevices.some(device => device.selected)
+                        text: "Disconnect from device"
+                        flat: true
+                        onClicked: player.setRenderer("")
                     }
                     VlcOption {
                         option: "sout-chromecast-conversion-quality"; kind: "choice"; fieldWidth: 240
-                        label: "Cast quality"
-                        info: "Choose the quality and bandwidth trade-off used by VLC's Chromecast output."
+                        label: "Chromecast stream quality"
+                        info: "Choose the quality and bandwidth trade-off used by VLC when streaming to a Chromecast."
                         choices: [{ label: "High quality, high bandwidth", value: 0 },
                                   { label: "Medium quality", value: 1 },
                                   { label: "Low quality, low bandwidth", value: 2 },

@@ -10,6 +10,7 @@ Rectangle {
     signal onboardingHoverChanged(bool hovered)
     property bool onboardingMode: false
     property bool compactPreview: false
+    readonly property bool compactLibraryActions: win.libraryFullPage
     property alias titleLabel: appTitle
     property alias pipButton: pipButtonControl
     property alias minimizeButton: minimizeButtonControl
@@ -41,16 +42,16 @@ Rectangle {
         Icon { name: "cone"; size: root.compactPreview ? 12 : 16; Layout.rightMargin: root.compactPreview ? 3 : 6 }
         IconButton { visible: !root.onboardingMode && !win.pip; icon: "ellipsis"; tip: "Menu"; onClicked: root.menuRequested(this) }
         IconButton {
-            visible: !root.onboardingMode && !win.pip
+            visible: !root.onboardingMode && !win.pip && !root.compactLibraryActions
             icon: "panel-left"; tip: "Library (L)"
-            checked: win.libraryOpen
+            checked: win.sidePanelOpen
             onClicked: root.action("library", this)
         }
         Rectangle { visible: !root.onboardingMode && !win.pip; width: 1; height: 16; color: Theme.border; Layout.leftMargin: 4; Layout.rightMargin: 4 }
         Rectangle {
             id: folderChip
             objectName: "folder-chip"
-            visible: !root.onboardingMode && !win.pip
+            visible: !root.onboardingMode && !win.pip && !root.compactLibraryActions
             implicitWidth: folderRow.implicitWidth + 12
             implicitHeight: 24
             radius: Theme.radiusSmall

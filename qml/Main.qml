@@ -23,6 +23,14 @@ ApplicationWindow {
 
     // ---------------------------------------------------------------- state
     readonly property bool fullscreen: visibility === Window.FullScreen
+    property bool manualWindowResize: false
+    property int activeResizeEdges: 0
+    property point resizeStartGlobal: Qt.point(0, 0)
+    property rect resizeStartGeometry: Qt.rect(0, 0, 0, 0)
+    readonly property int topEdge: 1
+    readonly property int leftEdge: 2
+    readonly property int rightEdge: 4
+    readonly property int bottomEdge: 8
     function windowFlags() {
         let result = Qt.Window | Qt.FramelessWindowHint
         if (pip || !!player.config("video-on-top")) result |= Qt.WindowStaysOnTopHint
@@ -34,16 +42,46 @@ ApplicationWindow {
         showSystemTray = !!show
         systemTray.setVisible(showSystemTray)
     }
+    function beginWindowResize(edges, source, mouse) {
+        activeResizeEdges = edges
+        resizeStartGlobal = source.mapToGlobal(Qt.point(mouse.x, mouse.y))
+        resizeStartGeometry = Qt.rect(x, y, width, height)
+        // Some XCB window managers reject system resize on frameless windows.
+        manualWindowResize = platform.platformName === "xcb"
+        if (!manualWindowResize && !startSystemResize(edges))
+            manualWindowResize = true
+    }
+    function updateWindowResize(source, mouse) {
+        if (!manualWindowResize || !(mouse.buttons & Qt.LeftButton)) return
+        const pointer = source.mapToGlobal(Qt.point(mouse.x, mouse.y))
+        const dx = pointer.x - resizeStartGlobal.x
+        const dy = pointer.y - resizeStartGlobal.y
+        const left = (activeResizeEdges & leftEdge) !== 0
+        const right = (activeResizeEdges & rightEdge) !== 0
+        const top = (activeResizeEdges & topEdge) !== 0
+        const bottom = (activeResizeEdges & bottomEdge) !== 0
+        const nextWidth = Math.max(minimumWidth, resizeStartGeometry.width + (left ? -dx : right ? dx : 0))
+        const nextHeight = Math.max(minimumHeight, resizeStartGeometry.height + (top ? -dy : bottom ? dy : 0))
+        x = left ? resizeStartGeometry.x + resizeStartGeometry.width - nextWidth : resizeStartGeometry.x
+        y = top ? resizeStartGeometry.y + resizeStartGeometry.height - nextHeight : resizeStartGeometry.y
+        width = nextWidth
+        height = nextHeight
+    }
+    function endWindowResize() { manualWindowResize = false }
     property bool uiHidden: false
     property bool pip: false
     property rect pipRestoreGeometry: Qt.rect(0, 0, 0, 0)
     property bool pipWasMaximized: false
     property bool libraryOpen: false
+    property bool libraryFullPage: false
     property bool musicSidebarOpen: false
     property bool folderSidebarOpen: false
+    property string sideReturnPage: ""
+    property bool sideReturnFullPage: false
     readonly property bool audioVisualizerOpen: audioVisualizerPopup.visible
     readonly property bool audioVisualizerActive: audioVisualizerPopup.selectedMode !== "disabled"
     property string navigationPage: "home"
+    property var navigationHistory: []
     property string rightPanel: ""          // "" | queue | settings
     property bool startupVolumePending: true
     property bool restoringWindowGeometry: true
@@ -57,13 +95,32 @@ ApplicationWindow {
     property bool topHot: false
     property bool bottomHot: false
     readonly property real playlistPaneWidth: Math.max(220, Math.min(375, width * 0.222 - navigationRail.width))
+    property real libraryPaneLayoutWidth: libraryOpen ? Math.max(300, Math.min(410, width * 0.196))
+        : (folderSidebarOpen ? Math.max(300, Math.min(500, width * 0.20))
+           : (musicSidebarOpen ? Math.max(280, Math.min(430, width * 0.224)) : 0))
+    Behavior on libraryPaneLayoutWidth {
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    }
     readonly property real expandedPlaylistPaneWidth: Math.max(playlistPaneWidth,
         Math.min(width * 0.30, playlistPaneWidth * 1.35))
     readonly property bool popupsOpen: tracksPopup.visible || audioVisualizerPopup.visible || contextMenu.visible || mainMenu.visible
     readonly property bool chromeShown: !overlayMode || topHot || bottomHot || popupsOpen
     readonly property bool topShown: !overlayMode || topHot || mainMenu.visible
-    readonly property bool bottomShown: !libraryOpen && (!overlayMode || bottomHot || tracksPopup.visible || contextMenu.visible)
+    readonly property bool bottomShown: !libraryFullPage && (!overlayMode || bottomHot || tracksPopup.visible || contextMenu.visible)
+    readonly property bool sidePanelOpen: libraryOpen || musicSidebarOpen || folderSidebarOpen
+    readonly property bool sideNavigationShown: sidePanelOpen || libraryFullPage
+                                                  || navigationPage === "home"
     readonly property bool onboardingActive: onboarding.visible
+    readonly property bool canGoBack: navigationHistory.length > 0 || navigationPage !== "home"
+                                         || libraryOpen || rightPanel.length > 0
+    onOverlayModeChanged: {
+        // Fullscreen changes the window bounds without necessarily moving the
+        // pointer, so discard edge-hover state from the old window geometry.
+        topHot = false
+        bottomHot = false
+        topHide.stop()
+        bottomHide.stop()
+    }
     function saveWindowGeometry() {
         if (restoringWindowGeometry || fullscreen || !Theme.store.rememberWindowGeometry) return
         Theme.store.hasWindowGeometry = true
@@ -181,54 +238,163 @@ ApplicationWindow {
         }
     }
     function togglePanel(name) { rightPanel = rightPanel === name ? "" : name }
-    function navigate(page) {
+    function openSidePanel(page) {
+        if (!sidePanelOpen) {
+            sideReturnPage = navigationPage
+            sideReturnFullPage = libraryFullPage
+        }
+        navigationPage = page || "playlist"
+        libraryFullPage = false
+        libraryOpen = true
+        musicSidebarOpen = false
+        folderSidebarOpen = false
+        rightPanel = ""
+        switch (navigationPage) {
+        case "home":
+            libraryPanel.section = "home"
+            libraryPanel.mediaType = "all"
+            break
+        case "videos":
+            libraryPanel.folder = StandardPaths.writableLocation(StandardPaths.MoviesLocation)
+            libraryPanel.section = "folder"
+            libraryPanel.mediaType = "video"
+            break
+        case "folder":
+            libraryPanel.section = "folder"
+            libraryPanel.mediaType = "all"
+            break
+        case "music":
+            libraryPanel.section = "music"
+            libraryPanel.mediaType = "audio"
+            mediaLibrary.model.view = "tracks"
+            break
+        case "recent":
+            libraryPanel.section = "recent"
+            libraryPanel.mediaType = "all"
+            break
+        }
+    }
+    function closeSidePanel() {
+        const returnPage = sideReturnPage.length ? sideReturnPage : "player"
+        const returnFullPage = sideReturnFullPage
+        sideReturnPage = ""
+        sideReturnFullPage = false
+        libraryOpen = false
+        musicSidebarOpen = false
+        folderSidebarOpen = false
+        rightPanel = ""
+        navigate(returnPage, false)
+        libraryFullPage = returnFullPage
+    }
+    function toggleLibrary() {
+        if (libraryFullPage) return
+        if (sidePanelOpen) closeSidePanel()
+        else openSidePanel("home")
+    }
+    function openFolderSidePanel(path) {
+        openSidePanel("folder")
+        if (path && path.length) libraryPanel.folder = platform.fileUrl(path)
+    }
+    function navigateFromRail(page) {
+        if (page === "home") {
+            openSidePanel("home")
+            return
+        }
+        if (page === "playlist") {
+            openSidePanel("playlist")
+            return
+        }
+        if (!["videos", "folder", "music", "recent"].includes(page)) {
+            navigate(page)
+            return
+        }
+        if (!sidePanelOpen) {
+            sideReturnPage = navigationPage
+            sideReturnFullPage = libraryFullPage
+        }
+        if (navigationPage !== page)
+            navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
+        openSidePanel(page)
+    }
+    function navigate(page, recordHistory) {
+        if (page === "streaming") { networkDialog.open(); return }
+        if (page === "add") { openFilesDialog.open(); return }
+        if (!["home", "videos", "folder", "playlist", "music", "recent", "player"].includes(page)) return
+        if (recordHistory !== false && navigationPage !== page)
+            navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
+        sideReturnPage = ""
+        sideReturnFullPage = false
         musicSidebarOpen = false
         folderSidebarOpen = false
         navigationPage = page
         switch (page) {
         case "home":
+            libraryFullPage = false
             libraryPanel.section = "home"
             libraryPanel.mediaType = "all"
             libraryOpen = false
             rightPanel = ""
             break
         case "videos":
+            libraryFullPage = true
             libraryPanel.folder = StandardPaths.writableLocation(StandardPaths.MoviesLocation)
             libraryPanel.section = "folder"
             libraryPanel.mediaType = "video"
-            libraryOpen = true
+            libraryOpen = false
             rightPanel = ""
             break
         case "folder":
+            libraryFullPage = true
             libraryPanel.section = "folder"
             libraryPanel.mediaType = "all"
-            libraryOpen = true
+            libraryOpen = false
             rightPanel = ""
             break
-        case "streaming":
-            networkDialog.open()
-            break
         case "playlist":
+            libraryFullPage = false
             libraryOpen = false
             rightPanel = ""
             break
         case "music":
+            libraryFullPage = true
             libraryPanel.section = "music"
             libraryPanel.mediaType = "audio"
             mediaLibrary.model.view = "tracks"
-            libraryOpen = true
+            libraryOpen = false
             rightPanel = ""
             break
         case "recent":
+            libraryFullPage = true
             libraryPanel.section = "recent"
             libraryPanel.mediaType = "all"
-            libraryOpen = true
+            libraryOpen = false
             rightPanel = ""
             break
-        case "add":
-            openFilesDialog.open()
+        case "player":
+            libraryFullPage = false
+            libraryOpen = false
+            rightPanel = ""
             break
         }
+    }
+    function goBack() {
+        if (tracksPopup.visible) { tracksPopup.close(); return true }
+        if (fullscreen) { setFullscreen(false); return true }
+        if (pip) { setPip(false); return true }
+        if (uiHidden) { uiHidden = false; return true }
+        if (rightPanel.length) { rightPanel = ""; return true }
+        if (sidePanelOpen && sideReturnPage.length) { closeSidePanel(); return true }
+        if (navigationHistory.length) {
+            const previousPage = navigationHistory[navigationHistory.length - 1]
+            navigationHistory = navigationHistory.slice(0, -1)
+            navigate(previousPage, false)
+            return true
+        }
+        if (navigationPage !== "home" || libraryOpen || libraryFullPage) {
+            navigate("home", false)
+            return true
+        }
+        return false
     }
     function setPip(on) {
         if (on === pip) return
@@ -282,6 +448,7 @@ ApplicationWindow {
         case "stop": player.stop(); break
         case "audio": tracksPopup.openFor("audio", source); break
         case "subtitle": tracksPopup.openFor("spu", source); break
+        case "cast": castDialog.open(); break
         case "visualizer": audioVisualizerPopup.openFor(source); break
         case "settings": togglePanel("settings"); break
         case "queue": togglePanel("queue"); break
@@ -308,11 +475,7 @@ ApplicationWindow {
         case "vlcsettings": settingsDialog.open(); break
         case "playlists": togglePanel("queue"); break
         case "home":
-            libraryOpen = false
-            folderSidebarOpen = false
-            musicSidebarOpen = false
-            rightPanel = ""
-            navigationPage = "home"
+            navigate("home")
             break
         case "zoom": sidePanel.tab = "video"; togglePanel("settings"); break
         case "thumbnail":
@@ -336,42 +499,47 @@ ApplicationWindow {
                 toast("Ctrl H", "UI shown")
             break
         case "library":
-            musicSidebarOpen = false
-            folderSidebarOpen = false
-            if (libraryOpen) {
-                libraryOpen = false
-                navigationPage = "home"
-                libraryPanel.section = "home"
-            } else {
-                libraryPanel.section = "folder"
-                libraryPanel.mediaType = "all"
-                navigationPage = "folder"
-                libraryOpen = true
-            }
+            toggleLibrary()
             break
         case "folder-sidebar":
-            libraryOpen = false
-            musicSidebarOpen = false
             if (folderSidebarOpen) {
-                folderSidebarOpen = false
+                closeSidePanel()
             } else {
+                if (!sidePanelOpen) {
+                    sideReturnPage = navigationPage
+                    sideReturnFullPage = libraryFullPage
+                }
+                navigationPage = "folder"
+                libraryFullPage = false
+                libraryOpen = false
+                musicSidebarOpen = false
                 libraryPanel.section = "folder"
                 libraryPanel.mediaType = "video"
                 libraryPanel.folder = player.folderPath.length
                     ? platform.fileUrl(player.folderPath)
                     : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
                 folderSidebarOpen = true
+                rightPanel = ""
             }
-            rightPanel = ""
             break
         case "music-library":
-            libraryOpen = false
-            folderSidebarOpen = false
-            musicSidebarOpen = !musicSidebarOpen
-            libraryPanel.section = "music"
-            libraryPanel.mediaType = "all"
-            mediaLibrary.model.view = "tracks"
-            rightPanel = ""
+            if (musicSidebarOpen) {
+                closeSidePanel()
+            } else {
+                if (!sidePanelOpen) {
+                    sideReturnPage = navigationPage
+                    sideReturnFullPage = libraryFullPage
+                }
+                navigationPage = "music"
+                libraryFullPage = false
+                libraryOpen = false
+                folderSidebarOpen = false
+                musicSidebarOpen = true
+                libraryPanel.section = "music"
+                libraryPanel.mediaType = "all"
+                mediaLibrary.model.view = "tracks"
+                rightPanel = ""
+            }
             break
         case "minimize": showMinimized(); break
         case "maximize": visibility === Window.Maximized ? showNormal() : showMaximized(); break
@@ -397,14 +565,8 @@ ApplicationWindow {
         let label = "", text = ""
 
         if (k === Qt.Key_Escape) {
-            if (tracksPopup.visible) { tracksPopup.close(); return true }
-            if (fullscreen) setFullscreen(false)
-            else if (pip) setPip(false)
-            else if (uiHidden) uiHidden = false
-            else if (rightPanel.length) rightPanel = ""
-            else if (libraryOpen) libraryOpen = false
-            else return player.forwardKey(k, e.modifiers, e.text)
-            return true
+            if (goBack()) return true
+            return player.forwardKey(k, e.modifiers, e.text)
         }
         if (action === "playPause" || k === Qt.Key_MediaTogglePlayPause) {
             label = "Space"; text = player.playing ? "Pause" : "Play"; player.togglePause()
@@ -444,7 +606,7 @@ ApplicationWindow {
         else if (action === "subtitles") { cycleTrack("spu"); return true }
         else if (action === "audio") { cycleTrack("audio"); return true }
         else if (action === "queue") { togglePanel("queue"); label = chord; text = rightPanel === "queue" ? "Queue" : "Queue hidden" }
-        else if (action === "library") { libraryOpen = !libraryOpen; label = chord; text = libraryOpen ? "Library" : "Library hidden" }
+        else if (action === "library") { toggleLibrary(); label = chord; text = sidePanelOpen ? "Library" : "Library hidden" }
         else if (action === "previousFrame") {
             const frameDuration = Math.round(1000 / (video.frameRate > 0 ? video.frameRate : 25))
             player.jumpTo(Math.max(0, player.time - frameDuration)); label = chord; text = "Previous frame"
@@ -491,7 +653,7 @@ ApplicationWindow {
         }
         function onMediaChanged() {
             if (win.navigationPage === "home" && player.hasMedia)
-                win.navigationPage = "player"
+                win.navigate("player")
             win.applyStartupVolume()
             win.applyFullscreenPreference()
             win.notifyMediaChanged()
@@ -563,13 +725,10 @@ ApplicationWindow {
                 const hot = win.overlayMode && y > win.height - Theme.barHeight - 44
                 if (hot) { win.bottomHot = true; bottomHide.stop() }
                 else if (win.bottomHot && !bottomHide.running) bottomHide.start()
-                if (win.overlayMode) cursorTimer.restart()
-                videoArea.cursorHidden = false
             }
         }
         Timer { id: topHide; interval: Theme.store.hideDelay; onTriggered: win.topHot = false }
         Timer { id: bottomHide; interval: Theme.store.hideDelay; onTriggered: win.bottomHot = false }
-        Timer { id: cursorTimer; interval: Theme.store.hideDelay + 800; onTriggered: if (win.overlayMode && !win.chromeShown) videoArea.cursorHidden = true }
 
         // Main content: either the library browser or the video surface.
         Item {
@@ -594,34 +753,47 @@ ApplicationWindow {
                 PlaylistsPanel {
                     id: playlistsPanel
                     objectName: "playlists-panel"
-                    visible: win.navigationPage === "playlist" && !win.libraryOpen
-                    Layout.preferredWidth: playlistsPanel.expanded ? win.expandedPlaylistPaneWidth : win.playlistPaneWidth
+                    visible: win.navigationPage === "playlist" && win.libraryOpen
+                             && !win.musicSidebarOpen && !win.folderSidebarOpen
+                    Layout.preferredWidth: win.libraryPaneLayoutWidth
                     Layout.fillHeight: true
+                    onCreatePlaylist: newPlaylistDialog.open()
+                    onOpenLibraryPage: win.navigateFromRail("videos")
+                }
+
+                HomeView {
+                    id: sideHomeView
+                    objectName: "side-home-screen"
+                    visible: win.libraryOpen && win.navigationPage === "home"
+                    sidePanel: true
+                    Layout.preferredWidth: win.libraryPaneLayoutWidth
+                    Layout.fillHeight: true
+                    onIndexFolder: indexFolderDialog.open()
                     onCreatePlaylist: newPlaylistDialog.open()
                 }
 
                 LibraryPanel {
                     id: libraryPanel
-                    visible: win.libraryOpen || win.musicSidebarOpen || win.folderSidebarOpen
+                    visible: win.libraryFullPage
+                             || (win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist")
+                             || (!win.libraryOpen && win.libraryPaneLayoutWidth > 0.5)
+                             || win.musicSidebarOpen || win.folderSidebarOpen
                     wide: true
                     compactMusicSidebar: win.musicSidebarOpen && !win.libraryOpen
                     compactFolderSidebar: win.folderSidebarOpen && !win.libraryOpen
                     Layout.fillHeight: true
-                    Layout.fillWidth: win.libraryOpen
-                    Layout.preferredWidth: win.folderSidebarOpen
-                        ? Math.max(300, Math.min(500, win.width * 0.20))
-                        : (win.musicSidebarOpen ? Math.max(280, Math.min(430, win.width * 0.224)) : 0)
+                    Layout.fillWidth: win.libraryFullPage
+                    Layout.preferredWidth: win.libraryPaneLayoutWidth
                     onOpenFiles: openFilesDialog.open()
                     onIndexFolder: indexFolderDialog.open()
                 }
 
                 Rectangle {
                     id: videoArea
-                    visible: !win.libraryOpen
+                    visible: !win.libraryFullPage
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: onboarding.visible ? Theme.onboardingVideoBg : Theme.videoBg
-                    property bool cursorHidden: false
 
                     MusicView {
                         id: musicView
@@ -634,7 +806,8 @@ ApplicationWindow {
                         id: homeView
                         anchors.fill: parent
                         z: 1
-                        visible: win.navigationPage === "home" && !onboarding.visible && !win.uiHidden
+                        visible: win.navigationPage === "home" && !win.libraryOpen
+                                 && !onboarding.visible && !win.uiHidden
                     }
 
                     MouseArea {
@@ -643,7 +816,6 @@ ApplicationWindow {
                         z: win.navigationPage === "home" ? 0 : 2
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
-                        cursorShape: videoArea.cursorHidden ? Qt.BlankCursor : Qt.ArrowCursor
                         // Keep this hit target active even when playback stops:
                         // clicks on the empty video surface must still dismiss
                         // transient track/settings popups.
@@ -736,7 +908,8 @@ ApplicationWindow {
 
         VideoOutput {
             id: video
-            parent: win.libraryOpen ? libraryPanel.miniVideoHost : videoArea
+            parent: win.libraryFullPage ? libraryPanel.miniVideoHost
+                    : win.navigationPage === "home" && !win.libraryOpen ? homeView.miniVideoHost : videoArea
             anchors.fill: parent
             fill: win.videoFill
             visible: player.hasVideo
@@ -798,11 +971,13 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             currentPage: win.navigationPage
-            expanded: win.libraryOpen || win.navigationPage === "home"
+            shown: win.sideNavigationShown
+            expanded: win.libraryFullPage || (!win.libraryOpen && win.navigationPage === "home")
+            canGoBack: win.canGoBack
             visible: !onboarding.visible && (!win.overlayMode || win.chromeShown)
-                     && (win.navigationPage !== "player" || win.libraryOpen || win.rightPanel.length > 0
-                         || win.musicSidebarOpen || win.folderSidebarOpen)
-            onNavigate: (page) => win.navigate(page)
+                     && (shown || width > 0.5)
+            onNavigate: (page) => win.navigateFromRail(page)
+            onBackRequested: win.goBack()
         }
 
         ResumePill {
@@ -932,6 +1107,7 @@ ApplicationWindow {
 
     // ------------------------------------------------------------ dialogs
     NetworkDialog { id: networkDialog; onClosed: win.focusKeys() }
+    CastDialog { id: castDialog }
     MediaPropertiesDialog { id: mediaPropertiesDialog; onClosed: win.focusKeys() }
     ConvertDialog { id: convertDialog; onClosed: win.focusKeys() }
     StreamDialog { id: streamDialog; onClosed: win.focusKeys() }
@@ -990,6 +1166,102 @@ ApplicationWindow {
         currentFolder: platform.fileUrl(platform.playlistLibraryDirectory())
         onAccepted: player.saveQueueAs(selectedFile)
         onVisibleChanged: if (!visible) win.restoreKeysLater()
+    }
+
+    // The custom frameless title bar removes the window manager's resize
+    // borders, so provide narrow native resize hit targets around the edges.
+    Item {
+        id: resizeHandles
+        anchors.fill: parent
+        z: 100000
+        visible: !win.fullscreen
+        property int edgeSize: 7
+        property int cornerSize: 14
+
+        MouseArea {
+            id: topResizeHandle
+            x: resizeHandles.cornerSize; y: 0
+            width: parent.width - resizeHandles.cornerSize * 2
+            height: resizeHandles.edgeSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeVerCursor
+            onPressed: (mouse) => win.beginWindowResize(win.topEdge, topResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(topResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: bottomResizeHandle
+            x: resizeHandles.cornerSize; y: parent.height - height
+            width: parent.width - resizeHandles.cornerSize * 2
+            height: resizeHandles.edgeSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeVerCursor
+            onPressed: (mouse) => win.beginWindowResize(win.bottomEdge, bottomResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(bottomResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: leftResizeHandle
+            x: 0; y: resizeHandles.cornerSize
+            width: resizeHandles.edgeSize
+            height: parent.height - resizeHandles.cornerSize * 2
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeHorCursor
+            onPressed: (mouse) => win.beginWindowResize(win.leftEdge, leftResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(leftResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: rightResizeHandle
+            x: parent.width - width; y: resizeHandles.cornerSize
+            width: resizeHandles.edgeSize
+            height: parent.height - resizeHandles.cornerSize * 2
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeHorCursor
+            onPressed: (mouse) => win.beginWindowResize(win.rightEdge, rightResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(rightResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: topLeftResizeHandle
+            x: 0; y: 0
+            width: resizeHandles.cornerSize; height: resizeHandles.cornerSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeFDiagCursor
+            onPressed: (mouse) => win.beginWindowResize(win.topEdge | win.leftEdge, topLeftResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(topLeftResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: topRightResizeHandle
+            x: parent.width - width; y: 0
+            width: resizeHandles.cornerSize; height: resizeHandles.cornerSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeBDiagCursor
+            onPressed: (mouse) => win.beginWindowResize(win.topEdge | win.rightEdge, topRightResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(topRightResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: bottomLeftResizeHandle
+            x: 0; y: parent.height - height
+            width: resizeHandles.cornerSize; height: resizeHandles.cornerSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeBDiagCursor
+            onPressed: (mouse) => win.beginWindowResize(win.bottomEdge | win.leftEdge, bottomLeftResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(bottomLeftResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
+        MouseArea {
+            id: bottomRightResizeHandle
+            x: parent.width - width; y: parent.height - height
+            width: resizeHandles.cornerSize; height: resizeHandles.cornerSize
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeFDiagCursor
+            onPressed: (mouse) => win.beginWindowResize(win.bottomEdge | win.rightEdge, bottomRightResizeHandle, mouse)
+            onPositionChanged: (mouse) => win.updateWindowResize(bottomRightResizeHandle, mouse)
+            onReleased: win.endWindowResize()
+        }
     }
 
 }

@@ -73,6 +73,8 @@ Item {
                   : root.controlId === "loop" && player.repeatOne ? "repeat-1" : meta.icon
             tip: meta.label
             iconSize: root.onboardingCompact ? 16 : (root.compact ? 20 : 24)
+            iconOffsetX: root.controlId === "cast" ? 1 : 0
+            iconOffsetY: root.controlId === "cast" ? -1 : 0
             implicitWidth: 30
             implicitHeight: 30
             checked: (root.controlId === "queue" && win.rightPanel === "queue")
@@ -81,6 +83,7 @@ Item {
                      || (root.controlId === "shuffle" && player.random)
                      || (root.controlId === "record" && player.recording)
                      || (root.controlId === "visualizer" && (win.audioVisualizerOpen || win.audioVisualizerActive))
+                     || (root.controlId === "cast" && player.rendererDevices.some(device => device.selected))
                      || (root.controlId === "library" && win.libraryOpen)
                      || (root.controlId === "favorite" && Theme.isFavorite(player.mediaUrl.toString()))
                      || (root.controlId === "thumbnail" && Theme.store.showSeekThumbnails)

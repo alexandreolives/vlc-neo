@@ -23,12 +23,14 @@ class Platform : public QObject
     Q_OBJECT
     Q_PROPERTY(bool hyprland READ hyprland CONSTANT)
     Q_PROPERTY(QString applicationVersion READ applicationVersion CONSTANT)
+    Q_PROPERTY(QString platformName READ platformName CONSTANT)
 
 public:
     using QObject::QObject;
 
     bool hyprland() const { return qEnvironmentVariableIsSet("HYPRLAND_INSTANCE_SIGNATURE"); }
     QString applicationVersion() const { return QCoreApplication::applicationVersion(); }
+    QString platformName() const { return QGuiApplication::platformName(); }
 
     Q_INVOKABLE QString clipboardText() const { return QGuiApplication::clipboard()->text().trimmed(); }
 

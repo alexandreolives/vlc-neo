@@ -9,7 +9,7 @@ QtObject {
     readonly property var accents: ["#D37918", "#B9443B", "#A08E32", "#2E9E4A", "#2AA3B3",
                                     "#2F5FC4", "#8A3FD1", "#C64AA4", "#9A9A9A"]
     readonly property var defaultLayout: ["prev", "play", "next", "time", "seek", "length",
-                                          "volume", "audio", "subtitle", "settings", "queue"]
+                                          "volume", "audio", "subtitle", "cast", "settings", "queue"]
     // Everything that can live on the control bar (Customize Player dialog).
     readonly property var controls: ({
         prev: { label: "Previous", icon: "skip-back" },
@@ -23,6 +23,7 @@ QtObject {
         visualizer: { label: "Audio Visualizer", icon: "waveform-two-tone" },
         audio: { label: "Audio Tracks", icon: "audio-lines" },
         subtitle: { label: "Subtitles", icon: "captions" },
+        cast: { label: "Play on a Device", icon: "cast" },
         settings: { label: "Playback Settings", icon: "settings" },
         queue: { label: "Queue", icon: "list" },
         fullscreen: { label: "Fullscreen", icon: "maximize" },
@@ -63,7 +64,7 @@ QtObject {
         "spacer", "divider", "speed", "fwd10", "back10", "fwd15", "back15", "stop", "loop",
         "shuffle", "record", "snapshot", "pip", "zoom", "rightsidebar", "quit", "vlcsettings",
         "home", "thumbnail", "filename", "artistname", "foldername", "playlistname", "properties", "replay",
-        "chapters", "favorite", "bookmark", "bookmarks", "playlists"
+        "chapters", "favorite", "bookmark", "bookmarks", "playlists", "cast"
     ]
     // Preserve the Figma grid position of the unsupported HDR action.
     readonly property var customizationSlots: [
@@ -79,6 +80,7 @@ QtObject {
         property string accent: "#D37918"
         property bool onboarded: false
         property string layout: ""
+        property int controlLayoutVersion: 0
         property bool showSeekThumbnails: true
         property string favoriteMediaJson: "[]"
         property int hideDelay: 1200
@@ -114,6 +116,8 @@ QtObject {
         property string vlcShortcutDefaultsJson: "{}"
         property string globalVlcShortcutDefaultsJson: "{}"
     }
+
+    Component.onCompleted: migrateControlLayout()
 
     readonly property var defaultShortcuts: ({
         playPause: "Space", fullscreen: "F", seekBack: "Left", seekForward: "Right",
@@ -332,6 +336,17 @@ QtObject {
     readonly property int fontBody: 13
     readonly property int fontTitle: 15
 
+    function migrateControlLayout() {
+        if (store.controlLayoutVersion >= 1) return
+        const hadSavedLayout = store.layout.length > 0
+        const saved = hadSavedLayout ? store.layout.split(",") : defaultLayout.slice()
+        if (hadSavedLayout && !saved.includes("cast")) {
+            const settingsIndex = saved.indexOf("settings")
+            saved.splice(settingsIndex >= 0 ? settingsIndex : saved.length, 0, "cast")
+            store.layout = saved.join(",")
+        }
+        store.controlLayoutVersion = 1
+    }
     function layoutList() {
         const saved = store.layout.length > 0 ? store.layout.split(",") : defaultLayout.slice()
         // These timeline controls stay in the footer and are not movable buttons.

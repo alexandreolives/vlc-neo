@@ -6,6 +6,8 @@ Rectangle {
     id: root
     property string icon
     property int iconSize: 18
+    property real iconOffsetX: 0
+    property real iconOffsetY: 0
     property bool checked: false
     property bool accentWhenChecked: true
     property string tip
@@ -35,7 +37,8 @@ Rectangle {
     }
 
     Icon {
-        anchors.centerIn: parent
+        x: (parent.width - width) / 2 + root.iconOffsetX
+        y: (parent.height - height) / 2 + root.iconOffsetY
         name: root.icon
         size: root.iconSize
         color: root.iconColor

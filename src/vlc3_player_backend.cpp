@@ -2,16 +2,28 @@
 #include "vlc_addon_uuid.hpp"
 
 #include <QFileInfo>
+#include <QDebug>
 #include <QHash>
 #include <QSharedPointer>
 #include <QStringList>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QHostAddress>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
+#include <QUdpSocket>
+#include <QMap>
 #include <QHash>
 #include <QTimer>
 #include <QUrl>
+#include <QUrlQuery>
+#include <QSet>
 #include <algorithm>
 #include <cstdlib>
+#include <functional>
 #include <utility>
 
 #include <vlc_configuration.h>
@@ -37,6 +49,67 @@ QByteArray esVarName(const QString &category)
 const char *const kPlaylistVars[] = {"volume", "mute", "fullscreen", "rate", "loop", "repeat", "random"};
 const char *const kPlaylistChangeVars[] = {"playlist-item-append", "playlist-item-deleted", "item-change"};
 
+struct DlnaRenderer {
+    QString id;
+    QString udn;
+    QString name;
+    QUrl avTransport;
+    QUrl renderingControl;
+};
+
+QHash<QString, QString> soapFields(const QByteArray &xml)
+{
+    QHash<QString, QString> fields;
+    QXmlStreamReader reader(xml);
+    while (!reader.atEnd()) {
+        reader.readNext();
+        if (!reader.isStartElement())
+            continue;
+        const QString name = reader.name().toString();
+        if (name == QLatin1String("CurrentTransportState")
+            || name == QLatin1String("CurrentTransportStatus")
+            || name == QLatin1String("RelTime") || name == QLatin1String("AbsTime")
+            || name == QLatin1String("TrackDuration") || name == QLatin1String("TrackURI")
+            || name == QLatin1String("CurrentTrackURI") || name == QLatin1String("CurrentURI"))
+            fields.insert(name, reader.readElementText());
+    }
+    return fields;
+}
+
+bool soapResponseSucceeded(const QByteArray &xml)
+{
+    if (xml.trimmed().isEmpty())
+        return false;
+    QXmlStreamReader reader(xml);
+    bool hasEnvelope = false;
+    bool hasFault = false;
+    while (!reader.atEnd()) {
+        reader.readNext();
+        if (!reader.isStartElement())
+            continue;
+        const QString name = reader.name().toString();
+        hasEnvelope |= name == QLatin1String("Envelope");
+        hasFault |= name == QLatin1String("Fault")
+            || name == QLatin1String("UPnPError")
+            || name == QLatin1String("errorCode");
+    }
+    return !reader.hasError() && hasEnvelope && !hasFault;
+}
+
+qint64 upnpTimeMs(const QString &value)
+{
+    const QStringList parts = value.split(QLatin1Char(':'));
+    if (parts.size() != 3)
+        return 0;
+    bool okH = false, okM = false, okS = false;
+    const qint64 h = parts[0].toLongLong(&okH);
+    const qint64 m = parts[1].toLongLong(&okM);
+    const double s = parts[2].toDouble(&okS);
+    if (!okH || !okM || !okS || h < 0 || m < 0 || s < 0)
+        return 0;
+    return (h * 3600 + m * 60) * 1000 + qint64(s * 1000.0);
+}
+
 template <typename Fn>
 void post(QObject *context, Fn &&fn)
 {
@@ -49,6 +122,12 @@ public:
     Vlc3PlayerBackend(intf_thread_t *intf, playlist_t *playlist) : m_intf(intf), m_playlist(playlist)
     {
         syncHttpProxyEnvironment();
+        m_network = new QNetworkAccessManager(this);
+        m_ssdpSocket = new QUdpSocket(this);
+        connect(m_ssdpSocket, &QUdpSocket::readyRead, this, [this] { readSsdpResponses(); });
+        m_ssdpTimer = new QTimer(this);
+        m_ssdpTimer->setInterval(4000);
+        connect(m_ssdpTimer, &QTimer::timeout, this, [this] { sendSsdpSearch(); });
         var_AddCallback(m_playlist, "input-current", onInputCurrent, this);
         for (const char *name : kPlaylistVars)
             var_AddCallback(m_playlist, name, onPlaylistVar, this);
@@ -72,16 +151,95 @@ public:
         clearCurrentInput();
     }
 
-    void togglePause() override { playlist_TogglePause(m_playlist); }
-    void play() override { playlist_Play(m_playlist); }
-    void pause() override { playlist_Pause(m_playlist); }
-    void stop() override { playlist_Stop(m_playlist); }
-    void next() override { playlist_Next(m_playlist); }
-    void previous() override { playlist_Prev(m_playlist); }
+    void togglePause() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            const bool isPlaying = m_remoteInputState.state == 2;
+            setRemoteTransportState(isPlaying ? QStringLiteral("Pause") : QStringLiteral("Play"),
+                                    isPlaying ? 3 : 2);
+            return;
+        }
+        playlist_TogglePause(m_playlist);
+    }
+    void play() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            setRemoteTransportState(QStringLiteral("Play"), 2);
+            return;
+        }
+        playlist_Play(m_playlist);
+    }
+    void pause() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            setRemoteTransportState(QStringLiteral("Pause"), 3);
+            return;
+        }
+        playlist_Pause(m_playlist);
+    }
+    void stop() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            setRemoteTransportState(QStringLiteral("Stop"), 0);
+            return;
+        }
+        playlist_Stop(m_playlist);
+    }
+    void next() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            sendDlnaAction(m_activeDlnaId, "Next", {{QStringLiteral("InstanceID"), QStringLiteral("0")}});
+            return;
+        }
+        playlist_Next(m_playlist);
+    }
+    void previous() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            sendDlnaAction(m_activeDlnaId, "Previous", {{QStringLiteral("InstanceID"), QStringLiteral("0")}});
+            return;
+        }
+        playlist_Prev(m_playlist);
+    }
     void setRate(double rate) override { var_SetFloat(m_playlist, "rate", float(rate)); }
-    void setVolume(double volume) override { playlist_VolumeSet(m_playlist, float(volume)); }
-    void setMuted(bool muted) override { playlist_MuteSet(m_playlist, muted); }
-    void toggleMute() override { playlist_MuteToggle(m_playlist); }
+    void setVolume(double volume) override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            m_remoteVolume = qBound(0.0, volume, 1.0);
+            const auto renderer = m_dlnaRenderers.constFind(m_activeDlnaId);
+            if (renderer != m_dlnaRenderers.cend() && renderer->renderingControl.isValid())
+                sendDlnaAction(m_activeDlnaId, "SetVolume",
+                    {{QStringLiteral("InstanceID"), QStringLiteral("0")},
+                     {QStringLiteral("Channel"), QStringLiteral("Master")},
+                     {QStringLiteral("DesiredVolume"), QString::number(qBound(0, qRound(volume * 100.0), 100))}}, true);
+            emit volumeStateChanged();
+            return;
+        }
+        playlist_VolumeSet(m_playlist, float(volume));
+    }
+    void setMuted(bool muted) override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            m_remoteMuted = muted;
+            const auto renderer = m_dlnaRenderers.constFind(m_activeDlnaId);
+            if (renderer != m_dlnaRenderers.cend() && renderer->renderingControl.isValid())
+                sendDlnaAction(m_activeDlnaId, "SetMute",
+                    {{QStringLiteral("InstanceID"), QStringLiteral("0")},
+                     {QStringLiteral("Channel"), QStringLiteral("Master")},
+                     {QStringLiteral("DesiredMute"), muted ? QStringLiteral("1") : QStringLiteral("0")}}, true);
+            emit volumeStateChanged();
+            return;
+        }
+        playlist_MuteSet(m_playlist, muted);
+    }
+    void toggleMute() override
+    {
+        if (!m_activeDlnaId.isEmpty()) {
+            setMuted(!m_remoteMuted);
+            return;
+        }
+        playlist_MuteToggle(m_playlist);
+    }
 
     void openUrls(const QList<QUrl> &urls, bool playNow) override
     {
@@ -159,6 +317,11 @@ public:
     BackendPlaylistState playlistState() const override
     {
         BackendPlaylistState state;
+        if (!m_activeDlnaId.isEmpty()) {
+            state.volume = m_remoteVolume;
+            state.muted = m_remoteMuted;
+            return state;
+        }
         float volume = playlist_VolumeGet(m_playlist);
         if (volume < 0.f)
             volume = var_GetFloat(m_playlist, "volume");
@@ -253,6 +416,8 @@ public:
 
     BackendInputState inputState() const override
     {
+        if (!m_activeDlnaId.isEmpty())
+            return m_remoteInputState;
         BackendInputState state;
         if (!m_input)
             return state;
@@ -287,14 +452,25 @@ public:
         return state;
     }
 
-    bool hasInput() const override { return m_input != nullptr; }
+    bool hasInput() const override { return !m_activeDlnaId.isEmpty() ? m_remoteInputState.hasInput : m_input != nullptr; }
     void seek(double position) override
     {
+        if (!m_activeDlnaId.isEmpty()) {
+            if (m_remoteInputState.seekable && m_remoteInputState.lengthMs > 0)
+                seekDlnaTo(qint64(qBound(0.0, position, 1.0) * m_remoteInputState.lengthMs));
+            return;
+        }
         if (m_input)
             var_SetFloat(m_input, "position", float(qBound(0.0, position, 1.0)));
     }
     void seekBy(int ms) override
     {
+        if (!m_activeDlnaId.isEmpty()) {
+            if (!m_remoteInputState.seekable)
+                return;
+            seekDlnaTo(qMax<qint64>(0, m_remoteInputState.timeMs + ms));
+            return;
+        }
         if (m_input)
             var_SetInteger(m_input, "time-offset", vlc_tick_t(ms) * 1000);
     }
@@ -305,6 +481,12 @@ public:
     }
     void jumpTo(qint64 ms) override
     {
+        if (!m_activeDlnaId.isEmpty()) {
+            if (!m_remoteInputState.seekable)
+                return;
+            seekDlnaTo(qMax<qint64>(0, ms));
+            return;
+        }
         if (m_input)
             var_SetInteger(m_input, "time", vlc_tick_t(ms) * 1000);
     }
@@ -858,12 +1040,27 @@ public:
     {
         QMutexLocker locker(&m_rendererMutex);
         QVariantList devices;
-        devices.reserve(m_renderers.size());
+        devices.reserve(m_renderers.size() + m_dlnaRenderers.size());
         for (auto it = m_renderers.cbegin(); it != m_renderers.cend(); ++it) {
             devices.append(QVariantMap{
                 {QStringLiteral("id"), it.key()},
                 {QStringLiteral("name"), QString::fromUtf8(vlc_renderer_item_name(it.value()))},
+                {QStringLiteral("protocol"), QStringLiteral("Chromecast")},
+                {QStringLiteral("status"), it.key() == m_activeRendererId ? QStringLiteral("Connected") : QString()},
                 {QStringLiteral("selected"), it.key() == m_activeRendererId}
+            });
+        }
+        for (auto it = m_dlnaRenderers.cbegin(); it != m_dlnaRenderers.cend(); ++it) {
+            devices.append(QVariantMap{
+                {QStringLiteral("id"), it.key()},
+                {QStringLiteral("name"), it->name},
+                {QStringLiteral("protocol"), QStringLiteral("DLNA")},
+                {QStringLiteral("status"), it.key() != m_activeDlnaId ? QString()
+                    : m_remoteInputState.state == 2 ? QStringLiteral("Playing")
+                    : m_remoteInputState.state == 3 ? QStringLiteral("Paused")
+                    : m_remoteInputState.state == 0 ? QStringLiteral("Stopped")
+                    : QStringLiteral("Connecting")},
+                {QStringLiteral("selected"), it.key() == m_activeDlnaId}
             });
         }
         std::sort(devices.begin(), devices.end(), [](const QVariant &a, const QVariant &b) {
@@ -874,20 +1071,16 @@ public:
     }
     bool rendererDiscoverySupported() const override
     {
-        char **names = nullptr;
-        char **longNames = nullptr;
-        const int result = vlc_rd_get_names(VLC_OBJECT(m_intf), &names, &longNames);
-        bool supported = false;
-        if (result == VLC_SUCCESS) {
-            for (char **name = names; name && *name; ++name)
-                supported = supported || isLocalRendererDiscoveryModule(*name);
-        }
-        freeRendererNames(names, longNames);
-        return supported;
+        return true; // VLC renderer discovery plus VLC Neo's SSDP/DLNA discovery.
     }
     bool discoverRenderers(bool enabled) override
     {
         if (!enabled) {
+            m_ssdpTimer->stop();
+            if (m_activeDlnaId.isEmpty()) {
+                QMutexLocker locker(&m_rendererMutex);
+                m_dlnaRenderers.clear();
+            }
             QList<vlc_renderer_discovery_t *> discoveries;
             discoveries.swap(m_rendererDiscoveries);
             for (vlc_renderer_discovery_t *discovery : discoveries)
@@ -895,13 +1088,23 @@ public:
             clearRenderers();
             return true;
         }
+        const bool ssdpBound = m_ssdpSocket->state() == QAbstractSocket::BoundState
+            || m_ssdpSocket->bind(QHostAddress::AnyIPv4, 0,
+                                  QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
+        if (ssdpBound) {
+            sendSsdpSearch();
+            m_ssdpTimer->start();
+        } else {
+            qWarning().noquote() << "VLC Neo DLNA: SSDP discovery could not bind its UDP socket; trying VLC renderer discovery only:"
+                                 << m_ssdpSocket->errorString();
+        }
         if (!m_rendererDiscoveries.isEmpty())
             return true;
 
         char **names = nullptr;
         char **longNames = nullptr;
         if (vlc_rd_get_names(VLC_OBJECT(m_intf), &names, &longNames) != VLC_SUCCESS)
-            return false;
+            return true;
         const vlc_renderer_discovery_owner owner = {this, onRendererAdded, onRendererRemoved};
         for (char **name = names; name && *name; ++name) {
             if (!isLocalRendererDiscoveryModule(*name))
@@ -911,10 +1114,92 @@ public:
                 m_rendererDiscoveries.append(discovery);
         }
         freeRendererNames(names, longNames);
-        return !m_rendererDiscoveries.isEmpty();
+        return true;
     }
     bool setRenderer(const QString &id) override
     {
+        if (id.startsWith(QStringLiteral("dlna:"))) {
+            const auto found = m_dlnaRenderers.constFind(id);
+            if (found == m_dlnaRenderers.cend()) {
+                qWarning().noquote() << "VLC Neo DLNA: selected renderer disappeared" << id;
+                return false;
+            }
+            QUrl mediaUrl;
+            BackendInputState localState;
+            if (m_input) {
+                localState = inputState();
+                if (input_item_t *item = input_GetItem(m_input))
+                    mediaUrl = QUrl(takeString(input_item_GetURI(item)));
+            }
+            if ((!mediaUrl.isValid() || mediaUrl.isEmpty()) && !m_remoteInputState.mediaUrl.isEmpty())
+                mediaUrl = m_remoteInputState.mediaUrl;
+            if (!mediaUrl.isValid() || (mediaUrl.scheme() != QLatin1String("http")
+                    && mediaUrl.scheme() != QLatin1String("https"))) {
+                qWarning().noquote() << "VLC Neo DLNA: current media is not a network URL" << mediaUrl.toString();
+                return false;
+            }
+
+            m_localWasPlayingBeforeDlna = localState.state == 2;
+            m_activeDlnaId = id;
+            m_remoteInputState = localState;
+            m_remoteInputState.hasInput = true;
+            m_remoteInputState.hasVideo = true;
+            m_remoteInputState.state = 1;
+            m_remoteInputState.mediaUrl = mediaUrl;
+            m_remoteInputState.title = mediaUrl.fileName().isEmpty() ? found->name : mediaUrl.fileName();
+            // A local VLC duration does not prove the renderer can seek this stream.
+            m_remoteInputState.seekable = false;
+            qInfo().noquote() << "VLC Neo DLNA: selecting" << found->name << mediaUrl.toString(QUrl::FullyEncoded);
+            emit rendererDevicesChanged();
+            emit inputChanged();
+
+            sendDlnaAction(id, "GetPositionInfo", {{QStringLiteral("InstanceID"), QStringLiteral("0")}}, false,
+                [this, id, mediaUrl](bool ok, const QByteArray &payload) {
+                    if (id != m_activeDlnaId)
+                        return;
+                    const QHash<QString, QString> fields = ok ? soapFields(payload) : QHash<QString, QString>();
+                    const QUrl currentUrl(fields.value(QStringLiteral("TrackURI")));
+                    if (currentUrl.isValid() && currentUrl.toString(QUrl::FullyEncoded) == mediaUrl.toString(QUrl::FullyEncoded)) {
+                        m_remoteInputState.timeMs = upnpTimeMs(fields.value(QStringLiteral("RelTime")));
+                        const qint64 duration = upnpTimeMs(fields.value(QStringLiteral("TrackDuration")));
+                        if (duration > 0)
+                            m_remoteInputState.lengthMs = duration;
+                        m_remoteInputState.seekable = duration > 0;
+                        // The same URI may still be loaded on the TV after it was stopped.
+                        // Explicitly issue Play so selecting it always starts visible playback.
+                        activateDlnaRenderer(id, false);
+                        return;
+                    }
+                    startDlnaPlayback(id, mediaUrl);
+                });
+            return true;
+        }
+        if (id.isEmpty() && !m_activeDlnaId.isEmpty()) {
+            const QString previousId = m_activeDlnaId;
+            m_activeDlnaId.clear();
+            m_remotePollPending = false;
+            m_remoteInputState = {};
+            sendDlnaAction(previousId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
+            if (m_localPausedByDlna) {
+                m_localPausedByDlna = false;
+                playlist_TogglePause(m_playlist);
+            }
+            emit rendererDevicesChanged();
+            emit inputChanged();
+            emit inputEvent(BackendInputEvent::State);
+            return true;
+        }
+        if (!m_activeDlnaId.isEmpty()) {
+            const QString previousId = m_activeDlnaId;
+            m_activeDlnaId.clear();
+            m_remotePollPending = false;
+            m_remoteInputState = {};
+            sendDlnaAction(previousId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
+            if (m_localPausedByDlna) {
+                m_localPausedByDlna = false;
+                playlist_TogglePause(m_playlist);
+            }
+        }
         vlc_renderer_item_t *item = nullptr;
         if (!id.isEmpty()) {
             QMutexLocker locker(&m_rendererMutex);
@@ -955,6 +1240,341 @@ public:
     }
 
 private:
+    void sendSsdpSearch()
+    {
+        if (!m_ssdpSocket || m_ssdpSocket->state() != QAbstractSocket::BoundState)
+            return;
+        static const QByteArray search =
+            "M-SEARCH * HTTP/1.1\r\n"
+            "HOST: 239.255.255.250:1900\r\n"
+            "MAN: \"ssdp:discover\"\r\n"
+            "MX: 2\r\n"
+            "ST: ssdp:all\r\n\r\n";
+        m_ssdpSocket->writeDatagram(search, QHostAddress(QStringLiteral("239.255.255.250")), 1900);
+    }
+
+    void readSsdpResponses()
+    {
+        while (m_ssdpSocket->hasPendingDatagrams()) {
+            QByteArray datagram;
+            datagram.resize(qsizetype(m_ssdpSocket->pendingDatagramSize()));
+            m_ssdpSocket->readDatagram(datagram.data(), datagram.size());
+            const QList<QByteArray> lines = datagram.split('\n');
+            for (const QByteArray &line : lines) {
+                const QByteArray trimmed = line.trimmed();
+                if (trimmed.left(9).compare("LOCATION:", Qt::CaseInsensitive) != 0)
+                    continue;
+                const QUrl location(QString::fromUtf8(trimmed.mid(9).trimmed()));
+                if (!location.isValid() || location.scheme() != QLatin1String("http"))
+                    continue;
+                const QString key = location.toString(QUrl::FullyEncoded);
+                if (m_dlnaLocations.contains(key))
+                    continue;
+                m_dlnaLocations.insert(key);
+                QNetworkReply *reply = m_network->get(QNetworkRequest(location));
+                connect(reply, &QNetworkReply::finished, this, [this, reply, location] {
+                    const QByteArray payload = reply->readAll();
+                    const bool success = reply->error() == QNetworkReply::NoError;
+                    reply->deleteLater();
+                    if (!success)
+                        return;
+                    parseDlnaDescription(location, payload);
+                });
+                break;
+            }
+        }
+    }
+
+    void parseDlnaDescription(const QUrl &location, const QByteArray &description)
+    {
+        QXmlStreamReader xml(description);
+        QString name, udn, baseUrl, serviceType, controlPath;
+        QUrl avTransport, renderingControl;
+        bool inService = false;
+        while (!xml.atEnd()) {
+            xml.readNext();
+            if (xml.isStartElement()) {
+                const QString tag = xml.name().toString();
+                if (tag == QLatin1String("service")) {
+                    inService = true;
+                    serviceType.clear();
+                    controlPath.clear();
+                } else if (tag == QLatin1String("friendlyName")) {
+                    name = xml.readElementText().trimmed();
+                } else if (tag == QLatin1String("UDN")) {
+                    udn = xml.readElementText().trimmed();
+                } else if (tag == QLatin1String("URLBase")) {
+                    baseUrl = xml.readElementText().trimmed();
+                } else if (inService && tag == QLatin1String("serviceType")) {
+                    serviceType = xml.readElementText().trimmed();
+                } else if (inService && tag == QLatin1String("controlURL")) {
+                    controlPath = xml.readElementText().trimmed();
+                }
+            } else if (xml.isEndElement() && xml.name() == QLatin1String("service")) {
+                const QUrl base = baseUrl.isEmpty() ? location : QUrl(baseUrl);
+                const QUrl control = base.resolved(QUrl(controlPath));
+                if (serviceType.contains(QStringLiteral(":AVTransport:")))
+                    avTransport = control;
+                else if (serviceType.contains(QStringLiteral(":RenderingControl:")))
+                    renderingControl = control;
+                inService = false;
+            }
+        }
+        if (xml.hasError() || udn.isEmpty() || !avTransport.isValid())
+            return;
+        if (name.isEmpty() || name.compare(QStringLiteral("hisens"), Qt::CaseInsensitive) == 0)
+            name = QStringLiteral("Hisense TV");
+        const QString id = QStringLiteral("dlna:") + udn;
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            m_dlnaRenderers.insert(id, DlnaRenderer{id, udn, name, avTransport, renderingControl});
+        }
+        emit rendererDevicesChanged();
+    }
+
+    void sendDlnaAction(const QString &id, const QString &action,
+                        const QMap<QString, QString> &arguments, bool renderingControl = false,
+                        std::function<void(bool, const QByteArray &)> finished = {})
+    {
+        const auto renderer = m_dlnaRenderers.constFind(id);
+        if (renderer == m_dlnaRenderers.cend()) {
+            if (finished)
+                finished(false, {});
+            return;
+        }
+        const QUrl endpoint = renderingControl ? renderer->renderingControl : renderer->avTransport;
+        if (!endpoint.isValid()) {
+            qWarning().noquote() << "VLC Neo DLNA: missing endpoint for" << action << id;
+            if (finished)
+                finished(false, {});
+            return;
+        }
+        const QString service = renderingControl
+            ? QStringLiteral("urn:schemas-upnp-org:service:RenderingControl:1")
+            : QStringLiteral("urn:schemas-upnp-org:service:AVTransport:1");
+        QByteArray body;
+        QXmlStreamWriter writer(&body);
+        writer.writeStartDocument();
+        writer.writeStartElement(QStringLiteral("s:Envelope"));
+        writer.writeNamespace(QStringLiteral("http://schemas.xmlsoap.org/soap/envelope/"), QStringLiteral("s"));
+        writer.writeAttribute(QStringLiteral("s:encodingStyle"), QStringLiteral("http://schemas.xmlsoap.org/soap/encoding/"));
+        writer.writeStartElement(QStringLiteral("s:Body"));
+        writer.writeStartElement(QStringLiteral("u:") + action);
+        writer.writeNamespace(service, QStringLiteral("u"));
+        for (auto it = arguments.cbegin(); it != arguments.cend(); ++it)
+            writer.writeTextElement(it.key(), it.value());
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndDocument();
+
+        QNetworkRequest request(endpoint);
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("text/xml; charset=\"utf-8\""));
+        request.setRawHeader("SOAPAction", QStringLiteral("\"%1#%2\"").arg(service, action).toUtf8());
+        const bool isStatePoll = action == QLatin1String("GetTransportInfo")
+            || action == QLatin1String("GetPositionInfo");
+        if (!isStatePoll)
+            qInfo().noquote() << "VLC Neo DLNA: sending" << action << endpoint.toString();
+        QNetworkReply *reply = m_network->post(request, body);
+        connect(reply, &QNetworkReply::finished, this, [reply, action, finished = std::move(finished)]() mutable {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QByteArray payload = reply->readAll();
+            const bool isStatePoll = action == QLatin1String("GetTransportInfo")
+                || action == QLatin1String("GetPositionInfo");
+            // Some TVs close the SOAP connection just after sending a complete
+            // 200 response. Qt may report a network error even though the UPnP
+            // action succeeded; trust the HTTP status and SOAP body in that case.
+            const bool ok = status >= 200 && status < 300 && soapResponseSucceeded(payload);
+            if (ok && !isStatePoll)
+                qInfo().noquote() << "VLC Neo DLNA: response" << action << status;
+            else if (!ok && (!isStatePoll || status < 200 || status >= 300 || payload.isEmpty()
+                             || !soapResponseSucceeded(payload)))
+                qWarning().noquote() << "VLC Neo DLNA: response failed" << action << status << reply->errorString() << payload.left(700);
+            reply->deleteLater();
+            if (finished)
+                finished(ok, payload);
+        });
+    }
+
+    void setRemoteTransportState(const QString &action, int state)
+    {
+        if (m_activeDlnaId.isEmpty())
+            return;
+        if (state != 0 && m_remotePendingState == state)
+            return;
+        if (m_remoteInputState.state == state && m_remotePendingState == 0)
+            return;
+
+        const QString id = m_activeDlnaId;
+        const quint64 command = ++m_remoteCommandSerial;
+        m_remotePendingState = state;
+        m_remoteInputState.state = state;
+        emit inputEvent(BackendInputEvent::State);
+        emit rendererDevicesChanged();
+
+        QMap<QString, QString> arguments{{QStringLiteral("InstanceID"), QStringLiteral("0")}};
+        if (action == QLatin1String("Play"))
+            arguments.insert(QStringLiteral("Speed"), QStringLiteral("1"));
+        sendDlnaAction(id, action, arguments, false, [this, id, command, state](bool ok, const QByteArray &) {
+            if (id != m_activeDlnaId || command != m_remoteCommandSerial)
+                return;
+            m_remotePendingState = 0;
+            if (ok)
+                m_remoteInputState.state = state;
+            else
+                qWarning().noquote() << "VLC Neo DLNA: transport command failed; querying renderer state";
+            emit inputEvent(BackendInputEvent::State);
+            emit rendererDevicesChanged();
+            if (!ok)
+                pollDlnaRenderer();
+        });
+    }
+
+    void activateDlnaRenderer(const QString &id, bool seekToLocalPosition)
+    {
+        sendDlnaAction(id, "Play",
+            {{QStringLiteral("InstanceID"), QStringLiteral("0")}, {QStringLiteral("Speed"), QStringLiteral("1")} }, false,
+            [this, id, seekToLocalPosition](bool ok, const QByteArray &) {
+                if (!ok || id != m_activeDlnaId) {
+                    failDlnaConnection(id);
+                    return;
+                }
+                if (m_input && m_localWasPlayingBeforeDlna && !m_localPausedByDlna) {
+                    playlist_Pause(m_playlist);
+                    m_localPausedByDlna = true;
+                }
+                m_remoteInputState.state = 2;
+                emit rendererDevicesChanged();
+                if (seekToLocalPosition && m_remoteInputState.timeMs > 0)
+                    QTimer::singleShot(900, this, [this, id] {
+                        if (id == m_activeDlnaId)
+                            seekDlnaTo(m_remoteInputState.timeMs);
+                    });
+                // Read the renderer state once after connecting. Transport
+                // controls update Neo optimistically from their SOAP result;
+                // continuously polling this TV creates noisy request loops.
+                pollDlnaRenderer();
+                emit inputEvent(BackendInputEvent::State);
+            });
+    }
+
+    void startDlnaPlayback(const QString &id, const QUrl &mediaUrl)
+    {
+        const QString didl = QStringLiteral(
+            "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" "
+            "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
+            "xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">"
+            "<item id=\"0\" parentID=\"-1\" restricted=\"1\"><dc:title>%1</dc:title>"
+            "<upnp:class>object.item.videoItem</upnp:class>"
+            "<res protocolInfo=\"http-get:*:application/vnd.apple.mpegurl:*\">%2</res>"
+            "</item></DIDL-Lite>").arg(mediaUrl.fileName().toHtmlEscaped(), mediaUrl.toString(QUrl::FullyEncoded).toHtmlEscaped());
+        sendDlnaAction(id, "SetAVTransportURI",
+            {{QStringLiteral("InstanceID"), QStringLiteral("0")},
+             {QStringLiteral("CurrentURI"), mediaUrl.toString(QUrl::FullyEncoded)},
+             {QStringLiteral("CurrentURIMetaData"), didl}}, false,
+            [this, id](bool ok, const QByteArray &) {
+                if (!ok || id != m_activeDlnaId) {
+                    failDlnaConnection(id);
+                    return;
+                }
+                activateDlnaRenderer(id, true);
+            });
+    }
+
+    void failDlnaConnection(const QString &id)
+    {
+        if (m_activeDlnaId != id)
+            return;
+        m_activeDlnaId.clear();
+        m_remotePollPending = false;
+        m_remoteInputState = {};
+        if (m_localPausedByDlna) {
+            m_localPausedByDlna = false;
+            playlist_TogglePause(m_playlist);
+        }
+        emit rendererDevicesChanged();
+        emit inputChanged();
+        emit inputEvent(BackendInputEvent::State);
+    }
+
+    void seekDlnaTo(qint64 targetMs)
+    {
+        if (m_activeDlnaId.isEmpty() || !m_remoteInputState.seekable)
+            return;
+        if (m_remoteInputState.lengthMs > 0)
+            targetMs = qMin(targetMs, m_remoteInputState.lengthMs);
+        const qint64 seconds = qMax<qint64>(0, targetMs / 1000);
+        const QString target = QStringLiteral("%1:%2:%3")
+            .arg(seconds / 3600, 2, 10, QLatin1Char('0'))
+            .arg((seconds / 60) % 60, 2, 10, QLatin1Char('0'))
+            .arg(seconds % 60, 2, 10, QLatin1Char('0'));
+        sendDlnaAction(m_activeDlnaId, "Seek",
+            {{QStringLiteral("InstanceID"), QStringLiteral("0")},
+             {QStringLiteral("Unit"), QStringLiteral("REL_TIME")},
+             {QStringLiteral("Target"), target}});
+    }
+
+    void pollDlnaRenderer()
+    {
+        if (m_activeDlnaId.isEmpty() || m_remotePollPending || m_remotePendingState != 0)
+            return;
+        const QString id = m_activeDlnaId;
+        m_remotePollPending = true;
+        sendDlnaAction(id, "GetTransportInfo", {{QStringLiteral("InstanceID"), QStringLiteral("0")}}, false,
+            [this, id](bool ok, const QByteArray &payload) {
+                if (id != m_activeDlnaId) {
+                    m_remotePollPending = false;
+                    return;
+                }
+                if (!ok) {
+                    m_remotePollPending = false;
+                    return;
+                }
+                if (m_remotePendingState != 0) {
+                    m_remotePollPending = false;
+                    return;
+                }
+                const QString state = soapFields(payload).value(QStringLiteral("CurrentTransportState"));
+                if (state == QLatin1String("PLAYING"))
+                    m_remoteInputState.state = 2;
+                else if (state == QLatin1String("PAUSED_PLAYBACK"))
+                    m_remoteInputState.state = 3;
+                else if (state == QLatin1String("TRANSITIONING"))
+                    m_remoteInputState.state = 1;
+                else
+                    m_remoteInputState.state = 0;
+                queryDlnaPosition(id);
+            });
+    }
+
+    void queryDlnaPosition(const QString &id)
+    {
+        sendDlnaAction(id, "GetPositionInfo", {{QStringLiteral("InstanceID"), QStringLiteral("0")}}, false,
+            [this, id](bool ok, const QByteArray &payload) {
+                if (id != m_activeDlnaId) {
+                    m_remotePollPending = false;
+                    return;
+                }
+                if (ok) {
+                    const QHash<QString, QString> fields = soapFields(payload);
+                    m_remoteInputState.timeMs = upnpTimeMs(fields.value(QStringLiteral("RelTime")));
+                    const qint64 duration = upnpTimeMs(fields.value(QStringLiteral("TrackDuration")));
+                    if (duration > 0)
+                        m_remoteInputState.lengthMs = duration;
+                    m_remoteInputState.seekable = duration > 0;
+                    m_remoteInputState.position = m_remoteInputState.lengthMs > 0
+                        ? double(m_remoteInputState.timeMs) / double(m_remoteInputState.lengthMs) : 0.0;
+                    const QString trackUri = fields.value(QStringLiteral("TrackURI"));
+                    if (!trackUri.isEmpty())
+                        m_remoteInputState.mediaUrl = QUrl(trackUri);
+                }
+                m_remotePollPending = false;
+                emit inputEvent(BackendInputEvent::Position);
+                emit inputEvent(BackendInputEvent::State);
+                emit rendererDevicesChanged();
+            });
+    }
+
     void restoreEnvironment(const char *name, bool wasSet, const QByteArray &value)
     {
         if (wasSet)
@@ -1149,7 +1769,21 @@ private:
     QList<vlc_renderer_discovery_t *> m_rendererDiscoveries;
     mutable QMutex m_rendererMutex;
     QHash<QString, vlc_renderer_item_t *> m_renderers;
+    QHash<QString, DlnaRenderer> m_dlnaRenderers;
+    QSet<QString> m_dlnaLocations;
+    QNetworkAccessManager *m_network = nullptr;
+    QUdpSocket *m_ssdpSocket = nullptr;
+    QTimer *m_ssdpTimer = nullptr;
     QString m_activeRendererId;
+    QString m_activeDlnaId;
+    BackendInputState m_remoteInputState;
+    bool m_remotePollPending = false;
+    quint64 m_remoteCommandSerial = 0;
+    int m_remotePendingState = 0;
+    bool m_localWasPlayingBeforeDlna = false;
+    bool m_localPausedByDlna = false;
+    double m_remoteVolume = 1.0;
+    bool m_remoteMuted = false;
 };
 
 } // namespace
