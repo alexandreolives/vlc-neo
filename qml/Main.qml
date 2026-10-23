@@ -109,7 +109,6 @@ ApplicationWindow {
     readonly property bool bottomShown: !libraryFullPage && (!overlayMode || bottomHot || tracksPopup.visible || contextMenu.visible)
     readonly property bool sidePanelOpen: libraryOpen || musicSidebarOpen || folderSidebarOpen
     readonly property bool sideNavigationShown: sidePanelOpen || libraryFullPage
-                                                  || navigationPage === "home"
     readonly property bool onboardingActive: onboarding.visible
     readonly property bool canGoBack: navigationHistory.length > 0 || navigationPage !== "home"
                                          || libraryOpen || rightPanel.length > 0

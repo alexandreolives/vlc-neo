@@ -73,10 +73,11 @@ Rectangle {
         Theme.store.pinned = list.join("\n")
     }
     function sidePanelTitle() {
-        if (win.navigationPage === "music")
+        if (win.navigationPage === "music") {
             if (musicSidePage === "songs" && musicSideFolderRoot.length)
                 return "…  ›  Songs  ›  " + musicSideRootLabel(musicSideFolderRoot)
             return musicSidePage === "categories" ? "Music" : "Music  ›  " + musicSidePage.charAt(0).toUpperCase() + musicSidePage.slice(1)
+        }
         if (root.section === "folder" && root.mediaType === "audio") {
             const currentPath = platform.localPath(root.folder)
             const rootPath = root.musicRootForPath(currentPath)
