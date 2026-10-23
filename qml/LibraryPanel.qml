@@ -15,6 +15,7 @@ Rectangle {
     property bool figmaSidePanel: false
     property var sideFolderHistory: []
     property string musicSidePage: "categories"
+    property string musicSideFolderRoot: ""
     property var musicSideHistory: []
     property bool musicSideSearchOpen: false
     property bool musicSideSortByName: false
@@ -72,7 +73,15 @@ Rectangle {
     }
     function sidePanelTitle() {
         if (win.navigationPage === "music")
+            if (musicSidePage === "songs" && musicSideFolderRoot.length)
+                return "Songs  ›  " + musicSideRootLabel(musicSideFolderRoot)
             return musicSidePage === "categories" ? "Music" : "Music  ›  " + musicSidePage.charAt(0).toUpperCase() + musicSidePage.slice(1)
+        if (root.section === "folder" && root.mediaType === "audio") {
+            const currentPath = platform.localPath(root.folder)
+            const rootPath = root.musicRootForPath(currentPath)
+            const nestedPaths = rootPath.length ? currentPath.slice(rootPath.length).split("/").filter(Boolean) : []
+            return "Songs  ›  " + [root.musicSideRootLabel(rootPath || currentPath)].concat(nestedPaths).join("  ›  ")
+        }
         if (win.navigationPage === "recent") return "Recent"
         if (win.navigationPage === "videos") {
             const currentPath = platform.localPath(root.folder)
@@ -82,8 +91,40 @@ Rectangle {
         }
         return "Library"
     }
+    function musicLocalPath(path) {
+        const value = path.toString()
+        return value.startsWith("file:") ? platform.localPath(path) : value
+    }
+    function musicRootForPath(path) {
+        const normalized = musicLocalPath(path)
+        let best = ""
+        for (const item of mediaLibrary.roots) {
+            const candidate = musicLocalPath(item)
+            if ((normalized === candidate || normalized.startsWith(candidate + "/")) && candidate.length > best.length)
+                best = candidate
+        }
+        return best
+    }
+    function musicSideRootLabel(path) {
+        const normalized = musicLocalPath(path)
+        const musicLocation = musicLocalPath(StandardPaths.writableLocation(StandardPaths.MusicLocation))
+        if (normalized === musicLocation) return "My Songs"
+        return normalized.split("/").filter(Boolean).pop() || "My Songs"
+    }
     function goBackFromSidePanel() {
+        if (win.navigationPage === "music" && musicSideFolderRoot.length) {
+            musicSideFolderRoot = ""
+            mediaLibrary.model.search = ""
+            return
+        }
         if (win.navigationPage === "music" && root.section === "folder") {
+            const currentPath = platform.localPath(root.folder)
+            const musicRoot = root.musicRootForPath(currentPath)
+            if (musicRoot.length && currentPath !== musicRoot && sideFolderHistory.length) {
+                root.folder = sideFolderHistory[sideFolderHistory.length - 1]
+                sideFolderHistory = sideFolderHistory.slice(0, -1)
+                return
+            }
             if (sideFolderHistory.length) {
                 root.folder = sideFolderHistory[sideFolderHistory.length - 1]
                 sideFolderHistory = sideFolderHistory.slice(0, -1)
@@ -114,14 +155,31 @@ Rectangle {
     }
     function openMusicSidePage(page) {
         musicSideHistory = musicSideHistory.concat([musicSidePage])
+        musicSideFolderRoot = ""
         musicSidePage = page
         mediaLibrary.model.search = ""
         mediaLibrary.model.view = ["albums", "artists", "genres"].includes(page) ? page : "tracks"
     }
     function musicSideItemCount() {
         if (musicSidePage === "categories") return visibleMusicCategories().length
-        if (musicSidePage === "songs") return mediaLibrary.roots.length
+        if (musicSidePage === "songs") return musicSideFolderRoot.length ? musicSideTracks().length : mediaLibrary.roots.length
         return mediaLibrary.model.itemCount()
+    }
+    function musicSideTracks() {
+        if (!musicSideFolderRoot.length) return []
+        const rootPath = musicLocalPath(musicSideFolderRoot)
+        const query = mediaLibrary.model.search.trim().toLowerCase()
+        const tracks = []
+        for (let index = 0; index < mediaLibrary.model.itemCount(); ++index) {
+            const item = mediaLibrary.model.itemAt(index)
+            if (item.kind !== "audio" || item.isGroup) continue
+            const path = musicLocalPath(item.path)
+            if (!path.startsWith(rootPath + "/") || path.slice(rootPath.length + 1).includes("/")) continue
+            if (query.length && ![item.title, item.artist, item.album, item.genre, path].join(" ").toLowerCase().includes(query)) continue
+            tracks.push(item)
+        }
+        if (musicSideSortByName) tracks.sort((a, b) => a.title.localeCompare(b.title))
+        return tracks
     }
     function visibleMusicCategories() {
         const categories = [
@@ -148,6 +206,7 @@ Rectangle {
             root.sideFolderHistory = []
             if (win.navigationPage === "music") {
                 root.musicSidePage = "categories"
+                root.musicSideFolderRoot = ""
                 root.musicSideHistory = []
                 root.musicSideSearchOpen = false
                 mediaLibrary.model.search = ""
@@ -520,7 +579,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
-                    NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: modelData.split("/").filter(Boolean).pop() || modelData; font.pixelSize: 13; color: Theme.text }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: root.musicSideRootLabel(modelData); font.pixelSize: 13; color: Theme.text }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
@@ -964,7 +1023,7 @@ Rectangle {
 
         ColumnLayout {
             objectName: "music-sidepanel-roots"
-            visible: root.musicSidePage === "songs"
+            visible: root.musicSidePage === "songs" && !root.musicSideFolderRoot.length
             Layout.fillWidth: true
             Layout.minimumHeight: 0
             Layout.preferredHeight: visible ? Math.max(1, mediaLibrary.roots.length * (root.musicSideCompactView ? 36 : 44)) : 1
@@ -977,15 +1036,13 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
-                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.split("/").filter(Boolean).pop() || modelData; font.pixelSize: 13; color: Theme.text }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: root.musicSideRootLabel(modelData); font.pixelSize: 13; color: Theme.text }
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            root.sideFolderHistory = root.sideFolderHistory.concat([root.folder])
-                            root.folder = platform.fileUrl(modelData)
-                            root.section = "folder"
-                            root.mediaType = "audio"
+                            root.musicSideFolderRoot = modelData
+                            mediaLibrary.model.search = ""
                         }
                     }
                 }
@@ -993,12 +1050,65 @@ Rectangle {
         }
 
         NText {
-            visible: root.musicSidePage === "songs" && mediaLibrary.roots.length === 0
+            visible: root.musicSidePage === "songs" && !root.musicSideFolderRoot.length && mediaLibrary.roots.length === 0
             Layout.leftMargin: 62
             Layout.topMargin: 6
             text: "No music folders"
             dim: true
             font.pixelSize: 12
+        }
+
+        ListView {
+            objectName: "music-sidepanel-tracks"
+            visible: root.musicSidePage === "songs" && root.musicSideFolderRoot.length > 0
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            model: root.musicSideTracks()
+            delegate: Item {
+                required property var modelData
+                objectName: "music-sidepanel-track-" + modelData.title
+                width: ListView.view.width
+                height: 50
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 20
+                    anchors.rightMargin: 18
+                    spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 34
+                        Layout.preferredHeight: 34
+                        radius: 3
+                        color: Theme.surface
+                        Image {
+                            id: trackCover
+                            anchors.fill: parent
+                            source: modelData.artwork || ""
+                            fillMode: Image.PreserveAspectCrop
+                            visible: status === Image.Ready
+                        }
+                        Icon { anchors.centerIn: parent; name: "music"; size: 17; color: Theme.icon; visible: trackCover.status !== Image.Ready }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+                        NText { text: modelData.title; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+                        NText { text: modelData.artist || "Unknown artist"; font.pixelSize: 11; dim: true; elide: Text.ElideRight; Layout.fillWidth: true }
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: player.openUrls([platform.fileUrl(modelData.path)], true)
+                }
+            }
+            NText {
+                anchors.centerIn: parent
+                visible: parent.visible && parent.count === 0
+                text: "No songs in this folder"
+                dim: true
+                font.pixelSize: 12
+            }
         }
 
         Item { Layout.fillHeight: true }
