@@ -979,6 +979,7 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             currentPage: win.navigationPage
             shown: win.sideNavigationShown
+            musicCategoryActive: libraryPanel.musicSidePage === "categories"
             expanded: win.libraryFullPage || (!win.libraryOpen && win.navigationPage === "home")
             canGoBack: win.canGoBack
             visible: !onboarding.visible && (!win.overlayMode || win.chromeShown)

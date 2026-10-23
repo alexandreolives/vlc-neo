@@ -11,6 +11,7 @@ Rectangle {
     property bool expanded: false
     property bool shown: false
     property bool canGoBack: false
+    property bool musicCategoryActive: true
     signal navigate(string page)
     signal backRequested()
 
@@ -70,7 +71,7 @@ Rectangle {
 
         RailButton { iconName: "home"; activeIconName: "home-active"; label: "Home"; page: "home" }
         RailButton { iconName: "videos"; activeIconName: "videos-active"; label: "Videos"; page: "videos" }
-        RailButton { iconName: "songs"; activeIconName: "songs-active"; label: "Music"; page: "music" }
+        RailButton { iconName: "songs"; selectedIconName: "songs-selected"; activeIconName: "songs-active"; label: "Music"; page: "music" }
         RailButton { iconName: "streaming"; activeIconName: "streaming-active"; label: "Network"; page: "streaming" }
         RailButton { iconName: "playlist"; activeIconName: "playlist-active"; label: "Playlists"; page: "playlist" }
         RailButton { iconName: "recent"; label: "Recent"; page: "recent" }
@@ -82,6 +83,7 @@ Rectangle {
     component RailButton: Button {
         id: control
         property string iconName
+        property string selectedIconName
         property string activeIconName
         property string label
         property string page
@@ -108,7 +110,10 @@ Rectangle {
             Layout.leftMargin: root.expanded ? 16 : 0
             spacing: root.expanded ? 8 : 0
             Icon {
-                name: control.selected && control.activeIconName.length ? control.activeIconName : control.iconName
+                name: control.selected
+                      ? (control.page === "music" && !root.musicCategoryActive && control.selectedIconName.length
+                         ? control.selectedIconName : (control.activeIconName.length ? control.activeIconName : control.iconName))
+                      : control.iconName
                 size: 14
                 color: control.hovered || control.activeFocus ? Theme.text : Theme.icon
             }
