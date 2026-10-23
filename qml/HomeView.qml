@@ -368,7 +368,7 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 26 : 16
                         Layout.rightMargin: 12
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: root.sidePanel ? 42 : 34
                         activeFocusOnTab: true
                         Accessible.role: Accessible.Button
                         Accessible.name: modelData.title + ", folder"
@@ -442,7 +442,7 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 24 : 16
                         Layout.rightMargin: 12
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: root.sidePanel ? 42 : 34
                         activeFocusOnTab: true
                         Accessible.role: Accessible.Button
                         Accessible.name: homePlaylists.get(index, "fileName") + ", playlist"
