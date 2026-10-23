@@ -29,6 +29,20 @@ Rectangle {
     function folderCardWidth() {
         return Math.min(220, Math.max(150, pageScroll.availableWidth * 0.12))
     }
+    function activateRecentVideo(item) {
+        win.navigate("player")
+        player.openLocation(item.url, true)
+        if (item.point > 0) player.jumpTo(item.point)
+    }
+    function activateRecentMusic(item) {
+        win.navigate("player")
+        player.openUrls([platform.fileUrl(item.path)], true)
+    }
+    function activateVisitedFolder(item) { win.openFolderSidePanel(item.path) }
+    function activateRecentPlaylist(index) {
+        win.navigate("player")
+        player.openUrls([platform.fileUrl(homePlaylists.get(index, "filePath"))], true)
+    }
     property var videoItems: []
     property var musicItems: []
     property var folderItems: []
@@ -171,32 +185,53 @@ Rectangle {
                 }
                 Repeater {
                     model: root.videoItems.slice(0, root.sidePanel ? 3 : 6)
-                    delegate: RowLayout {
+                    delegate: Item {
+                        required property int index
                         required property var modelData
+                        objectName: (root.sidePanel ? "home-side-video-" : "home-main-video-") + index
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 22 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 42
-                        spacing: 9
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.title + ", continue watching"
+                        Accessible.focusable: true
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                                root.activateRecentVideo(modelData)
+                                event.accepted = true
+                            }
+                        }
                         Rectangle {
-                            width: 32; height: 32; radius: 3; color: Theme.raised; clip: true
-                            Image {
-                                anchors.fill: parent
-                                source: "image://thumbnail/frame?path=" + encodeURIComponent(modelData.path)
-                                       + "&t=" + Math.floor(modelData.point / 1000)
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                            }
+                            anchors.fill: parent
+                            radius: Theme.radiusSmall
+                            color: videoRowHover.hovered ? Theme.hover : "transparent"
+                            border.width: parent.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+                        }
+                        RowLayout {
+                            anchors.fill: parent
+                            spacing: 9
                             Rectangle {
-                                anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                                height: 2; color: Theme.bar
-                                Rectangle { width: parent.width * modelData.progress; height: parent.height; color: Theme.accent }
+                                width: 32; height: 32; radius: 3; color: Theme.raised; clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    source: "image://thumbnail/frame?path=" + encodeURIComponent(modelData.path)
+                                           + "&t=" + Math.floor(modelData.point / 1000)
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                }
+                                Rectangle {
+                                    anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                                    height: 2; color: Theme.bar
+                                    Rectangle { width: parent.width * modelData.progress; height: parent.height; color: Theme.accent }
+                                }
                             }
+                            NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                         }
-                        NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                        TapHandler {
-                            onTapped: { win.navigate("player"); player.openLocation(modelData.url, true); if (modelData.point > 0) player.jumpTo(modelData.point) }
-                        }
+                        HoverHandler { id: videoRowHover }
+                        TapHandler { onTapped: { parent.forceActiveFocus(); root.activateRecentVideo(modelData) } }
                     }
                 }
                 NText {
@@ -240,26 +275,49 @@ Rectangle {
                 }
                 Repeater {
                     model: root.musicItems.slice(0, root.sidePanel ? 3 : 6)
-                    delegate: RowLayout {
+                    delegate: Item {
+                        required property int index
                         required property var modelData
+                        objectName: (root.sidePanel ? "home-side-music-" : "home-main-music-") + index
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 22 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 42
-                        spacing: 9
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.title + (modelData.artist.length ? " by " + modelData.artist : "")
+                        Accessible.focusable: true
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                                root.activateRecentMusic(modelData)
+                                event.accepted = true
+                            }
+                        }
                         Rectangle {
-                            width: 32; height: 32; radius: 3; color: Theme.raised; clip: true
-                            Image { id: homeMusicCover; anchors.fill: parent; source: modelData.artwork && modelData.artwork.length ? platform.fileUrl(modelData.artwork) : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
-                            Icon { anchors.centerIn: parent; name: "music"; size: 16; color: Theme.accent; visible: homeMusicCover.status !== Image.Ready }
+                            anchors.fill: parent
+                            radius: Theme.radiusSmall
+                            color: musicRowHover.hovered ? Theme.hover : "transparent"
+                            border.width: parent.activeFocus ? 1 : 0
+                            border.color: Theme.accent
                         }
-                        NText {
-                            text: modelData.title + (modelData.artist.length ? " - " + modelData.artist : "")
-                            font.pixelSize: root.sidePanel ? 13 : 11
-                            color: root.sidePanel ? Theme.librarySideText : Theme.text
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
+                        RowLayout {
+                            anchors.fill: parent
+                            spacing: 9
+                            Rectangle {
+                                width: 32; height: 32; radius: 3; color: Theme.raised; clip: true
+                                Image { id: homeMusicCover; anchors.fill: parent; source: modelData.artwork && modelData.artwork.length ? platform.fileUrl(modelData.artwork) : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
+                                Icon { anchors.centerIn: parent; name: "music"; size: 16; color: Theme.accent; visible: homeMusicCover.status !== Image.Ready }
+                            }
+                            NText {
+                                text: modelData.title + (modelData.artist.length ? " - " + modelData.artist : "")
+                                font.pixelSize: root.sidePanel ? 13 : 11
+                                color: root.sidePanel ? Theme.librarySideText : Theme.text
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
                         }
-                        TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(modelData.path)], true) } }
+                        HoverHandler { id: musicRowHover }
+                        TapHandler { onTapped: { parent.forceActiveFocus(); root.activateRecentMusic(modelData) } }
                     }
                 }
                 NText {
@@ -303,16 +361,39 @@ Rectangle {
                 }
                 Repeater {
                     model: root.folderItems.slice(0, root.foldersExpanded ? root.folderItems.length : (root.sidePanel ? 3 : 6))
-                    delegate: RowLayout {
+                    delegate: Item {
+                        required property int index
                         required property var modelData
+                        objectName: (root.sidePanel ? "home-side-folder-" : "home-main-folder-") + index
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 26 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 34
-                        spacing: root.sidePanel ? 16 : 9
-                        Icon { name: "folder"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
-                        NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                        TapHandler { onTapped: win.openFolderSidePanel(modelData.path) }
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.title + ", folder"
+                        Accessible.focusable: true
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                                root.activateVisitedFolder(modelData)
+                                event.accepted = true
+                            }
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Theme.radiusSmall
+                            color: folderRowHover.hovered ? Theme.hover : "transparent"
+                            border.width: parent.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+                        }
+                        RowLayout {
+                            anchors.fill: parent
+                            spacing: root.sidePanel ? 16 : 9
+                            Icon { name: "folder"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                            NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
+                        }
+                        HoverHandler { id: folderRowHover }
+                        TapHandler { onTapped: { parent.forceActiveFocus(); root.activateVisitedFolder(modelData) } }
                     }
                 }
                 NText {
@@ -355,16 +436,38 @@ Rectangle {
                 }
                 Repeater {
                     model: Math.min(homePlaylists.count, root.sidePanel ? 3 : 6)
-                    delegate: RowLayout {
+                    delegate: Item {
                         required property int index
+                        objectName: (root.sidePanel ? "home-side-playlist-" : "home-main-playlist-") + index
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 24 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 34
-                        spacing: root.sidePanel ? 17 : 9
-                        Icon { name: "playlist"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
-                        NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
-                        TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(homePlaylists.get(index, "filePath"))], true) } }
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: homePlaylists.get(index, "fileName") + ", playlist"
+                        Accessible.focusable: true
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                                root.activateRecentPlaylist(index)
+                                event.accepted = true
+                            }
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Theme.radiusSmall
+                            color: playlistRowHover.hovered ? Theme.hover : "transparent"
+                            border.width: parent.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+                        }
+                        RowLayout {
+                            anchors.fill: parent
+                            spacing: root.sidePanel ? 17 : 9
+                            Icon { name: "playlist"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                            NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
+                        }
+                        HoverHandler { id: playlistRowHover }
+                        TapHandler { onTapped: { parent.forceActiveFocus(); root.activateRecentPlaylist(index) } }
                     }
                 }
                 NText {
