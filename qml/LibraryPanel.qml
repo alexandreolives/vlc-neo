@@ -409,7 +409,10 @@ Rectangle {
             spacing: 4
             NText {
                 visible: !root.musicSideSearchOpen
-                text: root.musicSideItemCount() + " items" + (mediaLibrary.scanning ? " · Indexing…" : "")
+                text: {
+                    const count = root.musicSideItemCount()
+                    return count + (count === 1 ? " item" : " items") + (mediaLibrary.scanning ? " · Indexing…" : "")
+                }
                 dim: true
                 font.pixelSize: 12
                 Layout.fillWidth: true
