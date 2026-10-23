@@ -76,14 +76,14 @@ Rectangle {
     function sidePanelTitle() {
         if (win.navigationPage === "music") {
             if (musicSidePage === "songs" && musicSideFolderRoot.length)
-                return "…  ›  Songs  ›  " + musicSideRootLabel(musicSideFolderRoot)
-            return musicSidePage === "categories" ? "Music" : "Music  ›  " + musicSidePage.charAt(0).toUpperCase() + musicSidePage.slice(1)
+                return "…  ▸  Songs  ▸  " + musicSideRootLabel(musicSideFolderRoot)
+            return musicSidePage === "categories" ? "Music" : "Music  ▸  " + musicSidePage.charAt(0).toUpperCase() + musicSidePage.slice(1)
         }
         if (root.section === "folder" && root.mediaType === "audio") {
             const currentPath = platform.localPath(root.folder)
             const rootPath = root.musicRootForPath(currentPath)
             const nestedPaths = rootPath.length ? currentPath.slice(rootPath.length).split("/").filter(Boolean) : []
-            return "Songs  ›  " + [root.musicSideRootLabel(rootPath || currentPath)].concat(nestedPaths).join("  ›  ")
+            return "Songs  ▸  " + [root.musicSideRootLabel(rootPath || currentPath)].concat(nestedPaths).join("  ▸  ")
         }
         if (win.navigationPage === "recent") return "Recent"
         if (win.navigationPage === "videos") {
