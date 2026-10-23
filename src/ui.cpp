@@ -136,6 +136,15 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
 {
     if (action == QLatin1String("quit")) {
         window->close();
+    } else if (action.startsWith(QLatin1String("focus-item:"))) {
+        const QString objectName = action.mid(11);
+        QQuickItem *target = window ? findVisualItem(window->contentItem(), objectName) : nullptr;
+        if (!target) {
+            qWarning("neo test: invalid focus item: %s", qPrintable(objectName));
+            return;
+        }
+        target->forceActiveFocus(Qt::TabFocusReason);
+        qInfo("neo test: focused %s (%d)", qPrintable(objectName), int(target->hasActiveFocus()));
     } else if (action.startsWith(QLatin1String("move:")) || action.startsWith(QLatin1String("move-item:"))) {
         if (!window)
             return;
@@ -265,6 +274,7 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
     } else if (action.startsWith(QLatin1String("key:"))) {
         const QString keyName = action.mid(4);
         const QHash<QString, int> keys = {
+            {QStringLiteral("Tab"), Qt::Key_Tab},
             {QStringLiteral("Left"), Qt::Key_Left}, {QStringLiteral("Right"), Qt::Key_Right},
             {QStringLiteral("Up"), Qt::Key_Up}, {QStringLiteral("Down"), Qt::Key_Down},
             {QStringLiteral("Home"), Qt::Key_Home}, {QStringLiteral("End"), Qt::Key_End},

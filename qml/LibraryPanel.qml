@@ -539,20 +539,38 @@ Rectangle {
         }
 
         Item {
-            objectName: "music-sidepanel-add"
+            objectName: "music-sidepanel-add-library"
             visible: root.figmaSidePanel && root.section === "music"
+                     && !["categories", "songs"].includes(root.musicSidePage)
             Layout.fillWidth: true
             Layout.preferredHeight: 36
             Layout.topMargin: visible ? 16 : 0
             Layout.leftMargin: 25
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: "Add folder to music library"
+            Accessible.focusable: true
+            Keys.onPressed: event => {
+                if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                    root.indexFolder()
+                    event.accepted = true
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusSmall
+                color: addLibraryFolderMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: parent.activeFocus ? 1 : 0
+                border.color: Theme.accent
+            }
             Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
             NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
+            MouseArea { id: addLibraryFolderMouse; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { parent.forceActiveFocus(); root.indexFolder() } }
         }
 
         ColumnLayout {
-            objectName: "music-sidepanel-categories"
-            visible: root.figmaSidePanel && root.section === "music" && root.musicSidePage === "categories"
+            objectName: "music-sidepanel-categories-legacy"
+            visible: false
             Layout.fillWidth: true
             Layout.leftMargin: 26
             Layout.rightMargin: 12
@@ -561,7 +579,7 @@ Rectangle {
                 model: root.visibleMusicCategories()
                 delegate: Item {
                     required property var modelData
-                    objectName: "music-sidepanel-category-" + modelData.page
+                    objectName: "music-sidepanel-category-legacy-" + modelData.page
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: modelData.icon; size: 18; color: Theme.icon }
@@ -572,8 +590,8 @@ Rectangle {
         }
 
         ColumnLayout {
-            objectName: "music-sidepanel-roots"
-            visible: root.figmaSidePanel && root.section === "music" && root.musicSidePage === "songs"
+            objectName: "music-sidepanel-roots-legacy"
+            visible: false
             Layout.fillWidth: true
             Layout.leftMargin: 26
             Layout.rightMargin: 12
@@ -582,6 +600,7 @@ Rectangle {
                 model: mediaLibrary.roots
                 delegate: Item {
                     required property string modelData
+                    objectName: "music-sidepanel-root-legacy-" + root.musicSideRootLabel(modelData)
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
                     Icon { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
@@ -1003,9 +1022,26 @@ Rectangle {
             Layout.preferredHeight: 36
             Layout.topMargin: 16
             Layout.leftMargin: 25
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: "Add folder to music library"
+            Accessible.focusable: true
+            Keys.onPressed: event => {
+                if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                    root.indexFolder()
+                    event.accepted = true
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusSmall
+                color: addFolderMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: parent.activeFocus ? 1 : 0
+                border.color: Theme.accent
+            }
             Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
             NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
+            MouseArea { id: addFolderMouse; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { parent.forceActiveFocus(); root.indexFolder() } }
         }
 
         ColumnLayout {
@@ -1021,9 +1057,25 @@ Rectangle {
                     objectName: "music-sidepanel-category-" + modelData.page
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: modelData.label
+                    Accessible.focusable: true
+                    Keys.onPressed: event => {
+                        if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                            root.openMusicSidePage(modelData.page)
+                            event.accepted = true
+                        }
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        color: categoryMouse.containsMouse ? Theme.hover : "transparent"
+                        border.width: parent.activeFocus ? 1 : 0
+                        border.color: Theme.accent
+                    }
                     Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: modelData.icon; size: 18; color: Theme.icon }
                     NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; font.pixelSize: 13; color: Theme.librarySideText }
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openMusicSidePage(modelData.page) }
+                    MouseArea { id: categoryMouse; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { parent.forceActiveFocus(); root.openMusicSidePage(modelData.page) } }
                 }
             }
         }
@@ -1040,14 +1092,34 @@ Rectangle {
                 model: mediaLibrary.roots
                 delegate: Item {
                     required property string modelData
+                    objectName: "music-sidepanel-root-" + root.musicSideRootLabel(modelData)
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: root.musicSideRootLabel(modelData)
+                    Accessible.focusable: true
+                    Keys.onPressed: event => {
+                        if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                            root.musicSideFolderRoot = modelData
+                            mediaLibrary.model.search = ""
+                            event.accepted = true
+                        }
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        color: rootItemMouse.containsMouse ? Theme.hover : "transparent"
+                        border.width: parent.activeFocus ? 1 : 0
+                        border.color: Theme.accent
+                    }
                     Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
                     NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: root.musicSideRootLabel(modelData); font.pixelSize: 13; color: Theme.librarySideText }
                     MouseArea {
+                        id: rootItemMouse
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            parent.forceActiveFocus()
                             root.musicSideFolderRoot = modelData
                             mediaLibrary.model.search = ""
                         }
