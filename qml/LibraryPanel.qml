@@ -8,10 +8,17 @@ import Neo 1.0
 // Local media browser with a full-window mode and a compact embedded mode.
 Rectangle {
     id: root
-    color: root.wide && !root.compactFolderSidebar && !root.compactMusicSidebar ? Theme.window : Theme.panel
+    color: root.wide && !root.compactFolderSidebar && !root.compactMusicSidebar && !root.figmaSidePanel ? Theme.window : Theme.panel
     property bool wide: false
     property bool compactMusicSidebar: false
     property bool compactFolderSidebar: false
+    property bool figmaSidePanel: false
+    property var sideFolderHistory: []
+    property string musicSidePage: "categories"
+    property var musicSideHistory: []
+    property bool musicSideSearchOpen: false
+    property bool musicSideSortByName: false
+    property bool musicSideCompactView: false
     property bool musicSearchOpen: false
     property bool folderSearchOpen: false
     property alias folderSearchButton: compactFolderSearchButton
@@ -63,7 +70,90 @@ Rectangle {
         if (i >= 0) list.splice(i, 1); else list.push(path)
         Theme.store.pinned = list.join("\n")
     }
-    function openFolder(url) { root.folder = url; root.section = "folder"; root.mediaType = "all" }
+    function sidePanelTitle() {
+        if (win.navigationPage === "music")
+            return musicSidePage === "categories" ? "Music" : "Music  ›  " + musicSidePage.charAt(0).toUpperCase() + musicSidePage.slice(1)
+        if (win.navigationPage === "recent") return "Recent"
+        if (win.navigationPage === "videos") {
+            const currentPath = platform.localPath(root.folder)
+            const videosPath = platform.localPath(StandardPaths.writableLocation(StandardPaths.MoviesLocation))
+            if (currentPath !== videosPath) return currentPath.split("/").filter(Boolean).pop() || "Videos"
+            return "Videos"
+        }
+        return "Library"
+    }
+    function goBackFromSidePanel() {
+        if (win.navigationPage === "music" && root.section === "folder") {
+            if (sideFolderHistory.length) {
+                root.folder = sideFolderHistory[sideFolderHistory.length - 1]
+                sideFolderHistory = sideFolderHistory.slice(0, -1)
+            }
+            root.section = "music"
+            root.mediaType = "audio"
+            return
+        }
+        if (win.navigationPage === "music" && mediaLibrary.model.grouped) {
+            mediaLibrary.model.clearGroup()
+            return
+        }
+        if (win.navigationPage === "music" && musicSideHistory.length) {
+            musicSidePage = musicSideHistory[musicSideHistory.length - 1]
+            musicSideHistory = musicSideHistory.slice(0, -1)
+            if (["albums", "artists", "genres"].includes(musicSidePage))
+                mediaLibrary.model.view = musicSidePage
+            else
+                mediaLibrary.model.view = "tracks"
+            return
+        }
+        if (sideFolderHistory.length) {
+            root.folder = sideFolderHistory[sideFolderHistory.length - 1]
+            sideFolderHistory = sideFolderHistory.slice(0, -1)
+            return
+        }
+        win.goBack()
+    }
+    function openMusicSidePage(page) {
+        musicSideHistory = musicSideHistory.concat([musicSidePage])
+        musicSidePage = page
+        mediaLibrary.model.search = ""
+        mediaLibrary.model.view = ["albums", "artists", "genres"].includes(page) ? page : "tracks"
+    }
+    function musicSideItemCount() {
+        if (musicSidePage === "categories") return visibleMusicCategories().length
+        if (musicSidePage === "songs") return mediaLibrary.roots.length
+        return mediaLibrary.model.itemCount()
+    }
+    function visibleMusicCategories() {
+        const categories = [
+            { page: "songs", label: "Songs", icon: "music" },
+            { page: "albums", label: "Albums", icon: "album" },
+            { page: "artists", label: "Artists", icon: "artist" },
+            { page: "genres", label: "Genres", icon: "genre" }
+        ]
+        const query = musicSideSearchOpen ? mediaLibrary.model.search.trim().toLowerCase() : ""
+        const result = query.length ? categories.filter(item => item.label.toLowerCase().includes(query)) : categories
+        if (musicSideSortByName) result.sort((a, b) => a.label.localeCompare(b.label))
+        return result
+    }
+    function openFolder(url) {
+        if (root.figmaSidePanel) sideFolderHistory = sideFolderHistory.concat([root.folder])
+        root.folder = url
+        root.section = "folder"
+    }
+    onFigmaSidePanelChanged: if (figmaSidePanel) sideFolderHistory = []
+    Connections {
+        target: win
+        function onNavigationPageChanged() {
+            if (!root.figmaSidePanel) return
+            root.sideFolderHistory = []
+            if (win.navigationPage === "music") {
+                root.musicSidePage = "categories"
+                root.musicSideHistory = []
+                root.musicSideSearchOpen = false
+                mediaLibrary.model.search = ""
+            }
+        }
+    }
     function matches(name) { return searchText.length === 0 || name.toLowerCase().includes(searchText.trim().toLowerCase()) }
     function refreshFilteredCount() {
         if (searchText.trim().length === 0) {
@@ -174,18 +264,26 @@ Rectangle {
     }
 
     ColumnLayout {
+        visible: !(root.figmaSidePanel && root.section === "music"
+                   && ["categories", "songs"].includes(root.musicSidePage))
         anchors.fill: parent
         spacing: 0
 
         // Header: navigation, breadcrumbs and local search.
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: root.compactFolderSidebar ? 18 : (root.wide && root.section === "folder" ? 8 : 0)
-            Layout.leftMargin: 8
-            Layout.rightMargin: 8
-            implicitHeight: root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42
+            Layout.topMargin: root.figmaSidePanel ? 0 : (root.compactFolderSidebar ? 18 : (root.wide && root.section === "folder" ? 8 : 0))
+            Layout.leftMargin: root.figmaSidePanel ? 18 : 8
+            Layout.rightMargin: root.figmaSidePanel ? 27 : 8
+            Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
             spacing: 2
-            IconButton { icon: "chevron-left"; tip: "Up"; visible: root.section === "folder"; onClicked: root.openFolder(files.parentFolder) }
+            IconButton {
+                icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
+                tip: root.figmaSidePanel ? "Back" : "Up"
+                visible: root.figmaSidePanel || root.section === "folder"
+                onClicked: root.figmaSidePanel ? root.goBackFromSidePanel() : root.openFolder(files.parentFolder)
+            }
+            IconButton { icon: "arrow-right"; tip: "Forward"; visible: root.figmaSidePanel; enabled: false }
             Chips {
                 visible: !root.wide
                 model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
@@ -194,27 +292,28 @@ Rectangle {
             }
             NText {
                 visible: root.wide
-                text: root.section === "folder" ? root.crumbs().map(c => c.name).join("  ›  ")
+                text: root.figmaSidePanel ? root.sidePanelTitle()
+                      : root.section === "folder" ? root.crumbs().map(c => c.name).join("  ›  ")
                       : (root.section === "recent" ? "Recent media" : (root.section === "music" ? (root.compactMusicSidebar ? "Songs  ›  My Songs" : "Music library") : "Home"))
-                font.pixelSize: 12
+                font.pixelSize: root.figmaSidePanel ? 14 : 12
                 Layout.leftMargin: 8
                 Layout.fillWidth: true
             }
             Item { Layout.fillWidth: true }
-            NText { visible: root.wide && root.section === "folder" && !root.compactFolderSidebar; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
-            NText { id: musicItemCountLabel; visible: root.wide && root.section === "music"; text: mediaLibrary.model.count + " items" + (mediaLibrary.scanning ? " · Indexing…" : ""); dim: true; font.pixelSize: 11 }
+            NText { visible: root.wide && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
+            NText { id: musicItemCountLabel; visible: root.wide && root.section === "music" && !root.figmaSidePanel; text: mediaLibrary.model.count + " items" + (mediaLibrary.scanning ? " · Indexing…" : ""); dim: true; font.pixelSize: 11 }
             IconButton { objectName: "library-index-folder"; visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "folder"; tip: "Add folder to library"; onClicked: root.indexFolder() }
             IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "refresh"; tip: "Rescan library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.refresh() }
             IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "trash-2"; tip: "Clear indexed library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.clearLibrary() }
             IconButton {
                 icon: "arrow-up"; tip: "Sort: " + root.sortBy
-                visible: root.section !== "music" && !root.compactFolderSidebar
+                visible: root.section !== "music" && !root.compactFolderSidebar && !root.figmaSidePanel
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
             IconButton {
                 id: folderViewToggleButton
                 objectName: "library-folder-view-toggle"
-                visible: root.wide && root.section === "folder" && !root.compactFolderSidebar
+                visible: root.wide && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel
                 icon: root.folderViewMode === "grid" ? "list" : "grid"
                 tip: root.folderViewMode === "grid" ? "List view" : "Grid view"
                 Accessible.name: tip
@@ -222,7 +321,7 @@ Rectangle {
             }
             NField {
                 id: librarySearch
-                visible: root.wide && ((!root.compactMusicSidebar && !root.compactFolderSidebar)
+                visible: root.wide && !root.figmaSidePanel && ((!root.compactMusicSidebar && !root.compactFolderSidebar)
                                        || (root.compactMusicSidebar && root.musicSearchOpen)
                                        || (root.compactFolderSidebar && root.folderSearchOpen))
                 objectName: "library-search"
@@ -233,8 +332,36 @@ Rectangle {
             }
             IconButton { visible: root.compactMusicSidebar && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
             IconButton { visible: root.compactMusicSidebar && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
-            IconButton { visible: root.wide && !root.compactFolderSidebar; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
-            IconButton { icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
+            IconButton { visible: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
+            IconButton { visible: root.figmaSidePanel; icon: "more"; tip: "More options" }
+            IconButton { visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
+            IconButton { visible: !root.figmaSidePanel; icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
+        }
+
+        RowLayout {
+            visible: root.figmaSidePanel && root.section === "music"
+            Layout.fillWidth: true
+            Layout.leftMargin: 20
+            Layout.rightMargin: 27
+            Layout.preferredHeight: 52
+            spacing: 4
+            NText {
+                visible: !root.musicSideSearchOpen
+                text: root.musicSideItemCount() + " items" + (mediaLibrary.scanning ? " · Indexing…" : "")
+                dim: true
+                font.pixelSize: 12
+                Layout.fillWidth: true
+            }
+            NField {
+                visible: root.musicSideSearchOpen
+                Layout.fillWidth: true
+                placeholderText: "Search"
+                text: mediaLibrary.model.search
+                onTextEdited: mediaLibrary.model.search = text
+            }
+            IconButton { icon: "sort"; tip: "Sort"; checked: root.musicSideSortByName; onClicked: root.musicSideSortByName = !root.musicSideSortByName }
+            IconButton { icon: "view"; tip: "View options"; checked: root.musicSideCompactView; onClicked: root.musicSideCompactView = !root.musicSideCompactView }
+            IconButton { icon: root.musicSideSearchOpen ? "close" : "search"; tip: root.musicSideSearchOpen ? "Close search" : "Search"; onClicked: { root.musicSideSearchOpen = !root.musicSideSearchOpen; if (!root.musicSideSearchOpen) mediaLibrary.model.search = "" } }
         }
 
         // The compact player sidebar follows Figma's two-row folder header:
@@ -242,18 +369,25 @@ Rectangle {
         RowLayout {
             id: compactFolderToolbarItem
             objectName: "library-compact-folder-toolbar"
-            visible: root.compactFolderSidebar && root.section === "folder"
+            visible: (root.compactFolderSidebar || root.figmaSidePanel) && root.section === "folder"
             Layout.fillWidth: true
-            Layout.topMargin: 15
-            Layout.leftMargin: 10
-            Layout.rightMargin: 10
-            Layout.bottomMargin: 35
-            implicitHeight: 28
+            Layout.topMargin: visible && !root.figmaSidePanel ? 15 : 0
+            Layout.leftMargin: visible ? (root.figmaSidePanel ? 20 : 10) : 0
+            Layout.rightMargin: visible ? (root.figmaSidePanel ? 27 : 10) : 0
+            Layout.bottomMargin: visible && !root.figmaSidePanel ? 35 : 0
+            Layout.preferredHeight: root.figmaSidePanel ? 52 : 28
             spacing: 4
-            NText { text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
-            Item { Layout.fillWidth: true }
+            NText { visible: !root.folderSearchOpen; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 12 }
+            NField {
+                visible: root.figmaSidePanel && root.folderSearchOpen
+                Layout.fillWidth: true
+                placeholderText: "Search"
+                text: root.searchText
+                onTextEdited: root.searchText = text
+            }
+            Item { Layout.fillWidth: true; visible: !root.folderSearchOpen }
             IconButton {
-                icon: "arrow-up"; tip: "Sort: " + root.sortBy
+                icon: root.figmaSidePanel ? "sort" : "arrow-up"; tip: "Sort: " + root.sortBy
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
             IconButton {
@@ -268,6 +402,7 @@ Rectangle {
                 objectName: "library-folder-pin"
                 icon: "bookmark"; tip: "Pin this folder"
                 checked: root.pinnedList().indexOf(platform.localPath(root.folder)) >= 0
+                visible: !root.figmaSidePanel
                 onClicked: root.togglePin(platform.localPath(root.folder))
             }
             IconButton { id: compactFolderSearchButton; objectName: "library-folder-search-open"; visible: !root.folderSearchOpen; icon: "search"; tip: "Search this folder"; onClicked: root.folderSearchOpen = true }
@@ -326,6 +461,89 @@ Rectangle {
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
+        Item {
+            objectName: "library-sidepanel-add"
+            visible: root.figmaSidePanel && root.section === "folder"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            Layout.topMargin: visible && root.figmaSidePanel ? 16 : 0
+            Layout.leftMargin: 25
+            Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
+        }
+
+        Item {
+            objectName: "music-sidepanel-add"
+            visible: root.figmaSidePanel && root.section === "music"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            Layout.topMargin: visible ? 16 : 0
+            Layout.leftMargin: 25
+            Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
+        }
+
+        ColumnLayout {
+            objectName: "music-sidepanel-categories"
+            visible: root.figmaSidePanel && root.section === "music" && root.musicSidePage === "categories"
+            Layout.fillWidth: true
+            Layout.leftMargin: 26
+            Layout.rightMargin: 12
+            spacing: 0
+            Repeater {
+                model: root.visibleMusicCategories()
+                delegate: Item {
+                    required property var modelData
+                    objectName: "music-sidepanel-category-" + modelData.page
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    Icon { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: modelData.icon; size: 18; color: Theme.icon }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; font.pixelSize: 13; color: Theme.text }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openMusicSidePage(modelData.page) }
+                }
+            }
+        }
+
+        ColumnLayout {
+            objectName: "music-sidepanel-roots"
+            visible: root.figmaSidePanel && root.section === "music" && root.musicSidePage === "songs"
+            Layout.fillWidth: true
+            Layout.leftMargin: 26
+            Layout.rightMargin: 12
+            spacing: 0
+            Repeater {
+                model: mediaLibrary.roots
+                delegate: Item {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    Icon { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: modelData.split("/").filter(Boolean).pop() || modelData; font.pixelSize: 13; color: Theme.text }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.sideFolderHistory = root.sideFolderHistory.concat([root.folder])
+                            root.folder = platform.fileUrl(modelData)
+                            root.section = "folder"
+                            root.mediaType = "audio"
+                        }
+                    }
+                }
+            }
+        }
+
+        NText {
+            visible: root.figmaSidePanel && root.section === "music" && root.musicSidePage === "songs" && mediaLibrary.roots.length === 0
+            Layout.leftMargin: 62
+            Layout.topMargin: 6
+            text: "No music folders"
+            dim: true
+            font.pixelSize: 12
+        }
+
         RowLayout {
             visible: root.section === "music" && !root.compactMusicSidebar
             Layout.fillWidth: true
@@ -363,15 +581,15 @@ Rectangle {
             visible: root.section === "folder"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.leftMargin: root.wide ? 12 : 0
-            Layout.rightMargin: root.wide ? 12 : 0
-            Layout.topMargin: root.wide && !root.compactFolderSidebar ? 58 : 0
+            Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
+            Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
+            Layout.topMargin: root.figmaSidePanel ? 5 : (root.wide && !root.compactFolderSidebar ? 58 : 0)
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds
-            cellWidth: root.wide && !root.compactFolderSidebar
+            cellWidth: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel
                        ? Math.max(180, Math.floor(width / (root.folderViewMode === "grid" ? 5 : 4))) : width
-            cellHeight: root.compactFolderSidebar ? 38 : (root.wide
+            cellHeight: root.figmaSidePanel ? 42 : root.compactFolderSidebar ? 38 : (root.wide
                 ? (root.folderViewMode === "grid" ? Math.max(154, Math.min(244, Math.round(cellWidth * 0.72))) : 44)
                 : 34)
             ScrollBar.vertical: ScrollBar {}
@@ -381,14 +599,14 @@ Rectangle {
                 required property url fileUrl
                 required property bool fileIsDir
                 required property string fileSuffix
-                width: listing.cellWidth - (root.wide ? 8 : 0)
+                width: listing.cellWidth - (root.wide && !root.figmaSidePanel ? 8 : 0)
                 height: listing.cellHeight - 2
                 visible: root.matches(fileName)
                 radius: Theme.radiusSmall
                 property bool playing: !fileIsDir && player.mediaUrl.toString() === fileUrl.toString()
                 property string extension: root.extension(fileName)
                 property bool videoFile: !fileIsDir && root.videoExtensions.indexOf(extension) >= 0
-                property bool gridCard: root.wide && !root.compactFolderSidebar && root.folderViewMode === "grid"
+                property bool gridCard: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel && root.folderViewMode === "grid"
                 property real savedDuration: player.resumeDurationFor(fileUrl)
                 property real savedPoint: player.resumePointFor(fileUrl)
                 property real progressRatio: playing
@@ -406,7 +624,7 @@ Rectangle {
 
                 Item {
                     id: thumbnailFrame
-                    x: mediaCell.gridCard ? 8 : (root.wide ? 15 : 12)
+                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 26 : root.wide ? 15 : 12)
                     y: mediaCell.gridCard ? 8 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : (root.wide && mediaCell.videoFile ? 32 : 16)
                     height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.wide ? 32 : 18)
@@ -440,10 +658,10 @@ Rectangle {
                 }
                 NText {
                     text: mediaCell.fileName
-                    x: mediaCell.gridCard ? 8 : thumbnailFrame.x + thumbnailFrame.width + (root.wide ? 7 : 10)
+                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 62 : thumbnailFrame.x + thumbnailFrame.width + (root.wide ? 7 : 10))
                     y: mediaCell.gridCard ? thumbnailFrame.y + thumbnailFrame.height + 8 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : Math.max(20, parent.width - x - 36)
-                    font.pixelSize: root.wide ? (mediaCell.gridCard ? 13 : 11) : Theme.fontBody
+                    font.pixelSize: root.figmaSidePanel ? 13 : root.wide ? (mediaCell.gridCard ? 13 : 11) : Theme.fontBody
                     color: root.folderViewMode === "list" && mediaCell.playing ? Theme.accent : Theme.text
                     elide: Text.ElideRight
                 }
@@ -483,11 +701,12 @@ Rectangle {
         ListView {
             id: musicListing
             objectName: "music-library-list"
-            visible: root.section === "music"
+            visible: root.section === "music" && (!root.figmaSidePanel || !["categories", "songs"].includes(root.musicSidePage))
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.leftMargin: root.wide ? 12 : 0
-            Layout.rightMargin: root.wide ? 12 : 0
+            Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
+            Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
+            Layout.topMargin: root.figmaSidePanel ? 5 : 0
             clip: true
             model: mediaLibrary.model
             boundsBehavior: Flickable.StopAtBounds
@@ -506,17 +725,17 @@ Rectangle {
                 required property string kind
                 required property bool isGroup
                 width: ListView.view.width
-                height: 52
+                height: root.figmaSidePanel ? (root.musicSideCompactView ? 38 : 44) : 52
                 radius: Theme.radiusSmall
                 color: musicRowMouse.containsMouse ? Theme.hover : "transparent"
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 8
-                    anchors.rightMargin: 6
-                    spacing: 10
+                    anchors.leftMargin: root.figmaSidePanel ? 26 : 8
+                    anchors.rightMargin: root.figmaSidePanel ? 12 : 6
+                    spacing: root.figmaSidePanel ? 12 : 10
                     Rectangle {
-                        Layout.preferredWidth: 38
-                        Layout.preferredHeight: 38
+                        Layout.preferredWidth: root.figmaSidePanel ? 32 : 38
+                        Layout.preferredHeight: root.figmaSidePanel ? 32 : 38
                         radius: 4
                         color: Theme.raised
                         Image { id: cover; anchors.fill: parent; source: artwork; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
@@ -661,6 +880,128 @@ Rectangle {
                 }
             }
         }
+    }
+
+    ColumnLayout {
+        id: musicSidePanelLanding
+        objectName: "music-sidepanel-landing"
+        anchors.fill: parent
+        visible: root.figmaSidePanel && root.section === "music"
+                 && ["categories", "songs"].includes(root.musicSidePage)
+        spacing: 0
+        z: 1
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 52
+            Layout.leftMargin: 18
+            Layout.rightMargin: 27
+            spacing: 2
+            IconButton { icon: "arrow-left"; tip: "Back"; onClicked: root.goBackFromSidePanel() }
+            IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
+            NText { text: root.sidePanelTitle(); font.pixelSize: 14; Layout.leftMargin: 8; Layout.fillWidth: true }
+            IconButton { icon: "more"; tip: "More options" }
+            IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 52
+            Layout.leftMargin: 20
+            Layout.rightMargin: 27
+            spacing: 4
+            NText {
+                visible: !root.musicSideSearchOpen
+                text: root.musicSideItemCount() + " items" + (mediaLibrary.scanning ? " · Indexing…" : "")
+                dim: true
+                font.pixelSize: 12
+                Layout.fillWidth: true
+            }
+            NField {
+                visible: root.musicSideSearchOpen
+                Layout.fillWidth: true
+                placeholderText: "Search"
+                text: mediaLibrary.model.search
+                onTextEdited: mediaLibrary.model.search = text
+            }
+            IconButton { icon: "sort"; tip: "Sort"; checked: root.musicSideSortByName; onClicked: root.musicSideSortByName = !root.musicSideSortByName }
+            IconButton { icon: "view"; tip: "View options"; checked: root.musicSideCompactView; onClicked: root.musicSideCompactView = !root.musicSideCompactView }
+            IconButton { icon: root.musicSideSearchOpen ? "close" : "search"; tip: root.musicSideSearchOpen ? "Close search" : "Search"; onClicked: { root.musicSideSearchOpen = !root.musicSideSearchOpen; if (!root.musicSideSearchOpen) mediaLibrary.model.search = "" } }
+        }
+
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+        Item {
+            objectName: "music-sidepanel-add"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            Layout.topMargin: 16
+            Layout.leftMargin: 25
+            Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.text }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.indexFolder() }
+        }
+
+        ColumnLayout {
+            objectName: "music-sidepanel-categories"
+            visible: root.musicSidePage === "categories"
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? root.visibleMusicCategories().length * (root.musicSideCompactView ? 36 : 44) : 0
+            spacing: 0
+            Repeater {
+                model: root.visibleMusicCategories()
+                delegate: Item {
+                    required property var modelData
+                    objectName: "music-sidepanel-category-" + modelData.page
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: modelData.icon; size: 18; color: Theme.icon }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; font.pixelSize: 13; color: Theme.text }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.openMusicSidePage(modelData.page) }
+                }
+            }
+        }
+
+        ColumnLayout {
+            objectName: "music-sidepanel-roots"
+            visible: root.musicSidePage === "songs"
+            Layout.fillWidth: true
+            Layout.minimumHeight: 0
+            Layout.preferredHeight: visible ? Math.max(1, mediaLibrary.roots.length * (root.musicSideCompactView ? 36 : 44)) : 1
+            Layout.maximumHeight: visible ? Math.max(1, mediaLibrary.roots.length * (root.musicSideCompactView ? 36 : 44)) : 1
+            spacing: 0
+            Repeater {
+                model: mediaLibrary.roots
+                delegate: Item {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.musicSideCompactView ? 36 : 44
+                    Icon { anchors.left: parent.left; anchors.leftMargin: 26; anchors.verticalCenter: parent.verticalCenter; name: "folder"; size: 18; color: Theme.icon }
+                    NText { anchors.left: parent.left; anchors.leftMargin: 62; anchors.verticalCenter: parent.verticalCenter; text: modelData.split("/").filter(Boolean).pop() || modelData; font.pixelSize: 13; color: Theme.text }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.sideFolderHistory = root.sideFolderHistory.concat([root.folder])
+                            root.folder = platform.fileUrl(modelData)
+                            root.section = "folder"
+                            root.mediaType = "audio"
+                        }
+                    }
+                }
+            }
+        }
+
+        NText {
+            visible: root.musicSidePage === "songs" && mediaLibrary.roots.length === 0
+            Layout.leftMargin: 62
+            Layout.topMargin: 6
+            text: "No music folders"
+            dim: true
+            font.pixelSize: 12
+        }
+
+        Item { Layout.fillHeight: true }
     }
 
     Rectangle {

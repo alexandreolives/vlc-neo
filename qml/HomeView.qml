@@ -117,23 +117,23 @@ Rectangle {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: 12
-                    Layout.rightMargin: 8
-                    implicitHeight: 36
+                    Layout.leftMargin: root.sidePanel ? 20 : 12
+                    Layout.rightMargin: root.sidePanel ? 27 : 8
+                    Layout.preferredHeight: root.sidePanel ? 52 : 36
                     spacing: 3
                     IconButton { icon: "arrow-left"; tip: "Back"; onClicked: win.goBack() }
                     IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
-                    NText { text: "Home"; font.pixelSize: 12; Layout.fillWidth: true }
+                    NText { text: "Home"; font.pixelSize: root.sidePanel ? 14 : 12; Layout.fillWidth: true }
                     IconButton { icon: "more"; tip: "More options" }
                     IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
                 }
-                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: !root.sidePanel }
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: 12
-                    Layout.rightMargin: 8
-                    implicitHeight: 34
-                    NText { visible: !root.searchOpen; text: mediaLibrary.indexedCount + " items"; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
+                    Layout.leftMargin: root.sidePanel ? 20 : 12
+                    Layout.rightMargin: root.sidePanel ? 27 : 8
+                    Layout.preferredHeight: root.sidePanel ? 52 : 34
+                    NText { visible: !root.searchOpen; text: mediaLibrary.indexedCount + " items"; dim: true; font.pixelSize: 12; Layout.fillWidth: true }
                     NField {
                         visible: root.searchOpen
                         Layout.fillWidth: true
@@ -145,12 +145,13 @@ Rectangle {
                     IconButton { icon: "view"; tip: "Toggle compact view"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
                     IconButton { icon: root.searchOpen ? "close" : "search"; tip: root.searchOpen ? "Close search" : "Search"; onClicked: { root.searchOpen = !root.searchOpen; if (!root.searchOpen) { root.searchText = ""; root.refreshContent() } } }
                 }
+                Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: root.sidePanel }
 
                 NText {
                     text: "Continue Watching"
-                    font.pixelSize: 12
-                    Layout.leftMargin: 16
-                    Layout.topMargin: 18
+                    font.pixelSize: root.sidePanel ? 14 : 12
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
                 }
                 Repeater {
@@ -158,7 +159,7 @@ Rectangle {
                     delegate: RowLayout {
                         required property var modelData
                         Layout.fillWidth: true
-                        Layout.leftMargin: 16
+                        Layout.leftMargin: root.sidePanel ? 22 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 42
                         spacing: 9
@@ -176,12 +177,8 @@ Rectangle {
                                 height: 2; color: Theme.bar
                                 Rectangle { width: parent.width * modelData.progress; height: parent.height; color: Theme.accent }
                             }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: { win.navigate("player"); player.openLocation(modelData.url, true); if (modelData.point > 0) player.jumpTo(modelData.point) }
-                            }
                         }
-                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; elide: Text.ElideRight; Layout.fillWidth: true }
                         TapHandler {
                             onTapped: { win.navigate("player"); player.openLocation(modelData.url, true); if (modelData.point > 0) player.jumpTo(modelData.point) }
                         }
@@ -191,8 +188,8 @@ Rectangle {
                     visible: root.videoItems.length === 0
                     text: "No recent videos"
                     dim: true
-                    font.pixelSize: 10
-                    Layout.leftMargin: 16
+                    font.pixelSize: root.sidePanel ? 12 : 10
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.bottomMargin: 4
                 }
                 NButton {
@@ -207,9 +204,9 @@ Rectangle {
 
                 NText {
                     text: "Listen Again"
-                    font.pixelSize: 12
-                    Layout.leftMargin: 16
-                    Layout.topMargin: 18
+                    font.pixelSize: root.sidePanel ? 14 : 12
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
                 }
                 Repeater {
@@ -217,7 +214,7 @@ Rectangle {
                     delegate: RowLayout {
                         required property var modelData
                         Layout.fillWidth: true
-                        Layout.leftMargin: 16
+                        Layout.leftMargin: root.sidePanel ? 22 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 42
                         spacing: 9
@@ -225,8 +222,8 @@ Rectangle {
                             width: 32; height: 32; radius: 3; color: Theme.raised
                             Icon { anchors.centerIn: parent; name: "music"; size: 16; color: Theme.accent }
                         }
-                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
-                        NText { text: modelData.artist || ""; font.pixelSize: 10; dim: true; elide: Text.ElideRight; Layout.maximumWidth: 80 }
+                        NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        NText { text: modelData.artist || ""; font.pixelSize: root.sidePanel ? 11 : 10; dim: true; elide: Text.ElideRight; Layout.maximumWidth: 80 }
                         TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(modelData.path)], true) } }
                     }
                 }
@@ -234,8 +231,8 @@ Rectangle {
                     visible: root.musicItems.length === 0
                     text: "No indexed music"
                     dim: true
-                    font.pixelSize: 10
-                    Layout.leftMargin: 16
+                    font.pixelSize: root.sidePanel ? 12 : 10
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.bottomMargin: 4
                 }
                 NButton {
@@ -250,9 +247,9 @@ Rectangle {
 
                 NText {
                     text: "Frequently Visited Folders"
-                    font.pixelSize: 12
-                    Layout.leftMargin: 16
-                    Layout.topMargin: 18
+                    font.pixelSize: root.sidePanel ? 14 : 12
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
                 }
                 Repeater {
@@ -260,12 +257,12 @@ Rectangle {
                     delegate: RowLayout {
                         required property var modelData
                         Layout.fillWidth: true
-                        Layout.leftMargin: 16
+                        Layout.leftMargin: root.sidePanel ? 26 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 34
-                        spacing: 9
-                        Icon { name: "folder"; size: 16; color: Theme.icon }
-                        NText { text: modelData.title; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        spacing: root.sidePanel ? 16 : 9
+                        Icon { name: "folder"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                        NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; elide: Text.ElideRight; Layout.fillWidth: true }
                         TapHandler { onTapped: win.openFolderSidePanel(modelData.path) }
                     }
                 }
@@ -273,8 +270,8 @@ Rectangle {
                     visible: root.folderItems.length === 0
                     text: "No indexed folders"
                     dim: true
-                    font.pixelSize: 10
-                    Layout.leftMargin: 16
+                    font.pixelSize: root.sidePanel ? 12 : 10
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.bottomMargin: 4
                 }
                 NButton {
@@ -288,9 +285,9 @@ Rectangle {
                 }
                 NText {
                     text: "Frequently Visited Playlists"
-                    font.pixelSize: 12
-                    Layout.leftMargin: 16
-                    Layout.topMargin: 18
+                    font.pixelSize: root.sidePanel ? 14 : 12
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
                 }
                 Repeater {
@@ -298,12 +295,12 @@ Rectangle {
                     delegate: RowLayout {
                         required property int index
                         Layout.fillWidth: true
-                        Layout.leftMargin: 16
+                        Layout.leftMargin: root.sidePanel ? 24 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: 34
-                        spacing: 9
-                        Icon { name: "playlist"; size: 16; color: Theme.icon }
-                        NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+                        spacing: root.sidePanel ? 17 : 9
+                        Icon { name: "playlist"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                        NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: root.sidePanel ? 13 : 11; elide: Text.ElideRight; Layout.fillWidth: true }
                         TapHandler { onTapped: { win.navigate("player"); player.openUrls([platform.fileUrl(homePlaylists.get(index, "filePath"))], true) } }
                     }
                 }

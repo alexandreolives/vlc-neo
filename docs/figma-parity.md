@@ -81,6 +81,8 @@ The video canvas background uses Figma charcoal `#2C2B29` in both themes. Video 
 
 ## Change workflow
 
+Latest side-pane review (2026-10-24): the 1920×1080 Videos pane aligns its title row, item-count toolbar, separator, Add row and first media rows with Figma node `970:3792`. The Music landing pane now uses a dedicated layout for Categories and Songs so hidden full-page lists cannot displace its controls. Local geometry checks confirm the 52 px header and toolbar rows, 1 px divider, Add at y=121 and category rows beginning at y=157 relative to the pane; Music → Songs and Back return to the expected views. The rail is 50 px at this size. The Songs reference contains a sample music folder; the isolated local test has no indexed roots, so it shows the empty-library message instead. Recheck the Music Albums/Artists/Genres detail states against the prototype during the remaining visual pass.
+
 When a UI change is made, update its row if behavior, QML ownership, implementation state or acceptance criteria changed. Regenerate the relevant implementation capture when its visible result changes. Screenshots in `docs/screenshots/` document VLC Neo's current output; they are not Figma exports or pixel-diff baselines. Keep media attribution in the screenshot documentation in `README.md`.
 
 For a new Figma screen, record the exact frame name and node ID, intended behavior, QML mapping, current implementation state, automated evidence and manual acceptance check. Treat repeated frame names as distinct nodes, and record design-only or deferred behavior instead of marking it implemented.

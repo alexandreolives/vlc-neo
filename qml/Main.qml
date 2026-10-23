@@ -95,7 +95,7 @@ ApplicationWindow {
     property bool topHot: false
     property bool bottomHot: false
     readonly property real playlistPaneWidth: Math.max(220, Math.min(375, width * 0.222 - navigationRail.width))
-    property real libraryPaneLayoutWidth: libraryOpen ? Math.max(300, Math.min(410, width * 0.196))
+    property real libraryPaneLayoutWidth: libraryOpen ? Math.max(300, Math.min(410, Math.ceil(width * 0.19635)))
         : (folderSidebarOpen ? Math.max(300, Math.min(500, width * 0.20))
            : (musicSidebarOpen ? Math.max(280, Math.min(430, width * 0.224)) : 0))
     Behavior on libraryPaneLayoutWidth {
@@ -258,6 +258,8 @@ ApplicationWindow {
             libraryPanel.folder = StandardPaths.writableLocation(StandardPaths.MoviesLocation)
             libraryPanel.section = "folder"
             libraryPanel.mediaType = "video"
+            libraryPanel.folderViewMode = "list"
+            libraryPanel.sideFolderHistory = []
             break
         case "folder":
             libraryPanel.section = "folder"
@@ -266,6 +268,10 @@ ApplicationWindow {
         case "music":
             libraryPanel.section = "music"
             libraryPanel.mediaType = "audio"
+            libraryPanel.musicSidePage = "categories"
+            libraryPanel.musicSideHistory = []
+            libraryPanel.musicSideSearchOpen = false
+            mediaLibrary.model.search = ""
             mediaLibrary.model.view = "tracks"
             break
         case "recent":
@@ -779,7 +785,9 @@ ApplicationWindow {
                              || (!win.libraryOpen && win.libraryPaneLayoutWidth > 0.5)
                              || win.musicSidebarOpen || win.folderSidebarOpen
                     wide: true
-                    compactMusicSidebar: win.musicSidebarOpen && !win.libraryOpen
+                    figmaSidePanel: win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist"
+                    compactMusicSidebar: (win.musicSidebarOpen && !win.libraryOpen)
+                                         || (win.libraryOpen && win.navigationPage === "music")
                     compactFolderSidebar: win.folderSidebarOpen && !win.libraryOpen
                     Layout.fillHeight: true
                     Layout.fillWidth: win.libraryFullPage

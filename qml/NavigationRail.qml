@@ -15,7 +15,7 @@ Rectangle {
     signal backRequested()
 
     width: !shown ? 0 : expanded ? Math.max(112, Math.min(210, Math.round(win.width * 0.11)))
-                                 : Math.max(30, Math.min(52, Math.round(win.width * 0.027)))
+                                 : Math.max(30, Math.min(50, Math.round(win.width * 0.026)))
     opacity: shown ? 1 : 0
     color: Theme.rail
     clip: true
