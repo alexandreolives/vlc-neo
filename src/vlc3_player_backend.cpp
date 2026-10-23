@@ -128,6 +128,9 @@ public:
         m_ssdpTimer = new QTimer(this);
         m_ssdpTimer->setInterval(4000);
         connect(m_ssdpTimer, &QTimer::timeout, this, [this] { sendSsdpSearch(); });
+        m_remotePollTimer = new QTimer(this);
+        m_remotePollTimer->setInterval(2000);
+        connect(m_remotePollTimer, &QTimer::timeout, this, [this] { pollDlnaRenderer(); });
         var_AddCallback(m_playlist, "input-current", onInputCurrent, this);
         for (const char *name : kPlaylistVars)
             var_AddCallback(m_playlist, name, onPlaylistVar, this);
@@ -1177,7 +1180,9 @@ public:
         if (id.isEmpty() && !m_activeDlnaId.isEmpty()) {
             const QString previousId = m_activeDlnaId;
             m_activeDlnaId.clear();
+            m_remotePollTimer->stop();
             m_remotePollPending = false;
+            m_remoteTransportCommandPending = false;
             m_remoteInputState = {};
             sendDlnaAction(previousId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
             if (m_localPausedByDlna) {
@@ -1192,7 +1197,9 @@ public:
         if (!m_activeDlnaId.isEmpty()) {
             const QString previousId = m_activeDlnaId;
             m_activeDlnaId.clear();
+            m_remotePollTimer->stop();
             m_remotePollPending = false;
+            m_remoteTransportCommandPending = false;
             m_remoteInputState = {};
             sendDlnaAction(previousId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
             if (m_localPausedByDlna) {
@@ -1400,14 +1407,15 @@ private:
     {
         if (m_activeDlnaId.isEmpty())
             return;
-        if (state != 0 && m_remotePendingState == state)
+        if (m_remoteTransportCommandPending && m_remotePendingState == state)
             return;
-        if (m_remoteInputState.state == state && m_remotePendingState == 0)
+        if (m_remoteInputState.state == state && !m_remoteTransportCommandPending)
             return;
 
         const QString id = m_activeDlnaId;
         const quint64 command = ++m_remoteCommandSerial;
         m_remotePendingState = state;
+        m_remoteTransportCommandPending = true;
         m_remoteInputState.state = state;
         emit inputEvent(BackendInputEvent::State);
         emit rendererDevicesChanged();
@@ -1419,6 +1427,7 @@ private:
             if (id != m_activeDlnaId || command != m_remoteCommandSerial)
                 return;
             m_remotePendingState = 0;
+            m_remoteTransportCommandPending = false;
             if (ok)
                 m_remoteInputState.state = state;
             else
@@ -1439,6 +1448,7 @@ private:
                     failDlnaConnection(id);
                     return;
                 }
+                m_remotePollTimer->start();
                 if (m_input && m_localWasPlayingBeforeDlna && !m_localPausedByDlna) {
                     playlist_Pause(m_playlist);
                     m_localPausedByDlna = true;
@@ -1450,9 +1460,9 @@ private:
                         if (id == m_activeDlnaId)
                             seekDlnaTo(m_remoteInputState.timeMs);
                     });
-                // Read the renderer state once after connecting. Transport
-                // controls update Neo optimistically from their SOAP result;
-                // continuously polling this TV creates noisy request loops.
+                // Keep playback position and state in sync with the renderer.
+                // The timer issues read-only status requests; transport actions
+                // are sent only in response to user input.
                 pollDlnaRenderer();
                 emit inputEvent(BackendInputEvent::State);
             });
@@ -1486,7 +1496,9 @@ private:
         if (m_activeDlnaId != id)
             return;
         m_activeDlnaId.clear();
+        m_remotePollTimer->stop();
         m_remotePollPending = false;
+        m_remoteTransportCommandPending = false;
         m_remoteInputState = {};
         if (m_localPausedByDlna) {
             m_localPausedByDlna = false;
@@ -1516,7 +1528,7 @@ private:
 
     void pollDlnaRenderer()
     {
-        if (m_activeDlnaId.isEmpty() || m_remotePollPending || m_remotePendingState != 0)
+        if (m_activeDlnaId.isEmpty() || m_remotePollPending || m_remoteTransportCommandPending)
             return;
         const QString id = m_activeDlnaId;
         m_remotePollPending = true;
@@ -1530,7 +1542,7 @@ private:
                     m_remotePollPending = false;
                     return;
                 }
-                if (m_remotePendingState != 0) {
+                if (m_remoteTransportCommandPending) {
                     m_remotePollPending = false;
                     return;
                 }
@@ -1568,7 +1580,6 @@ private:
                     if (!trackUri.isEmpty())
                         m_remoteInputState.mediaUrl = QUrl(trackUri);
                 }
-                m_remotePollPending = false;
                 emit inputEvent(BackendInputEvent::Position);
                 emit inputEvent(BackendInputEvent::State);
                 emit rendererDevicesChanged();
@@ -1774,12 +1785,14 @@ private:
     QNetworkAccessManager *m_network = nullptr;
     QUdpSocket *m_ssdpSocket = nullptr;
     QTimer *m_ssdpTimer = nullptr;
+    QTimer *m_remotePollTimer = nullptr;
     QString m_activeRendererId;
     QString m_activeDlnaId;
     BackendInputState m_remoteInputState;
     bool m_remotePollPending = false;
     quint64 m_remoteCommandSerial = 0;
     int m_remotePendingState = 0;
+    bool m_remoteTransportCommandPending = false;
     bool m_localWasPlayingBeforeDlna = false;
     bool m_localPausedByDlna = false;
     double m_remoteVolume = 1.0;
