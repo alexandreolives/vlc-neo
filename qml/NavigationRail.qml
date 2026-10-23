@@ -68,11 +68,11 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: root.expanded ? 2 : 3
 
-        RailButton { iconName: "home"; label: "Home"; page: "home" }
-        RailButton { iconName: "videos"; label: "Videos"; page: "videos" }
-        RailButton { iconName: "music"; label: "Music"; page: "music" }
-        RailButton { iconName: "streaming"; label: "Network"; page: "streaming" }
-        RailButton { iconName: "playlist"; label: "Playlists"; page: "playlist" }
+        RailButton { iconName: "home"; activeIconName: "home-active"; label: "Home"; page: "home" }
+        RailButton { iconName: "videos"; activeIconName: "videos-active"; label: "Videos"; page: "videos" }
+        RailButton { iconName: "songs"; activeIconName: "songs-active"; label: "Music"; page: "music" }
+        RailButton { iconName: "streaming"; activeIconName: "streaming-active"; label: "Network"; page: "streaming" }
+        RailButton { iconName: "playlist"; activeIconName: "playlist-active"; label: "Playlists"; page: "playlist" }
         RailButton { iconName: "recent"; label: "Recent"; page: "recent" }
 
         Item { visible: !root.expanded; Layout.preferredHeight: 1 }
@@ -82,6 +82,7 @@ Rectangle {
     component RailButton: Button {
         id: control
         property string iconName
+        property string activeIconName
         property string label
         property string page
         readonly property bool selected: root.currentPage === page
@@ -107,9 +108,9 @@ Rectangle {
             Layout.leftMargin: root.expanded ? 16 : 0
             spacing: root.expanded ? 8 : 0
             Icon {
-                name: control.iconName
+                name: control.selected && control.activeIconName.length ? control.activeIconName : control.iconName
                 size: 14
-                color: control.selected ? Theme.accent : (control.hovered || control.activeFocus ? Theme.text : Theme.icon)
+                color: control.hovered || control.activeFocus ? Theme.text : Theme.icon
             }
             NText {
                 visible: root.expanded
