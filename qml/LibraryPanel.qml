@@ -28,6 +28,7 @@ Rectangle {
     property alias compactFolderToolbar: compactFolderToolbarItem
     property alias folderActionsRow: folderActionsRowItem
     property alias musicItemCountText: musicItemCountLabel.text
+    property alias figmaMusicItemCountText: musicSidePanelCount.text
     property url folder: player.folderPath.length ? platform.fileUrl(player.folderPath)
                                                   : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
     property string section: "folder"   // home | folder | recent | music
@@ -166,6 +167,11 @@ Rectangle {
         if (musicSidePage === "categories") return visibleMusicCategories().length
         if (musicSidePage === "songs") return musicSideFolderRoot.length ? musicSideTracks().length : mediaLibrary.roots.length
         return mediaLibrary.model.itemCount()
+    }
+    function musicSideCountText() {
+        const count = musicSideItemCount()
+        return count + (count === 1 ? " item" : " items")
+               + (mediaLibrary.scanning ? " · Indexing…" : "")
     }
     function musicSideTracks() {
         if (!musicSideFolderRoot.length) return []
@@ -409,10 +415,7 @@ Rectangle {
             spacing: 4
             NText {
                 visible: !root.musicSideSearchOpen
-                text: {
-                    const count = root.musicSideItemCount()
-                    return count + (count === 1 ? " item" : " items") + (mediaLibrary.scanning ? " · Indexing…" : "")
-                }
+                text: root.musicSideCountText()
                 dim: true
                 font.pixelSize: 12
                 Layout.fillWidth: true
@@ -1013,8 +1016,10 @@ Rectangle {
             Layout.rightMargin: 27
             spacing: 4
             NText {
+                id: musicSidePanelCount
+                objectName: "music-sidepanel-item-count"
                 visible: !root.musicSideSearchOpen
-                text: root.musicSideItemCount() + " items" + (mediaLibrary.scanning ? " · Indexing…" : "")
+                text: root.musicSideCountText()
                 color: Theme.librarySideText
                 font.pixelSize: 12
                 Layout.fillWidth: true
