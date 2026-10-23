@@ -8,7 +8,8 @@ import Neo 1.0
 // Local media browser with a full-window mode and a compact embedded mode.
 Rectangle {
     id: root
-    color: root.wide && !root.compactFolderSidebar && !root.compactMusicSidebar && !root.figmaSidePanel ? Theme.window : Theme.panel
+    color: root.figmaSidePanel ? Theme.librarySidePanel
+                               : root.wide && !root.compactFolderSidebar && !root.compactMusicSidebar ? Theme.window : Theme.panel
     property bool wide: false
     property bool compactMusicSidebar: false
     property bool compactFolderSidebar: false

@@ -6,7 +6,7 @@ import Neo 1.0
 
 Rectangle {
     id: root
-    color: Theme.panel
+    color: Theme.librarySidePanel
     signal createPlaylist()
     signal openLibraryPage()
     property bool compactRows: false

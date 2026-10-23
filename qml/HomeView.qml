@@ -9,7 +9,7 @@ import Neo 1.0
 Rectangle {
     id: root
     objectName: "home-screen"
-    color: Theme.window
+    color: root.sidePanel ? Theme.librarySidePanel : Theme.window
     property alias miniVideoHost: homeMiniVideoSurface
     property int contentRevision: 0
     property string searchText: ""
