@@ -17,6 +17,7 @@ Rectangle {
     property bool compactCards: false
     property bool sidePanel: false
     property bool searchOpen: false
+    property bool foldersExpanded: false
     signal indexFolder()
     signal createPlaylist()
     function videoCardWidth() {
@@ -71,7 +72,7 @@ Rectangle {
         if (sortByName) folders.sort((a, b) => a.title.localeCompare(b.title))
         if (searchText.trim().length)
             folders = folders.filter(item => item.title.toLowerCase().includes(searchText.trim().toLowerCase()))
-        folderItems = folders.slice(0, 8)
+        folderItems = folders
     }
     function videoThumbnailReady(index) {
         const card = videoRepeater.itemAt(index)
@@ -147,12 +148,25 @@ Rectangle {
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: root.sidePanel }
 
-                NText {
-                    text: "Continue Watching"
-                    font.pixelSize: root.sidePanel ? 14 : 12
+                RowLayout {
+                    Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.rightMargin: 18
                     Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
+                    NText {
+                        text: "Continue Watching"
+                        font.pixelSize: root.sidePanel ? 14 : 12
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        objectName: "home-side-see-all-videos"
+                        visible: root.sidePanel
+                        icon: "chevron-right"
+                        iconSize: 13
+                        tip: "See all videos"
+                        onClicked: win.navigateFromRail("videos")
+                    }
                 }
                 Repeater {
                     model: root.videoItems.slice(0, 6)
@@ -202,12 +216,25 @@ Rectangle {
                     onClicked: win.navigateFromRail("videos")
                 }
 
-                NText {
-                    text: "Listen Again"
-                    font.pixelSize: root.sidePanel ? 14 : 12
+                RowLayout {
+                    Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.rightMargin: 18
                     Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
+                    NText {
+                        text: "Listen Again"
+                        font.pixelSize: root.sidePanel ? 14 : 12
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        objectName: "home-side-see-all-music"
+                        visible: root.sidePanel
+                        icon: "chevron-right"
+                        iconSize: 13
+                        tip: "See all music"
+                        onClicked: win.navigateFromRail("music")
+                    }
                 }
                 Repeater {
                     model: root.musicItems.slice(0, 6)
@@ -245,15 +272,28 @@ Rectangle {
                     onClicked: win.navigateFromRail("music")
                 }
 
-                NText {
-                    text: "Frequently Visited Folders"
-                    font.pixelSize: root.sidePanel ? 14 : 12
+                RowLayout {
+                    Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.rightMargin: 18
                     Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
+                    NText {
+                        text: "Frequently Visited Folders"
+                        font.pixelSize: root.sidePanel ? 14 : 12
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        objectName: "home-side-expand-folders"
+                        visible: root.sidePanel
+                        icon: root.foldersExpanded ? "chevron-down" : "chevron-right"
+                        iconSize: 13
+                        tip: root.foldersExpanded ? "Show fewer folders" : "Show all folders"
+                        onClicked: root.foldersExpanded = !root.foldersExpanded
+                    }
                 }
                 Repeater {
-                    model: root.folderItems.slice(0, 6)
+                    model: root.folderItems.slice(0, root.foldersExpanded ? root.folderItems.length : 6)
                     delegate: RowLayout {
                         required property var modelData
                         Layout.fillWidth: true
@@ -283,12 +323,25 @@ Rectangle {
                     Layout.rightMargin: 12
                     onClicked: root.indexFolder()
                 }
-                NText {
-                    text: "Frequently Visited Playlists"
-                    font.pixelSize: root.sidePanel ? 14 : 12
+                RowLayout {
+                    Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.rightMargin: 18
                     Layout.topMargin: root.sidePanel ? 28 : 18
                     Layout.bottomMargin: 7
+                    NText {
+                        text: "Frequently Visited Playlists"
+                        font.pixelSize: root.sidePanel ? 14 : 12
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        objectName: "home-side-see-all-playlists"
+                        visible: root.sidePanel
+                        icon: "chevron-right"
+                        iconSize: 13
+                        tip: "See all playlists"
+                        onClicked: win.navigateFromRail("playlist")
+                    }
                 }
                 Repeater {
                     model: Math.min(homePlaylists.count, 6)
