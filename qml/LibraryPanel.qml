@@ -1161,11 +1161,28 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
             model: root.musicSideTracks()
-            delegate: Item {
+            delegate: Rectangle {
+                required property int index
                 required property var modelData
-                objectName: "music-sidepanel-track-" + modelData.title
+                objectName: "music-sidepanel-track-" + index
                 width: ListView.view.width
                 height: 44
+                radius: Theme.radiusSmall
+                color: trackMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: activeFocus ? 1 : 0
+                border.color: Theme.accent
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.title
+                                  + (modelData.artist.length ? " by " + modelData.artist : "")
+                                  + " (" + platform.localPath(modelData.path).split("/").pop() + ")"
+                Accessible.focusable: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                        player.openUrls([platform.fileUrl(modelData.path)], true)
+                        event.accepted = true
+                    }
+                }
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 20
@@ -1194,9 +1211,13 @@ Rectangle {
                     }
                 }
                 MouseArea {
+                    id: trackMouse
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: player.openUrls([platform.fileUrl(modelData.path)], true)
+                    onClicked: {
+                        parent.forceActiveFocus()
+                        player.openUrls([platform.fileUrl(modelData.path)], true)
+                    }
                 }
             }
             NText {
