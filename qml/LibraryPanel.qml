@@ -92,7 +92,6 @@ Rectangle {
             if (currentPath.startsWith(videosPath + "/")) {
                 const folders = currentPath.slice(videosPath.length + 1).split("/").filter(Boolean)
                 if (folders.length === 1) return "Videos  ▸  " + folders[0]
-                if (folders.length === 2) return folders.join("  ▸  ")
                 return "…  ▸  " + folders.slice(-2).join("  ▸  ")
             }
             return currentPath.split("/").filter(Boolean).pop() || "Videos"
@@ -448,10 +447,10 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: visible && !root.figmaSidePanel ? 15 : 0
             Layout.leftMargin: visible ? (root.figmaSidePanel ? 20 : 10) : 0
-            Layout.rightMargin: visible ? (root.figmaSidePanel ? 27 : 10) : 0
+            Layout.rightMargin: visible ? (root.figmaSidePanel ? 17 : 10) : 0
             Layout.bottomMargin: visible && !root.figmaSidePanel ? 35 : 0
             Layout.preferredHeight: root.figmaSidePanel ? 52 : 28
-            spacing: 4
+            spacing: root.figmaSidePanel ? 5 : 4
             NText {
                 visible: !root.folderSearchOpen
                 text: root.matchingFiles() + (root.matchingFiles() === 1 ? " item" : " items")
@@ -712,7 +711,7 @@ Rectangle {
 
                 Item {
                     id: thumbnailFrame
-                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 26 : root.wide ? 15 : 12)
+                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 20 : root.wide ? 15 : 12)
                     y: mediaCell.gridCard ? 8 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : (root.wide && mediaCell.videoFile ? 32 : 16)
                     height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.wide ? 32 : 18)
