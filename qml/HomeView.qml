@@ -1079,7 +1079,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.margins: 12 * homeMiniPlayer.uiScale
-                icon: "maximize"
+                icon: "open"
                 iconColor: Theme.text
                 iconSize: 22 * homeMiniPlayer.uiScale
                 implicitWidth: 30 * homeMiniPlayer.uiScale
@@ -1090,7 +1090,7 @@ Rectangle {
             }
             Row {
                 anchors.centerIn: parent
-                spacing: 24 * homeMiniPlayer.uiScale
+                spacing: 42 * homeMiniPlayer.uiScale
                 IconButton {
                     objectName: root.sidePanel ? "side-home-mini-player-previous" : "home-mini-player-previous"
                     icon: "previous"

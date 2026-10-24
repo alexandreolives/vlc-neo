@@ -1750,7 +1750,7 @@ Rectangle {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.margins: 12 * miniPlayer.uiScale
-                icon: "maximize"
+                icon: "open"
                 iconColor: Theme.text
                 iconSize: 22 * miniPlayer.uiScale
                 implicitWidth: 30 * miniPlayer.uiScale
@@ -1761,7 +1761,7 @@ Rectangle {
             }
             Row {
                 anchors.centerIn: parent
-                spacing: 24 * miniPlayer.uiScale
+                spacing: 42 * miniPlayer.uiScale
                 IconButton {
                     objectName: "mini-player-previous"
                     icon: "previous"
