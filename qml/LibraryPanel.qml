@@ -1189,9 +1189,12 @@ Rectangle {
                 }
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 20
+                    // The Figma side-panel track rows align their cover with
+                    // the folder and playlist rows, then place the title just
+                    // beyond the 32 px cover.
+                    anchors.leftMargin: 36
                     anchors.rightMargin: 18
-                    spacing: 10
+                    spacing: 6
                     Rectangle {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
