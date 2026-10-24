@@ -261,6 +261,7 @@ ApplicationWindow {
             libraryPanel.sideFolderHistory = []
             break
         case "folder":
+            libraryPanel.folder = currentMediaFolder()
             libraryPanel.section = "folder"
             libraryPanel.mediaType = "all"
             break
@@ -290,6 +291,11 @@ ApplicationWindow {
         rightPanel = ""
         navigate(returnPage, false)
         libraryFullPage = returnFullPage
+    }
+    function currentMediaFolder() {
+        return player.folderPath.length
+                ? platform.fileUrl(player.folderPath)
+                : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
     }
     function toggleLibrary() {
         if (libraryFullPage) return
@@ -350,6 +356,7 @@ ApplicationWindow {
             break
         case "folder":
             libraryFullPage = true
+            libraryPanel.folder = currentMediaFolder()
             libraryPanel.section = "folder"
             libraryPanel.mediaType = "all"
             libraryOpen = false
@@ -520,9 +527,7 @@ ApplicationWindow {
                 musicSidebarOpen = false
                 libraryPanel.section = "folder"
                 libraryPanel.mediaType = "video"
-                libraryPanel.folder = player.folderPath.length
-                    ? platform.fileUrl(player.folderPath)
-                    : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
+                libraryPanel.folder = currentMediaFolder()
                 folderSidebarOpen = true
                 rightPanel = ""
             }

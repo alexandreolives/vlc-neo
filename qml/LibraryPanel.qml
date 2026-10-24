@@ -29,8 +29,7 @@ Rectangle {
     property alias folderActionsRow: folderActionsRowItem
     property alias musicItemCountText: musicItemCountLabel.text
     property alias figmaMusicItemCountText: musicSidePanelCount.text
-    property url folder: player.folderPath.length ? platform.fileUrl(player.folderPath)
-                                                  : StandardPaths.writableLocation(StandardPaths.MoviesLocation)
+    property url folder: StandardPaths.writableLocation(StandardPaths.MoviesLocation)
     property string section: "folder"   // home | folder | recent | music
     property string sortBy: "name"
     property string folderViewMode: "grid"
