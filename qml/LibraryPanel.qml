@@ -404,8 +404,8 @@ Rectangle {
                 placeholderText: "Search"
                 onTextEdited: root.section === "music" ? musicSearchTimer.restart() : (root.searchText = text)
             }
-            IconButton { visible: root.compactMusicSidebar && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
-            IconButton { visible: root.compactMusicSidebar && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
+            IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
+            IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
             IconButton { visible: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
             IconButton { visible: root.figmaSidePanel; icon: "more"; tip: "More options" }
             IconButton { visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
