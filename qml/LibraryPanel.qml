@@ -57,6 +57,10 @@ Rectangle {
         recentRevision
         return player.recentMedia()
     }
+    function musicArtworkReady(index) {
+        const row = musicListing.itemAtIndex(index)
+        return !!row && row.artworkReady
+    }
     Connections {
         target: player
         function onRecentMediaChanged() { root.recentRevision++ }
@@ -946,6 +950,7 @@ Rectangle {
                 required property int count
                 required property string kind
                 required property bool isGroup
+                readonly property bool artworkReady: cover.status === Image.Ready
                 width: ListView.view.width
                 height: root.figmaSidePanel ? (root.musicSideCompactView ? 38 : 44) : 52
                 radius: Theme.radiusSmall
@@ -974,7 +979,7 @@ Rectangle {
                         Layout.preferredHeight: root.figmaSidePanel ? 32 : 38
                         radius: 4
                         color: Theme.raised
-                        Image { id: cover; anchors.fill: parent; source: artwork.length ? platform.fileUrl(artwork) : ""; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
+                        Image { id: cover; objectName: "music-library-cover-" + index; anchors.fill: parent; source: artwork; fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
                         Icon { anchors.centerIn: parent; name: kind === "video" ? "video-file" : (isGroup ? "album" : "music"); size: 17; color: Theme.icon; visible: cover.status !== Image.Ready }
                     }
                     ColumnLayout {

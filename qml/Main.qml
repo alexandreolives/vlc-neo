@@ -113,7 +113,8 @@ ApplicationWindow {
     readonly property bool topShown: !overlayMode || topHot || mainMenu.visible
     readonly property bool bottomShown: !libraryFullPage && (!overlayMode || bottomHot || tracksPopup.visible || contextMenu.visible)
     readonly property bool sidePanelOpen: libraryOpen || musicSidebarOpen || folderSidebarOpen
-    readonly property bool sideNavigationShown: sidePanelOpen || libraryFullPage
+    readonly property bool navigationShown: sidePanelOpen || libraryFullPage
+                                           || (navigationPage === "home" && !sidePanelOpen)
     readonly property bool onboardingActive: onboarding.visible
     readonly property bool canGoBack: navigationHistory.length > 0 || navigationPage !== "home"
                                          || libraryOpen || rightPanel.length > 0
@@ -1103,9 +1104,9 @@ ApplicationWindow {
             anchors.top: topBar.bottom
             anchors.bottom: parent.bottom
             currentPage: win.navigationPage
-            shown: win.sideNavigationShown
+            shown: win.navigationShown
             musicCategoryActive: libraryPanel.musicSidePage === "categories"
-            expanded: win.libraryFullPage || (!win.libraryOpen && win.navigationPage === "home")
+            expanded: win.libraryFullPage || (win.navigationPage === "home" && !win.sidePanelOpen)
             visible: !onboarding.visible && (!win.overlayMode || win.chromeShown)
                      && (shown || width > 0.5)
             onNavigate: (page) => win.navigateFromRail(page)
