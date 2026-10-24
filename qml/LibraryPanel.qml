@@ -746,10 +746,10 @@ Rectangle {
 
                 Item {
                     id: thumbnailFrame
-                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 20 : root.wide ? 15 : 12)
+                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel && mediaCell.fileIsDir ? 26 : root.figmaSidePanel ? 20 : root.wide ? 15 : 12)
                     y: mediaCell.gridCard ? 8 : Math.round((parent.height - height) / 2)
-                    width: mediaCell.gridCard ? parent.width - 16 : (root.wide && mediaCell.videoFile ? 32 : 16)
-                    height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.wide ? 32 : 18)
+                    width: mediaCell.gridCard ? parent.width - 16 : (root.figmaSidePanel && mediaCell.fileIsDir ? 20 : root.wide && mediaCell.videoFile ? 32 : 16)
+                    height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.figmaSidePanel && mediaCell.fileIsDir ? 20 : root.wide ? 32 : 18)
                     Image {
                         id: videoThumbnail
                         objectName: "library-video-thumbnail-" + mediaCell.fileName
@@ -765,7 +765,7 @@ Rectangle {
                     Icon {
                         anchors.centerIn: parent
                         name: mediaCell.fileIsDir ? "folder" : (root.audioExt.indexOf(mediaCell.extension) >= 0 ? "music" : "video")
-                        size: root.wide ? 15 : 16
+                        size: root.figmaSidePanel && mediaCell.fileIsDir ? 20 : root.wide ? 15 : 16
                         color: mediaCell.playing ? Theme.accent : Theme.icon
                         visible: !mediaCell.videoFile || videoThumbnail.status !== Image.Ready
                     }
