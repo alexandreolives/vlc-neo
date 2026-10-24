@@ -12,7 +12,8 @@ Rectangle {
     property bool compactRows: false
     property bool searchOpen: false
     property string searchText: ""
-    property bool reverseSort: false
+    // Figma's default playlist order is descending by name (Cool Songs before Anime to Watch).
+    property bool reverseSort: true
 
     function matches(name) { return searchText.trim().length === 0 || name.toLowerCase().includes(searchText.trim().toLowerCase()) }
     function fileCount() {
