@@ -79,6 +79,8 @@ ApplicationWindow {
     property bool folderSidebarOpen: false
     property string sideReturnPage: ""
     property bool sideReturnFullPage: false
+    property var sidePanelRouteHistory: []
+    property var sidePanelForwardRouteHistory: []
     readonly property bool audioVisualizerOpen: audioVisualizerPopup.visible
     readonly property bool audioVisualizerActive: audioVisualizerPopup.selectedMode !== "disabled"
     property string navigationPage: "home"
@@ -262,10 +264,50 @@ ApplicationWindow {
         rememberHomeVisit("playlist", path)
         player.openUrls([url], true)
     }
-    function openSidePanel(page) {
+    function captureSidePanelRoute() {
+        return {
+            page: navigationPage,
+            section: libraryPanel.section,
+            mediaType: libraryPanel.mediaType,
+            folder: libraryPanel.folder,
+            folderViewMode: libraryPanel.folderViewMode,
+            searchText: libraryPanel.searchText,
+            musicSidePage: libraryPanel.musicSidePage,
+            musicSideFolderRoot: libraryPanel.musicSideFolderRoot,
+            musicSearch: mediaLibrary.model.search,
+            musicView: mediaLibrary.model.view
+        }
+    }
+    function restoreSidePanelRoute(route) {
+        if (!route) return
+        libraryPanel.sideFolderHistory = []
+        libraryPanel.sidePanelForwardHistory = []
+        libraryPanel.musicSideHistory = []
+        navigationPage = route.page
+        libraryFullPage = false
+        libraryOpen = true
+        musicSidebarOpen = false
+        folderSidebarOpen = false
+        libraryPanel.section = route.section
+        libraryPanel.mediaType = route.mediaType
+        libraryPanel.folder = route.folder
+        libraryPanel.folderViewMode = route.folderViewMode
+        libraryPanel.searchText = route.searchText
+        libraryPanel.musicSidePage = route.musicSidePage
+        libraryPanel.musicSideFolderRoot = route.musicSideFolderRoot
+        mediaLibrary.model.search = route.musicSearch
+        mediaLibrary.model.view = route.musicView
+        rightPanel = ""
+    }
+    function openSidePanel(page, preserveRouteHistory) {
         if (!sidePanelOpen) {
             sideReturnPage = navigationPage
             sideReturnFullPage = libraryFullPage
+            sidePanelRouteHistory = []
+            sidePanelForwardRouteHistory = []
+        } else if (page !== navigationPage && !preserveRouteHistory) {
+            sidePanelRouteHistory = []
+            sidePanelForwardRouteHistory = []
         }
         libraryPanel.sideFolderHistory = []
         libraryPanel.sidePanelForwardHistory = []
@@ -318,6 +360,8 @@ ApplicationWindow {
         const returnFullPage = sideReturnFullPage
         sideReturnPage = ""
         sideReturnFullPage = false
+        sidePanelRouteHistory = []
+        sidePanelForwardRouteHistory = []
         libraryOpen = false
         musicSidebarOpen = false
         folderSidebarOpen = false
@@ -360,7 +404,11 @@ ApplicationWindow {
     }
     function openFolderSidePanel(path) {
         if (path && path.length) rememberHomeVisit("folder", path)
-        openSidePanel("folder")
+        if (sidePanelOpen && navigationPage !== "folder") {
+            sidePanelRouteHistory = sidePanelRouteHistory.concat([captureSidePanelRoute()])
+            sidePanelForwardRouteHistory = []
+        }
+        openSidePanel("folder", true)
         if (path && path.length) libraryPanel.folder = platform.fileUrl(path)
     }
     function navigateFromRail(page) {

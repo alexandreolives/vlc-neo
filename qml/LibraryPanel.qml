@@ -133,16 +133,23 @@ Rectangle {
         return normalized.split("/").filter(Boolean).pop() || "My Songs"
     }
     function canGoForwardFromSidePanel() {
-        return sidePanelForwardHistory.length > 0
+        return sidePanelForwardHistory.length > 0 || win.sidePanelForwardRouteHistory.length > 0
     }
     function canGoBackFromSidePanel() {
         if (win.navigationPage === "music" && (musicSideFolderRoot.length || root.section === "folder"
                                                  || mediaLibrary.model.grouped || musicSideHistory.length))
             return true
-        return sideFolderHistory.length > 0
+        return sideFolderHistory.length > 0 || win.sidePanelRouteHistory.length > 0
     }
     function goForwardFromSidePanel() {
-        if (!sidePanelForwardHistory.length) return
+        if (!sidePanelForwardHistory.length) {
+            if (!win.sidePanelForwardRouteHistory.length) return
+            win.sidePanelRouteHistory = win.sidePanelRouteHistory.concat([win.captureSidePanelRoute()])
+            const route = win.sidePanelForwardRouteHistory[win.sidePanelForwardRouteHistory.length - 1]
+            win.sidePanelForwardRouteHistory = win.sidePanelForwardRouteHistory.slice(0, -1)
+            win.restoreSidePanelRoute(route)
+            return
+        }
         const destination = sidePanelForwardHistory[sidePanelForwardHistory.length - 1]
         sidePanelForwardHistory = sidePanelForwardHistory.slice(0, -1)
         if (destination.kind === "folder") {
@@ -206,6 +213,13 @@ Rectangle {
             sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "folder", folder: root.folder, section: root.section, mediaType: root.mediaType }])
             root.folder = sideFolderHistory[sideFolderHistory.length - 1]
             sideFolderHistory = sideFolderHistory.slice(0, -1)
+            return
+        }
+        if (win.sidePanelRouteHistory.length) {
+            win.sidePanelForwardRouteHistory = win.sidePanelForwardRouteHistory.concat([win.captureSidePanelRoute()])
+            const route = win.sidePanelRouteHistory[win.sidePanelRouteHistory.length - 1]
+            win.sidePanelRouteHistory = win.sidePanelRouteHistory.slice(0, -1)
+            win.restoreSidePanelRoute(route)
             return
         }
         return false
