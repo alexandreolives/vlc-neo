@@ -43,8 +43,8 @@ Rectangle {
             Layout.rightMargin: 17
             Layout.preferredHeight: 52
             spacing: 6
-            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: false }
-            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
+            IconButton { objectName: "playlist-sidepanel-back"; icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: libraryPanel.canGoBackFromSidePanel(); onClicked: libraryPanel.goBackFromSidePanel() }
+            IconButton { objectName: "playlist-sidepanel-forward"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: libraryPanel.canGoForwardFromSidePanel(); onClicked: libraryPanel.goForwardFromSidePanel() }
             NText {
                 text: "Playlists"
                 font.pixelSize: 14

@@ -135,6 +135,12 @@ Rectangle {
     function canGoForwardFromSidePanel() {
         return sidePanelForwardHistory.length > 0
     }
+    function canGoBackFromSidePanel() {
+        if (win.navigationPage === "music" && (musicSideFolderRoot.length || root.section === "folder"
+                                                 || mediaLibrary.model.grouped || musicSideHistory.length))
+            return true
+        return sideFolderHistory.length > 0
+    }
     function goForwardFromSidePanel() {
         if (!sidePanelForwardHistory.length) return
         const destination = sidePanelForwardHistory[sidePanelForwardHistory.length - 1]
@@ -202,7 +208,7 @@ Rectangle {
             sideFolderHistory = sideFolderHistory.slice(0, -1)
             return
         }
-        win.goBack()
+        return false
     }
     function openMusicSidePage(page) {
         musicSideHistory = musicSideHistory.concat([musicSidePage])
@@ -428,6 +434,7 @@ Rectangle {
                 iconOffsetX: root.figmaSidePanel ? -2 : 0
                 tip: root.figmaSidePanel ? "Back" : "Up"
                 visible: root.figmaSidePanel || root.section === "folder"
+                enabled: root.figmaSidePanel ? root.canGoBackFromSidePanel() : root.section === "folder"
                 onClicked: root.figmaSidePanel ? root.goBackFromSidePanel() : root.openFolder(files.parentFolder)
             }
             IconButton { objectName: "sidepanel-forward-generic"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
@@ -1115,7 +1122,7 @@ Rectangle {
             Layout.leftMargin: 18
             Layout.rightMargin: 17
             spacing: 6
-            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
+            IconButton { objectName: "sidepanel-back-music"; icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: root.canGoBackFromSidePanel(); onClicked: root.goBackFromSidePanel() }
             IconButton { objectName: "sidepanel-forward-music"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 0; Layout.fillWidth: true }
             IconButton {
@@ -1390,7 +1397,7 @@ Rectangle {
             Layout.rightMargin: 17
             Layout.preferredHeight: 52
             spacing: 6
-            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
+            IconButton { objectName: "sidepanel-back-network"; icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: root.canGoBackFromSidePanel(); onClicked: root.goBackFromSidePanel() }
             IconButton { objectName: "sidepanel-forward-network"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             NText {
                 text: "Network"

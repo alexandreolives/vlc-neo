@@ -223,8 +223,8 @@ Rectangle {
                     Layout.rightMargin: root.sidePanel ? 17 : 8
                     Layout.preferredHeight: root.sidePanel ? 52 : 36
                     spacing: 3
-                    IconButton { icon: "arrow-left"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Back"; onClicked: win.goBack() }
-                    IconButton { icon: "arrow-right"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Forward"; enabled: false }
+                    IconButton { objectName: "home-sidepanel-back"; icon: "arrow-left"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Back"; enabled: !root.sidePanel || libraryPanel.canGoBackFromSidePanel(); onClicked: libraryPanel.goBackFromSidePanel() }
+                    IconButton { objectName: "home-sidepanel-forward"; icon: "arrow-right"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Forward"; enabled: root.sidePanel && libraryPanel.canGoForwardFromSidePanel(); onClicked: libraryPanel.goForwardFromSidePanel() }
                     NText { text: "Home"; font.pixelSize: root.sidePanel ? 14 : 12; color: root.sidePanel ? Theme.librarySideTitle : Theme.text; Layout.leftMargin: root.sidePanel ? 3 : 0; Layout.fillWidth: true }
                     IconButton {
                         id: homeSideMoreButton
