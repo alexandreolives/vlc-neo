@@ -1004,8 +1004,8 @@ ApplicationWindow {
         NavigationRail {
             id: navigationRail
             anchors.left: parent.left
+            anchors.top: topBar.bottom
             anchors.bottom: parent.bottom
-            y: topBar.y + topBar.height
             currentPage: win.navigationPage
             shown: win.sideNavigationShown
             musicCategoryActive: libraryPanel.musicSidePage === "categories"

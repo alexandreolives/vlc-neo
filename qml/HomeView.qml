@@ -188,7 +188,7 @@ Rectangle {
                         onTextEdited: { root.searchText = text; root.refreshContent() }
                     }
                     IconButton { icon: "sort"; tip: "Sort"; onClicked: { root.sortByName = !root.sortByName; root.refreshContent() } }
-                    IconButton { icon: "view"; tip: "Toggle compact view"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
+                    IconButton { icon: "list"; tip: "Toggle compact view"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
                     IconButton { icon: root.searchOpen ? "close" : "search"; tip: root.searchOpen ? "Close search" : "Search"; onClicked: { root.searchOpen = !root.searchOpen; if (!root.searchOpen) { root.searchText = ""; root.refreshContent() } } }
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: root.sidePanel }
@@ -532,7 +532,7 @@ Rectangle {
                 NText { text: "Home"; font.pixelSize: 13; Layout.fillWidth: true }
                 NText { text: mediaLibrary.indexedCount + " items"; dim: true; font.pixelSize: 11 }
                 IconButton { objectName: "home-sort"; icon: "sort"; tip: root.sortByName ? "Sort by recent" : "Sort by name"; onClicked: { root.sortByName = !root.sortByName; root.refreshContent() } }
-                IconButton { objectName: "home-view"; icon: "view"; tip: root.compactCards ? "Use comfortable cards" : "Use compact cards"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
+                IconButton { objectName: "home-view"; icon: root.compactCards ? "list" : "grid"; tip: root.compactCards ? "Use comfortable cards" : "Use compact cards"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
                 NField {
                     objectName: "home-search"
                     Layout.preferredWidth: Math.min(230, pageScroll.availableWidth * 0.22)

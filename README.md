@@ -227,7 +227,7 @@ episodes. A shortcut to search OpenSubtitles for the current title is included.
 <p>
   <img src="docs/screenshots/hidden-ui.webp" alt="Hide UI mode: only the video, controls appear near the edges" width="49%">
   <img src="docs/screenshots/light-theme.webp" alt="VLC Neo light theme with a blue accent colour" width="49%">
-  <img src="docs/screenshots/player-light-sidebar.webp" alt="Light player with the compact folder sidebar and its two-row toolbar" width="49%">
+  <img src="docs/screenshots/player-light-sidebar.webp" alt="Light player with the Videos side panel, navigation rail, folder breadcrumb and toolbar" width="49%">
 </p>
 
 **Music view and home screen**

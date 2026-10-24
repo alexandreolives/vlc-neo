@@ -71,7 +71,7 @@ Rectangle {
                 onTextEdited: root.searchText = text
             }
             IconButton { objectName: "playlist-sort"; visible: !root.searchOpen; icon: "sort"; tip: "Reverse name order"; onClicked: root.reverseSort = !root.reverseSort }
-            IconButton { objectName: "playlist-view"; visible: !root.searchOpen; icon: "view"; checked: root.compactRows; tip: "Toggle compact rows"; onClicked: root.compactRows = !root.compactRows }
+            IconButton { objectName: "playlist-view"; visible: !root.searchOpen; icon: "list"; checked: root.compactRows; tip: "Toggle compact rows"; onClicked: root.compactRows = !root.compactRows }
             IconButton { objectName: "playlist-search"; visible: !root.searchOpen; icon: "search"; tip: "Search playlists"; onClicked: root.searchOpen = true }
             IconButton { objectName: "playlist-search-close"; visible: root.searchOpen; icon: "close"; tip: "Close search"; onClicked: { root.searchOpen = false; root.searchText = "" } }
         }
