@@ -11,6 +11,7 @@ Rectangle {
     property bool expanded: false
     property bool shown: false
     property bool musicCategoryActive: true
+    readonly property int railItemHeight: root.expanded ? 44 : Math.max(26, Math.min(44, Math.floor((root.height - 14) / 7)))
     signal navigate(string page)
 
     width: !shown ? 0 : expanded ? Math.max(112, Math.min(210, Math.round(win.width * 0.11)))
@@ -49,9 +50,9 @@ Rectangle {
     ColumnLayout {
         id: buttonList
         anchors.top: parent.top
-        anchors.topMargin: root.expanded ? 20 : 14
+        anchors.topMargin: root.expanded ? 20 : 2
         anchors.horizontalCenter: parent.horizontalCenter
-        spacing: root.expanded ? 2 : 3
+        spacing: 2
 
         RailButton { iconName: "home"; activeIconName: "home-active"; label: "Home"; page: "home" }
         RailButton { iconName: "videos"; activeIconName: "videos-active"; label: "Videos"; page: "videos" }
@@ -60,7 +61,6 @@ Rectangle {
         RailButton { iconName: "playlist"; activeIconName: "playlist-active"; label: "Playlists"; page: "playlist" }
         RailButton { iconName: "recent"; label: "Recent"; page: "recent" }
 
-        Item { visible: !root.expanded; Layout.preferredHeight: 1 }
         RailButton { iconName: "add"; label: "Add item"; page: "add" }
     }
 
@@ -76,7 +76,7 @@ Rectangle {
         objectName: "navigation-" + page
         Layout.alignment: Qt.AlignHCenter
         Layout.preferredWidth: root.expanded ? root.width - 10 : 26
-        Layout.preferredHeight: root.expanded ? 44 : 26
+        Layout.preferredHeight: root.railItemHeight
         Layout.leftMargin: root.expanded ? 5 : 0
         padding: 0
         focusPolicy: Qt.TabFocus
