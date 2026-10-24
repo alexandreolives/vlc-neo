@@ -72,7 +72,7 @@ QtObject {
         "spacer", "divider", "speed", "fwd10", "back10", "fwd15", "back15", "stop", "loop",
         "shuffle", "record", "snapshot", "pip", "hdr", "zoom", "rightsidebar", "quit", "vlcsettings",
         "home", "thumbnail", "filename", "artistname", "foldername", "playlistname", "properties", "replay",
-        "chapters", "favorite", "bookmark", "bookmarks", "playlists"
+        "chapters", "favorite", "bookmark", "bookmarks", "playlists", "cast"
     ]
 
     property Settings store: Settings {

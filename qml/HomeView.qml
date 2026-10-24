@@ -12,6 +12,8 @@ Rectangle {
     color: root.sidePanel ? Theme.librarySidePanel : Theme.window
     property alias miniVideoHost: homeMiniVideoSurface
     property alias miniPlayerItem: homeMiniPlayer
+    property alias miniPlayerOverlay: homeMiniPlayerHoverOverlay
+    property alias miniPlayerHovered: miniPlayerHover.hovered
     property int contentRevision: 0
     property string searchText: ""
     property bool sortByName: false
@@ -797,7 +799,7 @@ Rectangle {
                                             Rectangle { width: parent.width * modelData.progress; height: parent.height; color: Theme.accent }
                                         }
                                         MouseArea {
-                                            objectName: "home-video-card-play-" + index
+                                            objectName: (root.sidePanel ? "side-home-video-card-play-" : "home-video-card-play-") + index
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
@@ -953,81 +955,291 @@ Rectangle {
         }
     }
 
-    Rectangle {
+    FocusScope {
         id: homeMiniPlayer
-        objectName: "home-mini-player"
+        objectName: root.sidePanel ? "side-home-mini-player" : "home-mini-player"
         visible: root.visible && !root.sidePanel && player.hasVideo
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.rightMargin: 16
-        anchors.bottomMargin: 16
-        width: Math.min(Math.min(380, Math.max(220, root.width * 0.32)), Math.max(0, root.width - 32))
-        height: homeMiniVideoSurface.height + 64
-        radius: 10
-        color: Theme.bar
-        border.color: Theme.border
+        activeFocusOnTab: true
+        Accessible.name: "Mini player"
+        property real dragOffsetX: 0
+        property real dragOffsetY: 0
+        property bool dragging: false
+        readonly property real uiScale: Math.min(1, width / 391)
+        readonly property real defaultX: parent.width - width - 16
+        readonly property real defaultY: parent.height - height - 16
+        x: Math.max(0, Math.min(parent.width - width, defaultX + dragOffsetX))
+        y: Math.max(0, Math.min(parent.height - height, defaultY + dragOffsetY))
+        width: Math.min(Math.min(391, Math.max(220, root.width * 0.32)), Math.max(0, root.width - 32))
+        height: width * 339 / 391
         z: 5
 
+        Rectangle {
+            anchors.fill: parent
+            radius: 12 * homeMiniPlayer.uiScale
+            color: Theme.bar
+            border.color: Theme.border
+        }
+
         HoverHandler { id: miniPlayerHover }
+        Behavior on x {
+            enabled: !homeMiniPlayer.dragging && !homeMiniPlayerTitleDrag.pressed
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+        Behavior on y {
+            enabled: !homeMiniPlayer.dragging && !homeMiniPlayerTitleDrag.pressed
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
 
         Item {
             id: homeMiniVideoSurface
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: 8
+            anchors.margins: 8 * homeMiniPlayer.uiScale
             height: width * 9 / 16
             clip: true
 
             MouseArea {
+                id: homeMiniVideoDrag
+                objectName: root.sidePanel ? "side-home-mini-player-video-drag" : "home-mini-player-video-drag"
                 anchors.fill: parent
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                property real pressX: 0
+                property real pressY: 0
+                property real pointerOffsetX: 0
+                property real pointerOffsetY: 0
+                property bool dragStarted: false
+                onPressed: (event) => {
+                    pressX = event.x
+                    pressY = event.y
+                    dragStarted = false
+                    const point = mapToItem(homeMiniPlayer.parent, event.x, event.y)
+                    pointerOffsetX = point.x - homeMiniPlayer.x
+                    pointerOffsetY = point.y - homeMiniPlayer.y
+                }
+                onPositionChanged: (event) => {
+                    if (!pressed || !(event.buttons & Qt.LeftButton)) return
+                    if (!dragStarted && Math.abs(event.x - pressX) + Math.abs(event.y - pressY) < 8) return
+                    dragStarted = true
+                    homeMiniPlayer.dragging = true
+                    const point = mapToItem(homeMiniPlayer.parent, event.x, event.y)
+                    const maxX = Math.max(0, homeMiniPlayer.parent.width - homeMiniPlayer.width)
+                    const maxY = Math.max(0, homeMiniPlayer.parent.height - homeMiniPlayer.height)
+                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
+                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    homeMiniPlayer.dragOffsetX = xNow - homeMiniPlayer.defaultX
+                    homeMiniPlayer.dragOffsetY = yNow - homeMiniPlayer.defaultY
+                }
+                onReleased: homeMiniPlayer.dragging = false
                 onClicked: (event) => {
                     if (event.button === Qt.RightButton) {
                         const point = homeMiniVideoSurface.mapToItem(keyCatcher, event.x, event.y)
                         contextMenu.popup(point.x, point.y)
-                    } else {
+                    } else if (!dragStarted) {
                         win.navigate("player")
                     }
                 }
             }
         }
+        Rectangle {
+            anchors.fill: homeMiniVideoSurface
+            radius: 6 * homeMiniPlayer.uiScale
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.border
+            z: 2
+        }
+        Rectangle {
+            id: homeMiniPlayerHoverOverlay
+            objectName: root.sidePanel ? "side-home-mini-player-hover-overlay" : "home-mini-player-hover-overlay"
+            anchors.fill: homeMiniVideoSurface
+            radius: 6
+            color: "#99000000"
+            opacity: miniPlayerHover.hovered || homeMiniPlayer.activeFocus ? 1 : 0
+            visible: opacity > 0.01
+            z: 3
+            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            IconButton {
+                objectName: root.sidePanel ? "side-home-mini-player-close" : "home-mini-player-close"
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: 12 * homeMiniPlayer.uiScale
+                icon: "close"
+                iconColor: Theme.text
+                iconSize: 22 * homeMiniPlayer.uiScale
+                implicitWidth: 30 * homeMiniPlayer.uiScale
+                implicitHeight: 30 * homeMiniPlayer.uiScale
+                tip: "Stop playback"
+                Accessible.name: "Stop playback"
+                onClicked: player.stop()
+            }
+            IconButton {
+                objectName: root.sidePanel ? "side-home-mini-player-expand" : "home-mini-player-expand"
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 12 * homeMiniPlayer.uiScale
+                icon: "maximize"
+                iconColor: Theme.text
+                iconSize: 22 * homeMiniPlayer.uiScale
+                implicitWidth: 30 * homeMiniPlayer.uiScale
+                implicitHeight: 30 * homeMiniPlayer.uiScale
+                tip: "Expand player"
+                Accessible.name: "Expand player"
+                onClicked: win.navigate("player")
+            }
+            Row {
+                anchors.centerIn: parent
+                spacing: 24 * homeMiniPlayer.uiScale
+                IconButton {
+                    objectName: root.sidePanel ? "side-home-mini-player-previous" : "home-mini-player-previous"
+                    icon: "previous"
+                    iconColor: Theme.text
+                    iconSize: 26 * homeMiniPlayer.uiScale
+                    implicitWidth: 30 * homeMiniPlayer.uiScale
+                    implicitHeight: 30 * homeMiniPlayer.uiScale
+                    tip: "Previous"
+                    Accessible.name: "Previous"
+                    onClicked: win.navigateMiniPlayerTrack(-1)
+                }
+                IconButton {
+                    objectName: root.sidePanel ? "side-home-mini-player-toggle" : "home-mini-player-toggle"
+                    icon: player.playing ? "pause" : "play"
+                    iconColor: Theme.text
+                    iconSize: 32 * homeMiniPlayer.uiScale
+                    implicitWidth: 36 * homeMiniPlayer.uiScale
+                    implicitHeight: 36 * homeMiniPlayer.uiScale
+                    tip: player.playing ? "Pause" : "Play"
+                    Accessible.name: player.playing ? "Pause" : "Play"
+                    onClicked: player.togglePause()
+                }
+                IconButton {
+                    objectName: root.sidePanel ? "side-home-mini-player-next" : "home-mini-player-next"
+                    icon: "next"
+                    iconColor: Theme.text
+                    iconSize: 26 * homeMiniPlayer.uiScale
+                    implicitWidth: 30 * homeMiniPlayer.uiScale
+                    implicitHeight: 30 * homeMiniPlayer.uiScale
+                    tip: "Next"
+                    Accessible.name: "Next"
+                    onClicked: win.navigateMiniPlayerTrack(1)
+                }
+            }
+        }
 
+        Rectangle {
+            id: homeMiniProgress
+            objectName: root.sidePanel ? "side-home-mini-player-progress" : "home-mini-player-progress"
+            anchors.left: homeMiniVideoSurface.left
+            anchors.right: homeMiniVideoSurface.right
+            anchors.top: homeMiniVideoSurface.bottom
+            anchors.topMargin: 5 * homeMiniPlayer.uiScale
+            height: 16 * homeMiniPlayer.uiScale
+            radius: 8 * homeMiniPlayer.uiScale
+            color: Theme.field
+            border.width: homeMiniPlayerSeek.activeFocus ? 1 : 0
+            border.color: Theme.accent
+            Rectangle {
+                width: parent.width * player.position
+                height: parent.height
+                radius: parent.radius
+                color: Theme.accentDim
+            }
+            Rectangle {
+                width: parent.height
+                height: parent.height
+                radius: parent.height / 2
+                x: Math.max(0, Math.min(parent.width - width, parent.width * player.position - width / 2))
+                color: Theme.accent
+                visible: miniPlayerHover.hovered
+                Behavior on x { NumberAnimation { duration: 100 } }
+            }
+            MouseArea {
+                id: homeMiniPlayerSeek
+                objectName: root.sidePanel ? "side-home-mini-player-seek" : "home-mini-player-seek"
+                anchors.fill: parent
+                z: 1
+                activeFocusOnTab: true
+                Accessible.name: "Seek position"
+                Accessible.role: Accessible.Slider
+                onPressed: (mouse) => player.seek(Math.max(0, Math.min(1, mouse.x / width)))
+                onPositionChanged: (mouse) => { if (pressed) player.seek(Math.max(0, Math.min(1, mouse.x / width))) }
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Left) player.seekBy(-5000)
+                    else if (event.key === Qt.Key_Right) player.seekBy(5000)
+                    else if (event.key === Qt.Key_Home) player.seek(0)
+                    else if (event.key === Qt.Key_End) player.seek(0.99)
+                    else return
+                    event.accepted = true
+                }
+            }
+        }
+        NText {
+            objectName: root.sidePanel ? "side-home-mini-player-title" : "home-mini-player-title"
+            MouseArea {
+                id: homeMiniPlayerTitleDrag
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real pointerOffsetX: 0
+                property real pointerOffsetY: 0
+                property real pendingOffsetX: homeMiniPlayer.dragOffsetX
+                property real pendingOffsetY: homeMiniPlayer.dragOffsetY
+                onPressed: (mouse) => {
+                    const point = mapToItem(homeMiniPlayer.parent, mouse.x, mouse.y)
+                    pointerOffsetX = point.x - homeMiniPlayer.x
+                    pointerOffsetY = point.y - homeMiniPlayer.y
+                    pendingOffsetX = homeMiniPlayer.dragOffsetX
+                    pendingOffsetY = homeMiniPlayer.dragOffsetY
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed) return
+                    const point = mapToItem(homeMiniPlayer.parent, mouse.x, mouse.y)
+                    const maxX = Math.max(0, homeMiniPlayer.parent.width - homeMiniPlayer.width)
+                    const maxY = Math.max(0, homeMiniPlayer.parent.height - homeMiniPlayer.height)
+                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
+                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    pendingOffsetX = xNow - homeMiniPlayer.defaultX
+                    pendingOffsetY = yNow - homeMiniPlayer.defaultY
+                }
+                onReleased: {
+                    homeMiniPlayer.dragOffsetX = pendingOffsetX
+                    homeMiniPlayer.dragOffsetY = pendingOffsetY
+                }
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 16 * homeMiniPlayer.uiScale
+            anchors.rightMargin: 16 * homeMiniPlayer.uiScale
+            anchors.top: homeMiniVideoSurface.bottom
+            anchors.topMargin: 45 * homeMiniPlayer.uiScale
+            text: player.title.length ? player.title : "Now playing"
+            font.pixelSize: 18 * homeMiniPlayer.uiScale
+            elide: Text.ElideRight
+        }
         RowLayout {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 12
-            anchors.rightMargin: 8
-            anchors.bottomMargin: 4
-            spacing: 6
-            NText {
-                text: player.title.length ? player.title : "Now playing"
-                font.pixelSize: 11
-                elide: Text.ElideRight
-                Layout.fillWidth: true
-            }
+            anchors.leftMargin: 16 * homeMiniPlayer.uiScale
+            anchors.rightMargin: 16 * homeMiniPlayer.uiScale
+            anchors.bottomMargin: 16 * homeMiniPlayer.uiScale
+            spacing: 10 * homeMiniPlayer.uiScale
+            Icon { name: "folder"; size: 20 * homeMiniPlayer.uiScale; color: Theme.textDim }
+            NText { text: player.folderName; dim: true; font.pixelSize: 14 * homeMiniPlayer.uiScale; Layout.maximumWidth: 70 * homeMiniPlayer.uiScale; elide: Text.ElideRight }
+            Icon { visible: player.artist.length > 0; name: "artist"; size: 20 * homeMiniPlayer.uiScale; color: Theme.textDim }
+            NText { visible: player.artist.length > 0; text: player.artist; dim: true; font.pixelSize: 14 * homeMiniPlayer.uiScale; Layout.fillWidth: true; elide: Text.ElideRight }
+            Item { Layout.fillWidth: true; visible: player.artist.length === 0 }
             IconButton {
-                objectName: "home-mini-player-toggle"
-                icon: player.playing ? "pause" : "play"
-                tip: player.playing ? "Pause" : "Play"
-                onClicked: player.togglePause()
+                objectName: root.sidePanel ? "side-home-mini-player-queue" : "home-mini-player-queue"
+                icon: "list"
+                tip: "Show queue"
+                Accessible.name: "Show queue"
+                iconSize: 18 * homeMiniPlayer.uiScale
+                implicitWidth: 30 * homeMiniPlayer.uiScale
+                implicitHeight: 30 * homeMiniPlayer.uiScale
+                onClicked: win.togglePanel("queue")
             }
-        }
-        IconButton {
-            objectName: "home-mini-player-return"
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: 8
-            anchors.rightMargin: 8
-            z: 2
-            visible: miniPlayerHover.hovered
-            icon: "maximize"
-            iconSize: 15
-            tip: "Expand player"
-            Accessible.name: "Expand player"
-            onClicked: win.navigate("player")
         }
     }
 }

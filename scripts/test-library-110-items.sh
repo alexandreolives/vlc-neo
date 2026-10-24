@@ -60,7 +60,7 @@ if ! grep -Eq 'listThumbnailFinalSummary=([0-9]+)/\1/0/0 geometry=' <<<"$output"
     echo "FAIL visible list thumbnails did not all finish loading within twenty-four seconds" >&2
     exit 1
 fi
-if ! grep -qF 'geometry=135/237/140/32/32/6/735/390/339' <<<"$output"; then
+if ! grep -qF 'geometry=135/237/140/32/32/216/735/391/339' <<<"$output"; then
     echo "FAIL full-list or mini-player geometry drifted from the Figma 1920x1080 frame" >&2
     exit 1
 fi

@@ -75,6 +75,7 @@ ApplicationWindow {
     property bool libraryOpen: false
     property var sidePanelActionAnchor: null
     property bool libraryFullPage: false
+    property bool preserveHomeForMiniPlayerTrackChange: false
     property bool musicSidebarOpen: false
     property bool folderSidebarOpen: false
     property string sideReturnPage: ""
@@ -517,6 +518,13 @@ ApplicationWindow {
             break
         }
     }
+    function navigateMiniPlayerTrack(direction) {
+        preserveHomeForMiniPlayerTrackChange = navigationPage === "home"
+        if (preserveHomeForMiniPlayerTrackChange)
+            miniPlayerNavigationReset.restart()
+        if (direction < 0) player.previous()
+        else player.next()
+    }
     function goBack() {
         if (tracksPopup.visible) { tracksPopup.close(); return true }
         if (fullscreen) { setFullscreen(false); return true }
@@ -820,12 +828,21 @@ ApplicationWindow {
             else if (Theme.store.resumeMode === "ask") resumePill.offer(ms)
         }
         function onMediaChanged() {
-            if (win.navigationPage === "home" && player.hasMedia)
-                win.navigate("player")
+            if (win.navigationPage === "home" && player.hasMedia) {
+                if (win.preserveHomeForMiniPlayerTrackChange)
+                    miniPlayerNavigationReset.restart()
+                else
+                    win.navigate("player")
+            }
             win.applyStartupVolume()
             win.applyFullscreenPreference()
             win.notifyMediaChanged()
         }
+    }
+    Timer {
+        id: miniPlayerNavigationReset
+        interval: 1200
+        onTriggered: win.preserveHomeForMiniPlayerTrackChange = false
     }
     Connections {
         target: mediaLibrary
@@ -985,7 +1002,10 @@ ApplicationWindow {
                     MouseArea {
                         objectName: "video-click-area"
                         anchors.fill: parent
-                        z: win.navigationPage === "home" ? 0 : 2
+                        // On Home with a side pane, the Home dashboard lives in
+                        // the pane and the video surface still needs to dismiss
+                        // transient popups. On full Home, keep cards above it.
+                        z: win.navigationPage === "home" && !win.libraryOpen ? 0 : 2
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         hoverEnabled: true
                         // Keep this hit target active even when playback stops:
@@ -1057,11 +1077,22 @@ ApplicationWindow {
                     }
                 }
 
-                Rectangle { visible: win.rightPanel.length > 0; Layout.fillHeight: true; implicitWidth: 1; color: Theme.border }
+                Rectangle {
+                    visible: win.rightPanel.length > 0
+                    Layout.fillHeight: true
+                    Layout.topMargin: win.fullscreen && win.overlayMode
+                                      ? Math.max(0, topBar.y + topBar.height) : 0
+                    implicitWidth: 1
+                    color: Theme.border
+                }
                 Item {
                     visible: win.rightPanel.length > 0
                     Layout.fillHeight: true
                     Layout.preferredWidth: 360
+                    // In fullscreen auto-hide mode the top bar floats over the
+                    // video. Keep the right-side panel below its visible edge.
+                    Layout.topMargin: win.fullscreen && win.overlayMode
+                                      ? Math.max(0, topBar.y + topBar.height) : 0
                     QueuePanel {
                         anchors.fill: parent
                         visible: win.rightPanel === "queue"

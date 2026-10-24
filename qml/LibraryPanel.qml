@@ -44,6 +44,8 @@ Rectangle {
     property int recentRevision: 0
     property alias miniVideoHost: miniVideoSurface
     property alias miniPlayerItem: miniPlayer
+    property alias miniPlayerOverlay: miniPlayerHoverOverlay
+    property alias miniPlayerHovered: miniPlayerHover.hovered
     property alias folderViewToggleItem: folderViewToggleButton
     property alias folderListingItem: listing
     property alias indexedListing: musicListing
@@ -1624,38 +1626,87 @@ Rectangle {
         }
     }
 
-    Rectangle {
+    FocusScope {
         id: miniPlayer
+        objectName: "mini-player"
         visible: root.wide && win.libraryFullPage && player.hasVideo
-        anchors.bottom: parent.bottom
-        x: root.folderViewMode === "list" ? root.mapFromItem(win.contentItem, 6, 0).x : parent.width - width - 12
-        anchors.bottomMargin: 6
-        width: Math.min(Math.min(390, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
-        height: width * 0.87
-        radius: 12
-        color: Theme.bar
-        border.color: Theme.border
+        activeFocusOnTab: true
+        Accessible.name: "Mini player"
+        property real dragOffsetX: 0
+        property real dragOffsetY: 0
+        property bool dragging: false
+        readonly property real uiScale: Math.min(1, width / 391)
+        readonly property real defaultX: root.folderViewMode === "list" ? 6 : parent.width - width - 12
+        readonly property real defaultY: parent.height - height - 6
+        x: Math.max(0, Math.min(parent.width - width, defaultX + dragOffsetX))
+        y: Math.max(0, Math.min(parent.height - height, defaultY + dragOffsetY))
+        width: Math.min(Math.min(391, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
+        height: width * 339 / 391
         z: 2
 
+        Rectangle {
+            anchors.fill: parent
+            radius: 12 * miniPlayer.uiScale
+            color: Theme.bar
+            border.color: Theme.border
+        }
+
         HoverHandler { id: miniPlayerHover }
+        Behavior on x {
+            enabled: !miniPlayer.dragging && !miniPlayerTitleDrag.pressed
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+        Behavior on y {
+            enabled: !miniPlayer.dragging && !miniPlayerTitleDrag.pressed
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
 
         Item {
             id: miniVideoSurface
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: 8
+            anchors.margins: 8 * miniPlayer.uiScale
             height: width * 9 / 16
             clip: true
 
             MouseArea {
+                id: miniVideoDrag
+                objectName: "mini-player-video-drag"
                 anchors.fill: parent
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                property real pressX: 0
+                property real pressY: 0
+                property real pointerOffsetX: 0
+                property real pointerOffsetY: 0
+                property bool dragStarted: false
+                onPressed: (event) => {
+                    pressX = event.x
+                    pressY = event.y
+                    dragStarted = false
+                    const point = mapToItem(miniPlayer.parent, event.x, event.y)
+                    pointerOffsetX = point.x - miniPlayer.x
+                    pointerOffsetY = point.y - miniPlayer.y
+                }
+                onPositionChanged: (event) => {
+                    if (!pressed || !(event.buttons & Qt.LeftButton)) return
+                    if (!dragStarted && Math.abs(event.x - pressX) + Math.abs(event.y - pressY) < 8) return
+                    dragStarted = true
+                    miniPlayer.dragging = true
+                    const point = mapToItem(miniPlayer.parent, event.x, event.y)
+                    const maxX = Math.max(0, miniPlayer.parent.width - miniPlayer.width)
+                    const maxY = Math.max(0, miniPlayer.parent.height - miniPlayer.height)
+                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
+                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    miniPlayer.dragOffsetX = xNow - miniPlayer.defaultX
+                    miniPlayer.dragOffsetY = yNow - miniPlayer.defaultY
+                }
+                onReleased: miniPlayer.dragging = false
                 onClicked: (event) => {
                     if (tracksPopup.visible) tracksPopup.close()
-                    if (event.button === Qt.LeftButton) win.navigate("player")
-                    else {
+                    if (event.button === Qt.LeftButton && !dragStarted) win.navigate("player")
+                    else if (event.button === Qt.RightButton) {
                         const point = miniVideoSurface.mapToItem(keyCatcher, event.x, event.y)
                         contextMenu.popup(point.x, point.y)
                     }
@@ -1663,48 +1714,197 @@ Rectangle {
             }
         }
         Rectangle {
+            anchors.fill: miniVideoSurface
+            radius: 6 * miniPlayer.uiScale
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.border
+            z: 2
+        }
+        Rectangle {
+            id: miniPlayerHoverOverlay
+            objectName: "mini-player-hover-overlay"
+            anchors.fill: miniVideoSurface
+            radius: 6 * miniPlayer.uiScale
+            color: "#99000000"
+            opacity: miniPlayerHover.hovered || miniPlayer.activeFocus ? 1 : 0
+            visible: opacity > 0.01
+            z: 3
+            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            IconButton {
+                objectName: "mini-player-close"
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: 12 * miniPlayer.uiScale
+                icon: "close"
+                iconColor: Theme.text
+                iconSize: 22 * miniPlayer.uiScale
+                implicitWidth: 30 * miniPlayer.uiScale
+                implicitHeight: 30 * miniPlayer.uiScale
+                tip: "Stop playback"
+                Accessible.name: "Stop playback"
+                onClicked: player.stop()
+            }
+            IconButton {
+                objectName: "mini-player-expand"
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 12 * miniPlayer.uiScale
+                icon: "maximize"
+                iconColor: Theme.text
+                iconSize: 22 * miniPlayer.uiScale
+                implicitWidth: 30 * miniPlayer.uiScale
+                implicitHeight: 30 * miniPlayer.uiScale
+                tip: "Expand player"
+                Accessible.name: "Expand player"
+                onClicked: win.navigate("player")
+            }
+            Row {
+                anchors.centerIn: parent
+                spacing: 24 * miniPlayer.uiScale
+                IconButton {
+                    objectName: "mini-player-previous"
+                    icon: "previous"
+                    iconColor: Theme.text
+                    iconSize: 26 * miniPlayer.uiScale
+                    implicitWidth: 30 * miniPlayer.uiScale
+                    implicitHeight: 30 * miniPlayer.uiScale
+                    tip: "Previous"
+                    Accessible.name: "Previous"
+                    onClicked: player.previous()
+                }
+                IconButton {
+                    objectName: "mini-player-play"
+                    icon: player.playing ? "pause" : "play"
+                    iconColor: Theme.text
+                    iconSize: 32 * miniPlayer.uiScale
+                    implicitWidth: 36 * miniPlayer.uiScale
+                    implicitHeight: 36 * miniPlayer.uiScale
+                    tip: player.playing ? "Pause" : "Play"
+                    Accessible.name: player.playing ? "Pause" : "Play"
+                    onClicked: player.togglePause()
+                }
+                IconButton {
+                    objectName: "mini-player-next"
+                    icon: "next"
+                    iconColor: Theme.text
+                    iconSize: 26 * miniPlayer.uiScale
+                    implicitWidth: 30 * miniPlayer.uiScale
+                    implicitHeight: 30 * miniPlayer.uiScale
+                    tip: "Next"
+                    Accessible.name: "Next"
+                    onClicked: player.next()
+                }
+            }
+        }
+        Rectangle {
+            id: miniPlayerProgress
+            objectName: "mini-player-progress"
             anchors.left: miniVideoHost.left
             anchors.right: miniVideoHost.right
             anchors.top: miniVideoHost.bottom
-            height: 6
-            radius: 3
+            anchors.topMargin: 5 * miniPlayer.uiScale
+            height: 16 * miniPlayer.uiScale
+            radius: 8 * miniPlayer.uiScale
             color: Theme.field
-            Rectangle { width: parent.width * player.position; height: parent.height; radius: 3; color: Theme.accentDim }
+            border.width: miniPlayerSeek.activeFocus ? 1 : 0
+            border.color: Theme.accent
+            Rectangle { width: parent.width * player.position; height: parent.height; radius: parent.radius; color: Theme.accentDim }
+            Rectangle {
+                width: parent.height
+                height: parent.height
+                radius: parent.height / 2
+                x: Math.max(0, Math.min(parent.width - width, parent.width * player.position - width / 2))
+                color: Theme.accent
+                visible: miniPlayerHover.hovered
+                Behavior on x { NumberAnimation { duration: 100 } }
+            }
+            MouseArea {
+                id: miniPlayerSeek
+                objectName: "mini-player-seek"
+                anchors.fill: parent
+                z: 1
+                activeFocusOnTab: true
+                Accessible.name: "Seek position"
+                Accessible.role: Accessible.Slider
+                onPressed: (mouse) => player.seek(Math.max(0, Math.min(1, mouse.x / width)))
+                onPositionChanged: (mouse) => { if (pressed) player.seek(Math.max(0, Math.min(1, mouse.x / width))) }
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Left) player.seekBy(-5000)
+                    else if (event.key === Qt.Key_Right) player.seekBy(5000)
+                    else if (event.key === Qt.Key_Home) player.seek(0)
+                    else if (event.key === Qt.Key_End) player.seek(0.99)
+                    else return
+                    event.accepted = true
+                }
+            }
         }
         NText {
+            objectName: "mini-player-title"
+            MouseArea {
+                id: miniPlayerTitleDrag
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real pointerOffsetX: 0
+                property real pointerOffsetY: 0
+                property real pendingOffsetX: miniPlayer.dragOffsetX
+                property real pendingOffsetY: miniPlayer.dragOffsetY
+                onPressed: (mouse) => {
+                    const point = mapToItem(miniPlayer.parent, mouse.x, mouse.y)
+                    pointerOffsetX = point.x - miniPlayer.x
+                    pointerOffsetY = point.y - miniPlayer.y
+                    pendingOffsetX = miniPlayer.dragOffsetX
+                    pendingOffsetY = miniPlayer.dragOffsetY
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed) return
+                    const point = mapToItem(miniPlayer.parent, mouse.x, mouse.y)
+                    const maxX = Math.max(0, miniPlayer.parent.width - miniPlayer.width)
+                    const maxY = Math.max(0, miniPlayer.parent.height - miniPlayer.height)
+                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
+                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    pendingOffsetX = xNow - miniPlayer.defaultX
+                    pendingOffsetY = yNow - miniPlayer.defaultY
+                }
+                onReleased: {
+                    miniPlayer.dragOffsetX = pendingOffsetX
+                    miniPlayer.dragOffsetY = pendingOffsetY
+                }
+            }
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
+            anchors.leftMargin: 16 * miniPlayer.uiScale
+            anchors.rightMargin: 16 * miniPlayer.uiScale
             anchors.top: miniVideoHost.bottom
-            anchors.topMargin: 14
+            anchors.topMargin: 45 * miniPlayer.uiScale
             text: player.title.length ? player.title : "Now playing"
-            font.pixelSize: 11
+            font.pixelSize: 18 * miniPlayer.uiScale
+            elide: Text.ElideRight
         }
         RowLayout {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 12
-            anchors.rightMargin: 6
-            anchors.bottomMargin: 4
-            spacing: 6
-            Icon { name: "folder"; size: 13; color: Theme.textDim }
-            NText { text: player.folderName; dim: true; font.pixelSize: 10; Layout.fillWidth: true }
-        }
-        IconButton {
-            objectName: "mini-player-return"
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: 8
-            anchors.rightMargin: 8
-            z: 3
-            visible: miniPlayerHover.hovered
-            icon: "maximize"
-            iconSize: 15
-            tip: "Expand player"
-            Accessible.name: "Expand player"
-            onClicked: win.navigate("player")
+            anchors.leftMargin: 16 * miniPlayer.uiScale
+            anchors.rightMargin: 16 * miniPlayer.uiScale
+            anchors.bottomMargin: 16 * miniPlayer.uiScale
+            spacing: 10 * miniPlayer.uiScale
+            Icon { name: "folder"; size: 20 * miniPlayer.uiScale; color: Theme.textDim }
+            NText { text: player.folderName; dim: true; font.pixelSize: 14 * miniPlayer.uiScale; Layout.maximumWidth: 70 * miniPlayer.uiScale; elide: Text.ElideRight }
+            Icon { visible: player.artist.length > 0; name: "artist"; size: 20 * miniPlayer.uiScale; color: Theme.textDim }
+            NText { visible: player.artist.length > 0; text: player.artist; dim: true; font.pixelSize: 14 * miniPlayer.uiScale; Layout.fillWidth: true; elide: Text.ElideRight }
+            Item { Layout.fillWidth: true; visible: player.artist.length === 0 }
+            IconButton {
+                objectName: "mini-player-queue"
+                icon: "list"
+                tip: "Show queue"
+                Accessible.name: "Show queue"
+                iconSize: 18 * miniPlayer.uiScale
+                implicitWidth: 30 * miniPlayer.uiScale
+                implicitHeight: 30 * miniPlayer.uiScale
+                onClicked: win.togglePanel("queue")
+            }
         }
     }
 

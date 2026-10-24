@@ -9,7 +9,9 @@ Popup {
     // Popups are positioned in the full player overlay coordinate space.
     // Anchoring to the control's RowLayout gives the popup only that row's
     // width/height and makes clamping fail on compact or resized windows.
-    parent: keyCatcher
+    // Use the control bar as the Popup parent. This preserves clicks on its
+    // triggers while outside presses elsewhere in the window dismiss the menu.
+    parent: controlBar
     property string tab: "spu"
     property Item currentAnchor: null
     signal showPreferences(string tab)
@@ -22,9 +24,6 @@ Popup {
     padding: 0
     modal: false
     focus: true
-    // Treat the whole control row that opened this popup as its parent. This
-    // keeps a press on the trigger available for toggle/switch handling while
-    // clicks elsewhere in the window dismiss the popup.
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
     function openFor(tabName, triggerItem) {
@@ -32,6 +31,8 @@ Popup {
             close()
             return
         }
+        if (visible)
+            close()
         currentAnchor = triggerItem
         tab = tabName
         refresh()
@@ -49,17 +50,24 @@ Popup {
         const maxY = Math.max(margin, keyCatcher.height - height - margin)
         const above = anchorTop - height - gap
         const below = anchorBottom + gap
-        const fitsAbove = above >= margin
-        const fitsBelow = below + height <= keyCatcher.height - margin
+        // An anchor can remain outside the viewport after the window shrinks.
+        // Only use the above placement if the complete popup still fits.
+        const fitsAbove = above >= margin && above <= maxY
+        const fitsBelow = below >= margin && below + height <= keyCatcher.height - margin
 
-        x = Math.max(margin, Math.min(p.x + currentAnchor.width / 2 - width / 2,
-                                       keyCatcher.width - width - margin))
+        let popupX = Math.max(margin, Math.min(p.x + currentAnchor.width / 2 - width / 2,
+                                                keyCatcher.width - width - margin))
+        let popupY
         if (fitsAbove)
-            y = above
+            popupY = above
         else if (fitsBelow)
-            y = below
+            popupY = below
         else
-            y = Math.max(margin, Math.min(above, maxY))
+            popupY = Math.max(margin, Math.min(above, maxY))
+
+        const localPosition = keyCatcher.mapToItem(parent, popupX, popupY)
+        x = localPosition.x
+        y = localPosition.y
     }
     function schedulePlace() { Qt.callLater(place) }
     onWidthChanged: if (visible) schedulePlace()
@@ -99,6 +107,8 @@ Popup {
     }
     Connections {
         target: root.parent
+        function onXChanged() { root.schedulePlace() }
+        function onYChanged() { root.schedulePlace() }
         function onWidthChanged() { root.schedulePlace() }
         function onHeightChanged() { root.schedulePlace() }
     }
@@ -158,20 +168,24 @@ Popup {
                                 color: root.tab === tabButton.tabId ? Theme.accent : Theme.border
                             }
                         }
-                        contentItem: Row {
-                            anchors.centerIn: parent
+                        contentItem: RowLayout {
+                            anchors.fill: parent
                             spacing: 6
+                            // Symmetric flexible spacers keep icon + label
+                            // centered in each tab at every popup width.
+                            Item { Layout.fillWidth: true }
                             Icon {
                                 name: tabButton.modelData.icon; size: 15
                                 color: root.tab === tabButton.tabId ? Theme.accent : Theme.textDim
-                                anchors.verticalCenter: parent.verticalCenter
+                                Layout.alignment: Qt.AlignVCenter
                             }
                             NText {
                                 text: tabButton.modelData.label
                                 font.pixelSize: 12
                                 color: root.tab === tabButton.tabId ? Theme.text : Theme.textDim
-                                anchors.verticalCenter: parent.verticalCenter
+                                Layout.alignment: Qt.AlignVCenter
                             }
+                            Item { Layout.fillWidth: true }
                         }
                     }
                 }
