@@ -164,7 +164,7 @@ Rectangle {
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 12
-                    Layout.rightMargin: root.sidePanel ? 27 : 8
+                    Layout.rightMargin: root.sidePanel ? 17 : 8
                     Layout.preferredHeight: root.sidePanel ? 52 : 36
                     spacing: 3
                     IconButton { icon: "arrow-left"; tip: "Back"; onClicked: win.goBack() }
@@ -177,7 +177,7 @@ Rectangle {
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 12
-                    Layout.rightMargin: root.sidePanel ? 27 : 8
+                    Layout.rightMargin: root.sidePanel ? 17 : 8
                     Layout.preferredHeight: root.sidePanel ? 52 : 34
                     NText { visible: !root.searchOpen; text: mediaLibrary.indexedCount + " items"; color: root.sidePanel ? Theme.librarySideText : Theme.textDim; font.pixelSize: 12; Layout.fillWidth: true }
                     NField {
@@ -197,8 +197,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 28 : 18
-                    Layout.bottomMargin: 7
+                    Layout.topMargin: root.sidePanel ? 21 : 18
+                    Layout.bottomMargin: root.sidePanel ? 11 : 7
                     NText {
                         text: "Continue Watching"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -287,8 +287,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 28 : 18
-                    Layout.bottomMargin: 7
+                    Layout.topMargin: root.sidePanel ? 25 : 18
+                    Layout.bottomMargin: root.sidePanel ? 16 : 7
                     NText {
                         text: "Listen Again"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -373,8 +373,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 28 : 18
-                    Layout.bottomMargin: 7
+                    Layout.topMargin: root.sidePanel ? 24 : 18
+                    Layout.bottomMargin: root.sidePanel ? 12 : 7
                     NText {
                         text: "Frequently Visited Folders"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -419,8 +419,14 @@ Rectangle {
                         }
                         RowLayout {
                             anchors.fill: parent
-                            spacing: root.sidePanel ? 16 : 9
-                            Icon { name: "folder"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                            spacing: root.sidePanel ? 11 : 9
+                            Icon {
+                                name: "folder"
+                                size: root.sidePanel ? 25 : 16
+                                Layout.preferredWidth: size
+                                Layout.preferredHeight: size
+                                color: Theme.icon
+                            }
                             NText { text: modelData.title; font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                         HoverHandler { id: folderRowHover }
@@ -448,8 +454,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 28 : 18
-                    Layout.bottomMargin: 7
+                    Layout.topMargin: root.sidePanel ? 24 : 18
+                    Layout.bottomMargin: root.sidePanel ? 14 : 7
                     NText {
                         text: "Frequently Visited Playlists"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -494,8 +500,14 @@ Rectangle {
                         }
                         RowLayout {
                             anchors.fill: parent
-                            spacing: root.sidePanel ? 17 : 9
-                            Icon { name: "playlist"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
+                            spacing: root.sidePanel ? 13 : 9
+                            Icon {
+                                name: "playlist"
+                                size: root.sidePanel ? 25 : 16
+                                Layout.preferredWidth: size
+                                Layout.preferredHeight: size
+                                color: Theme.icon
+                            }
                             NText { text: root.playlistLabel(playlist.fileName); font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                         HoverHandler { id: playlistRowHover }
