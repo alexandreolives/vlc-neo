@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtCore
 import Neo 1.0
 
 // Title bar: cone, menu, library toggle, show/folder name (opens library), title, window buttons.
@@ -11,6 +12,17 @@ Rectangle {
     property bool onboardingMode: false
     property bool compactPreview: false
     readonly property bool compactLibraryActions: win.libraryFullPage
+    readonly property string folderLabel: {
+        if (player.hasMedia && (!player.hasVideo || win.audioVisualizerActive))
+            return "My Songs"
+        const path = player.folderPath.length
+                ? player.folderPath
+                : platform.localPath(StandardPaths.writableLocation(StandardPaths.MoviesLocation))
+        const normalized = path.toString().replace(/[\\/]+$/, "")
+        const separator = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"))
+        const name = normalized.slice(separator + 1)
+        return name.length ? name : "Videos"
+    }
     property alias titleLabel: appTitle
     property alias pipButton: pipButtonControl
     property alias minimizeButton: minimizeButtonControl
@@ -62,9 +74,8 @@ Rectangle {
                 spacing: 6
                 Icon { name: "folder"; size: 15; anchors.verticalCenter: parent.verticalCenter }
                 NText {
-                    text: player.hasMedia && (!player.hasVideo || win.audioVisualizerActive)
-                          ? "My Songs"
-                          : (player.folderName.length ? player.folderName : "Library")
+                    objectName: "folder-chip-label"
+                    text: root.folderLabel
                     dim: true
                     font.pixelSize: 12
                     anchors.verticalCenter: parent.verticalCenter
