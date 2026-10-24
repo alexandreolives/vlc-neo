@@ -156,7 +156,7 @@ Rectangle {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
                         Image { id: coverImage; anchors.fill: parent; source: platform.playlistCoverUrl(fileUrl); fillMode: Image.PreserveAspectCrop; visible: status === Image.Ready }
-                        Icon { anchors.centerIn: parent; name: "playlist"; size: 20; color: rowMouse.containsMouse ? Theme.accent : Theme.icon; visible: coverImage.status !== Image.Ready }
+                        Icon { anchors.centerIn: parent; name: "playlist"; size: 24; color: rowMouse.containsMouse ? Theme.accent : Theme.icon; visible: coverImage.status !== Image.Ready }
                     }
                     NText {
                         text: fileName.replace(/\.(m3u8?|pls|xspf)$/i, "")
