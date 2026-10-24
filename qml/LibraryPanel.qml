@@ -447,7 +447,7 @@ Rectangle {
                 tip: "More options"
                 onClicked: root.showMoreOptions(genericSideMoreButton)
             }
-            IconButton { visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
+            IconButton { objectName: "sidepanel-open-full-page"; visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.expandLibrarySidePanel() }
             IconButton { visible: !root.figmaSidePanel; icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
         }
 
@@ -511,7 +511,7 @@ Rectangle {
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
             IconButton {
-                objectName: "library-folder-view-toggle"
+                objectName: root.figmaSidePanel ? "library-sidepanel-folder-view-toggle" : "library-folder-view-toggle"
                 icon: root.figmaSidePanel
                       ? (root.folderViewMode === "grid" ? "grid" : "list")
                       : (root.folderViewMode === "grid" ? "list" : "grid")

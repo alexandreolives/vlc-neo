@@ -177,7 +177,7 @@ Rectangle {
                         tip: "More options"
                         onClicked: win.openSidePanelActions(homeSideMoreButton)
                     }
-                    IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
+                    IconButton { objectName: root.sidePanel ? "home-sidepanel-open-full-page" : "home-open-full-page"; icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: !root.sidePanel }
                 RowLayout {

@@ -323,6 +323,24 @@ ApplicationWindow {
         navigate(returnPage, false)
         libraryFullPage = returnFullPage
     }
+    function expandLibrarySidePanel() {
+        const page = navigationPage
+        const section = libraryPanel.section
+        const mediaType = libraryPanel.mediaType
+        const folder = libraryPanel.folder
+        const folderViewMode = libraryPanel.folderViewMode
+        const searchText = libraryPanel.searchText
+        const musicView = mediaLibrary.model.view
+        const musicSearch = mediaLibrary.model.search
+        navigate(page)
+        libraryPanel.section = section
+        libraryPanel.mediaType = mediaType
+        libraryPanel.folder = folder
+        libraryPanel.folderViewMode = folderViewMode
+        libraryPanel.searchText = searchText
+        mediaLibrary.model.search = musicSearch
+        if (page === "music") mediaLibrary.model.view = musicView
+    }
     function openSidePanelActions(anchor) {
         sidePanelActionAnchor = anchor
         const p = anchor.mapToItem(keyCatcher, 0, anchor.height)
@@ -812,7 +830,7 @@ ApplicationWindow {
                     Layout.preferredWidth: win.libraryPaneLayoutWidth
                     Layout.fillHeight: true
                     onCreatePlaylist: newPlaylistDialog.open()
-                    onOpenLibraryPage: win.navigateFromRail("videos")
+                    onOpenLibraryPage: win.navigate("folder")
                 }
 
                 HomeView {
