@@ -21,13 +21,13 @@ Rectangle {
     signal indexFolder()
     signal createPlaylist()
     function videoCardWidth() {
-        return compactCards ? 190 : Math.min(320, Math.max(220, (pageScroll.availableWidth - 72) / 4))
+        return compactCards ? 190 : Math.min(316, Math.max(220, (pageScroll.availableWidth - 72) / 4))
     }
     function musicCardWidth() {
-        return compactCards ? 110 : Math.min(200, Math.max(130, pageScroll.availableWidth * 0.117))
+        return compactCards ? 110 : Math.min(198, Math.max(130, pageScroll.availableWidth * 0.116))
     }
     function folderCardWidth() {
-        return Math.min(220, Math.max(150, pageScroll.availableWidth * 0.12))
+        return Math.min(200, Math.max(150, pageScroll.availableWidth * 0.12))
     }
     function activateRecentVideo(item) {
         win.navigate("player")
@@ -678,6 +678,24 @@ Rectangle {
                 Layout.rightMargin: 18
                 Layout.preferredHeight: Math.max(46, Math.round(win.width * 0.034))
                 spacing: 12
+                IconButton {
+                    objectName: "home-fullpage-back"
+                    icon: "arrow-left"
+                    iconSize: 24
+                    iconOffsetX: -2
+                    tip: "Back"
+                    enabled: win.canGoBack
+                    onClicked: win.goBack()
+                }
+                IconButton {
+                    objectName: "home-fullpage-forward"
+                    icon: "arrow-right"
+                    iconSize: 24
+                    iconOffsetX: -2
+                    tip: "Forward"
+                    enabled: win.canGoForward
+                    onClicked: win.goForward()
+                }
                 NText { text: "Home"; font.pixelSize: 13; Layout.fillWidth: true }
                 NText { text: mediaLibrary.indexedCount + " items"; dim: true; font.pixelSize: 11 }
                 IconButton { objectName: "home-sort"; icon: "sort"; tip: root.sortByName ? "Sort by recent" : "Sort by name"; onClicked: { root.sortByName = !root.sortByName; root.refreshContent() } }
@@ -703,17 +721,17 @@ Rectangle {
             ColumnLayout {
                 visible: !root.sidePanel
                 Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
+                Layout.leftMargin: 28
+                Layout.rightMargin: 28
                 Layout.bottomMargin: 28
-                spacing: 100
-                Layout.topMargin: Math.max(36, Math.round(win.width * 0.0245))
+                spacing: root.compactCards ? 100 : 75
+                Layout.topMargin: Math.max(38, Math.round(win.width * 0.019))
 
                 component ShelfTitle: RowLayout {
                     property string title
                     property string page
                     Layout.fillWidth: true
-                    NText { text: parent.title; font.pixelSize: 15; font.weight: Font.Medium; Layout.fillWidth: true }
+                    NText { text: parent.title; font.pixelSize: 15; font.weight: Font.Medium }
                     IconButton {
                         icon: "chevron-right"
                         tip: "Open " + parent.title
@@ -729,18 +747,18 @@ Rectangle {
                     objectName: "home-continue-shelf"
                     visible: root.videoItems.length > 0
                     Layout.fillWidth: true
-                    spacing: 9
+                    spacing: root.compactCards ? 9 : 22
                     ShelfTitle { title: "Continue Watching"; page: "videos" }
                     Flickable {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.compactCards ? 174 : Math.max(174, root.videoCardWidth() * 0.56 + 36)
+                        Layout.preferredHeight: root.compactCards ? 174 : Math.max(174, root.videoCardWidth() * 0.56 + 34)
                         contentWidth: videoCards.width
                         clip: true
                         flickableDirection: Flickable.HorizontalFlick
                         boundsBehavior: Flickable.StopAtBounds
                         Row {
                             id: videoCards
-                            spacing: 14
+                            spacing: root.compactCards ? 14 : 19
                             Repeater {
                                 id: videoRepeater
                                 model: root.videoItems
@@ -750,7 +768,7 @@ Rectangle {
                                     required property var modelData
                                     readonly property bool thumbnailReady: videoThumbnail.status === Image.Ready
                                     width: root.videoCardWidth()
-                                    height: root.compactCards ? 174 : Math.max(174, width * 0.56 + 36)
+                                    height: root.compactCards ? 174 : Math.max(174, width * 0.56 + 34)
                                     Rectangle {
                                         id: thumbnailFrame
                                         width: parent.width
@@ -790,7 +808,7 @@ Rectangle {
                                     }
                                     NText {
                                         anchors.top: thumbnailFrame.bottom
-                                        anchors.topMargin: 6
+                                        anchors.topMargin: root.compactCards ? 6 : 20
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         text: modelData.title
@@ -807,18 +825,19 @@ Rectangle {
                     objectName: "home-listen-shelf"
                     visible: root.musicItems.length > 0
                     Layout.fillWidth: true
-                    spacing: 9
+                    spacing: root.compactCards ? 9 : 22
+                    Layout.bottomMargin: root.compactCards ? 0 : 6
                     ShelfTitle { title: "Listen Again"; page: "music" }
                     Flickable {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.musicCardWidth() + 48
+                        Layout.preferredHeight: root.musicCardWidth() + (root.compactCards ? 48 : 60)
                         contentWidth: musicCards.width
                         clip: true
                         flickableDirection: Flickable.HorizontalFlick
                         boundsBehavior: Flickable.StopAtBounds
                         Row {
                             id: musicCards
-                            spacing: 14
+                            spacing: root.compactCards ? 14 : 20
                             Repeater {
                                 model: root.musicItems
                                 delegate: Item {
@@ -851,7 +870,7 @@ Rectangle {
                                     }
                                     NText {
                                         anchors.top: coverFrame.bottom
-                                        anchors.topMargin: 6
+                                        anchors.topMargin: root.compactCards ? 6 : 22
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         text: modelData.title
@@ -860,7 +879,7 @@ Rectangle {
                                     }
                                     NText {
                                         anchors.top: coverFrame.bottom
-                                        anchors.topMargin: 23
+                                        anchors.topMargin: root.compactCards ? 23 : 48
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         text: modelData.artist
@@ -878,7 +897,7 @@ Rectangle {
                     objectName: "home-folder-shelf"
                     visible: root.folderItems.length > 0
                     Layout.fillWidth: true
-                    spacing: 9
+                    spacing: root.compactCards ? 9 : 22
                     ShelfTitle { title: "Frequently Visited Folders"; page: "folders" }
                     Flickable {
                         Layout.fillWidth: true
@@ -889,7 +908,7 @@ Rectangle {
                         boundsBehavior: Flickable.StopAtBounds
                         Row {
                             id: folderCards
-                            spacing: 14
+                            spacing: 20
                             Repeater {
                                 model: root.folderItems
                                 delegate: Rectangle {

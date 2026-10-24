@@ -446,6 +446,26 @@ Rectangle {
             Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
             spacing: root.figmaSidePanel ? 6 : 2
             IconButton {
+                objectName: "library-global-back"
+                visible: !root.figmaSidePanel && win.libraryFullPage
+                icon: "arrow-left"
+                iconSize: 24
+                iconOffsetX: -2
+                tip: "Back"
+                enabled: win.canGoBack
+                onClicked: win.goBack()
+            }
+            IconButton {
+                objectName: "library-global-forward"
+                visible: !root.figmaSidePanel && win.libraryFullPage
+                icon: "arrow-right"
+                iconSize: 24
+                iconOffsetX: -2
+                tip: "Forward"
+                enabled: win.canGoForward
+                onClicked: win.goForward()
+            }
+            IconButton {
                 objectName: "sidepanel-back-generic"
                 icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
                 iconSize: root.figmaSidePanel ? 24 : 18
@@ -1416,8 +1436,24 @@ Rectangle {
             Layout.rightMargin: 17
             Layout.preferredHeight: 52
             spacing: 6
-            IconButton { objectName: "sidepanel-back-network"; icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: root.canGoBackFromSidePanel(); onClicked: root.goBackFromSidePanel() }
-            IconButton { objectName: "sidepanel-forward-network"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
+            IconButton {
+                objectName: "sidepanel-back-network"
+                icon: "arrow-left"
+                iconSize: 24
+                iconOffsetX: -2
+                tip: "Back"
+                enabled: win.libraryFullPage ? win.canGoBack : root.canGoBackFromSidePanel()
+                onClicked: win.libraryFullPage ? win.goBack() : root.goBackFromSidePanel()
+            }
+            IconButton {
+                objectName: "sidepanel-forward-network"
+                icon: "arrow-right"
+                iconSize: 24
+                iconOffsetX: -2
+                tip: "Forward"
+                enabled: win.libraryFullPage ? win.canGoForward : root.canGoForwardFromSidePanel()
+                onClicked: win.libraryFullPage ? win.goForward() : root.goForwardFromSidePanel()
+            }
             NText {
                 text: "Network"
                 font.pixelSize: 14

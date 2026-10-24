@@ -85,6 +85,9 @@ ApplicationWindow {
     readonly property bool audioVisualizerActive: audioVisualizerPopup.selectedMode !== "disabled"
     property string navigationPage: "home"
     property var navigationHistory: []
+    property var navigationForwardHistory: []
+    property var navigationFullPageHistory: []
+    property var navigationForwardFullPageHistory: []
     property string lastOpenedPlaylistPath: ""
     property double lastOpenedPlaylistAt: 0
     property string rightPanel: ""          // "" | queue | settings
@@ -118,6 +121,7 @@ ApplicationWindow {
     readonly property bool onboardingActive: onboarding.visible
     readonly property bool canGoBack: navigationHistory.length > 0 || navigationPage !== "home"
                                          || libraryOpen || rightPanel.length > 0
+    readonly property bool canGoForward: navigationForwardHistory.length > 0
     onOverlayModeChanged: {
         // Fullscreen changes the window bounds without necessarily moving the
         // pointer, so discard edge-hover state from the old window geometry.
@@ -432,16 +436,24 @@ ApplicationWindow {
             sideReturnPage = navigationPage
             sideReturnFullPage = libraryFullPage
         }
-        if (navigationPage !== page)
+        if (navigationPage !== page) {
             navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
+            navigationFullPageHistory = navigationFullPageHistory.concat([libraryFullPage]).slice(-30)
+            navigationForwardHistory = []
+            navigationForwardFullPageHistory = []
+        }
         openSidePanel(page)
     }
     function navigate(page, recordHistory) {
         if (page === "streaming") { networkDialog.open(); return }
         if (page === "add") { openFilesDialog.open(); return }
         if (!["home", "videos", "folder", "playlist", "music", "network", "recent", "player"].includes(page)) return
-        if (recordHistory !== false && navigationPage !== page)
+        if (recordHistory !== false && navigationPage !== page) {
             navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
+            navigationFullPageHistory = navigationFullPageHistory.concat([libraryFullPage]).slice(-30)
+            navigationForwardHistory = []
+            navigationForwardFullPageHistory = []
+        }
         sideReturnPage = ""
         sideReturnFullPage = false
         musicSidebarOpen = false
@@ -519,14 +531,40 @@ ApplicationWindow {
         if (navigationHistory.length) {
             const previousPage = navigationHistory[navigationHistory.length - 1]
             navigationHistory = navigationHistory.slice(0, -1)
+            const previousFullPage = navigationFullPageHistory.length
+                ? navigationFullPageHistory[navigationFullPageHistory.length - 1] : false
+            navigationFullPageHistory = navigationFullPageHistory.slice(0, -1)
+            navigationForwardHistory = navigationForwardHistory.concat([navigationPage]).slice(-30)
+            navigationForwardFullPageHistory = navigationForwardFullPageHistory.concat([libraryFullPage]).slice(-30)
             navigate(previousPage, false)
+            libraryFullPage = previousFullPage
             return true
         }
         if (navigationPage !== "home" || libraryOpen || libraryFullPage) {
+            if (navigationPage !== "home") {
+                navigationForwardHistory = navigationForwardHistory.concat([navigationPage]).slice(-30)
+                navigationForwardFullPageHistory = navigationForwardFullPageHistory.concat([libraryFullPage]).slice(-30)
+            }
             navigate("home", false)
             return true
         }
         return false
+    }
+    function goForward() {
+        if (fullscreen || pip || uiHidden || rightPanel.length || sidePanelOpen)
+            return false
+        if (!navigationForwardHistory.length)
+            return false
+        const nextPage = navigationForwardHistory[navigationForwardHistory.length - 1]
+        navigationForwardHistory = navigationForwardHistory.slice(0, -1)
+        const nextFullPage = navigationForwardFullPageHistory.length
+            ? navigationForwardFullPageHistory[navigationForwardFullPageHistory.length - 1] : false
+        navigationForwardFullPageHistory = navigationForwardFullPageHistory.slice(0, -1)
+        navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
+        navigationFullPageHistory = navigationFullPageHistory.concat([libraryFullPage]).slice(-30)
+        navigate(nextPage, false)
+        libraryFullPage = nextFullPage
+        return true
     }
     function setPip(on) {
         if (on === pip) return
