@@ -177,6 +177,7 @@ if(BUILD_TESTING)
     PREFIX /neo
     BASE ${CMAKE_CURRENT_SOURCE_DIR}
     FILES ${NEO_ICONS} ${NEO_FIGMA_ICONS}
+          assets/figma-icons/SHA256SUMS assets/figma-icons/index.json
   )
   target_include_directories(icon_provider_test PRIVATE src)
   target_link_libraries(icon_provider_test PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Svg)

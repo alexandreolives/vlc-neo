@@ -1,7 +1,11 @@
 #include "icon_provider.hpp"
 
+#include <QCryptographicHash>
 #include <QFile>
 #include <QGuiApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPainter>
 #include <QSize>
 #include <QSvgRenderer>
@@ -62,6 +66,62 @@ int main(int argc, char **argv)
     IconProvider provider;
     bool ok = true;
     QSize size;
+
+    QFile figmaIndexFile(QStringLiteral(":/neo/assets/figma-icons/index.json"));
+    const bool indexLoaded = figmaIndexFile.open(QIODevice::ReadOnly);
+    const QJsonObject figmaIndex = indexLoaded
+        ? QJsonDocument::fromJson(figmaIndexFile.readAll()).object() : QJsonObject();
+    ok &= expect(indexLoaded && figmaIndex.value(QStringLiteral("count")).toInt() == 206
+                     && figmaIndex.value(QStringLiteral("icons")).toArray().size() == 206,
+                 "the canonical Figma index contains all 206 exported icons");
+
+    QFile figmaSumsFile(QStringLiteral(":/neo/assets/figma-icons/SHA256SUMS"));
+    const bool sumsLoaded = figmaSumsFile.open(QIODevice::ReadOnly);
+    ok &= expect(sumsLoaded, "the pinned Figma SHA-256 manifest is bundled with the icons");
+    int verifiedFigmaFiles = 0;
+    int verifiedFigmaIcons = 0;
+    if (sumsLoaded) {
+        const QByteArray manifest = figmaSumsFile.readAll();
+        ok &= expect(manifest.contains("Source commit: 2c4b704edc49e01b6375de034ff8c85aa592918f"),
+                     "the Figma manifest records the pinned upstream export commit");
+        for (QByteArray line : manifest.split('\n')) {
+            line = line.trimmed();
+            if (line.isEmpty() || line.startsWith('#'))
+                continue;
+            const QList<QByteArray> fields = line.simplified().split(' ');
+            if (fields.size() != 2 || fields.at(0).size() != 64
+                || !fields.at(1).startsWith("assets/figma-icons/")) {
+                ok &= expect(false, "the Figma SHA-256 manifest has valid entries");
+                continue;
+            }
+            const QByteArray relativePath = fields.at(1);
+            const QByteArray basename = relativePath.mid(QByteArray("assets/figma-icons/").size());
+            if (basename.contains('/') || basename == "." || basename == "..") {
+                ok &= expect(false, "the Figma manifest only references files in its asset directory");
+                continue;
+            }
+            QFile assetFile(QStringLiteral(":/neo/") + QString::fromUtf8(relativePath));
+            const bool assetLoaded = assetFile.open(QIODevice::ReadOnly);
+            if (!assetLoaded) {
+                const QByteArray name = basename;
+                std::fprintf(stderr, "FAIL: pinned Figma asset '%s' is missing from Qt resources\n", name.constData());
+                ok = false;
+                continue;
+            }
+            const QByteArray actual = QCryptographicHash::hash(assetFile.readAll(), QCryptographicHash::Sha256).toHex();
+            if (actual != fields.at(0)) {
+                const QByteArray name = basename;
+                std::fprintf(stderr, "FAIL: pinned Figma asset '%s' does not match its SHA-256\n", name.constData());
+                ok = false;
+                continue;
+            }
+            ++verifiedFigmaFiles;
+            if (basename.endsWith(".svg"))
+                ++verifiedFigmaIcons;
+        }
+    }
+    ok &= expect(verifiedFigmaFiles == 207 && verifiedFigmaIcons == 206,
+                 "all 206 Figma SVGs and the icon index match the pinned SHA-256 manifest");
 
     const QImage figmaPlay = provider.requestImage(QStringLiteral("play?D37918"), &size, QSize(48, 48));
     ok &= expect(!figmaPlay.isNull() && size == QSize(48, 48), "Figma icon loads at the requested size");
