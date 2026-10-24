@@ -840,6 +840,7 @@ Rectangle {
             ScrollBar.vertical: ScrollBar {}
             delegate: Rectangle {
                 id: mediaCell
+                objectName: "library-folder-item-" + fileName
                 required property string fileName
                 required property url fileUrl
                 required property bool fileIsDir
@@ -864,8 +865,24 @@ Rectangle {
                                                       videoThumbnail.status === Image.Loading ? "loading" :
                                                       videoThumbnail.status === Image.Ready ? "ready" :
                                                       videoThumbnail.status === Image.Error ? "error" : "unknown"
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: fileName
+                Accessible.description: fileIsDir ? "Open folder" : "Play media"
+                Accessible.focusable: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                            && !event.isAutoRepeat) {
+                        mediaCell.forceActiveFocus()
+                        if (mediaCell.fileIsDir) root.openFolder(mediaCell.fileUrl)
+                        else player.openUrls([mediaCell.fileUrl], true)
+                        event.accepted = true
+                    }
+                }
                 color: root.folderViewMode === "list" && playing ? Theme.accentSoft
-                     : (cellMouse.containsMouse ? Theme.hover : "transparent")
+                     : (cellMouse.containsMouse || activeFocus ? Theme.hover : "transparent")
+                border.width: activeFocus ? 1 : 0
+                border.color: Theme.accent
 
                 Item {
                     id: thumbnailFrame
@@ -926,7 +943,11 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     drag.target: dragProxy
-                    onClicked: mediaCell.fileIsDir ? root.openFolder(mediaCell.fileUrl) : player.openUrls([mediaCell.fileUrl], true)
+                    onClicked: {
+                        mediaCell.forceActiveFocus()
+                        if (mediaCell.fileIsDir) root.openFolder(mediaCell.fileUrl)
+                        else player.openUrls([mediaCell.fileUrl], true)
+                    }
                 }
                 Item {
                     id: dragProxy
@@ -1689,6 +1710,7 @@ Rectangle {
 
     component LibraryRow: Rectangle {
         id: row
+        objectName: "library-row-" + label
         property string label
         property string iconName: "video"
         property url url
@@ -1697,7 +1719,23 @@ Rectangle {
         Layout.fillWidth: true
         width: ListView.view ? ListView.view.width : implicitWidth
         implicitHeight: 34
-        color: playing ? Theme.accentSoft : (rowMouse.containsMouse ? Theme.hover : "transparent")
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: label
+        Accessible.description: isDir ? "Open folder" : "Play media"
+        Accessible.focusable: true
+        Keys.onPressed: event => {
+            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                    && !event.isAutoRepeat) {
+                row.forceActiveFocus()
+                if (row.isDir) root.openFolder(row.url)
+                else player.openUrls([row.url], true)
+                event.accepted = true
+            }
+        }
+        color: playing ? Theme.accentSoft : (rowMouse.containsMouse || activeFocus ? Theme.hover : "transparent")
+        border.width: activeFocus ? 1 : 0
+        border.color: Theme.accent
 
         RowLayout {
             anchors.fill: parent
@@ -1718,7 +1756,11 @@ Rectangle {
             anchors.rightMargin: 34
             hoverEnabled: true
             drag.target: dragProxy
-            onClicked: row.isDir ? root.openFolder(row.url) : player.openUrls([row.url], true)
+            onClicked: {
+                row.forceActiveFocus()
+                if (row.isDir) root.openFolder(row.url)
+                else player.openUrls([row.url], true)
+            }
         }
         // Drag to the queue (or anywhere that accepts file urls).
         Item {
