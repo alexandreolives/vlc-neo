@@ -510,6 +510,10 @@ ApplicationWindow {
         if (pip) { setPip(false); return true }
         if (uiHidden) { uiHidden = false; return true }
         if (rightPanel.length) { rightPanel = ""; return true }
+        if (sidePanelOpen && libraryPanel.canGoBackFromSidePanel()) {
+            libraryPanel.goBackFromSidePanel()
+            return true
+        }
         if (sidePanelOpen && sideReturnPage.length) { closeSidePanel(); return true }
         if (navigationHistory.length) {
             const previousPage = navigationHistory[navigationHistory.length - 1]
