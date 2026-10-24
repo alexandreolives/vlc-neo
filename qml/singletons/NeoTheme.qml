@@ -80,6 +80,8 @@ QtObject {
         property string accent: "#D37918"
         property bool onboarded: false
         property string layout: ""
+        property string homeFolderVisitCountsJson: "{}"
+        property string homePlaylistVisitCountsJson: "{}"
         property int controlLayoutVersion: 0
         property bool showSeekThumbnails: true
         property string favoriteMediaJson: "[]"

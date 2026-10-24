@@ -202,6 +202,7 @@ Rectangle {
     }
     function openFolder(url) {
         if (root.figmaSidePanel) sideFolderHistory = sideFolderHistory.concat([root.folder])
+        win.rememberHomeVisit("folder", platform.localPath(url))
         root.folder = url
         root.section = "folder"
     }

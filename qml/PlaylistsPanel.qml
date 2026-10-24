@@ -143,7 +143,7 @@ Rectangle {
                 Accessible.focusable: true
                 Keys.onPressed: event => {
                     if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
-                        player.openUrls([fileUrl], true)
+                        win.openPlaylist(fileUrl)
                         event.accepted = true
                     }
                 }
@@ -170,7 +170,7 @@ Rectangle {
                         icon: "play"
                         iconSize: 13
                         tip: "Play playlist"
-                        onClicked: player.openUrls([fileUrl], true)
+                        onClicked: win.openPlaylist(fileUrl)
                     }
                 }
                 MouseArea {
@@ -179,8 +179,7 @@ Rectangle {
                     anchors.rightMargin: 34
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: { parent.forceActiveFocus(); player.openUrls([fileUrl], true) }
-                    onDoubleClicked: player.openUrls([fileUrl], true)
+                    onClicked: { parent.forceActiveFocus(); win.openPlaylist(fileUrl) }
                 }
             }
             NText {

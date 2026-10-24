@@ -41,11 +41,45 @@ Rectangle {
     function activateVisitedFolder(item) { win.openFolderSidePanel(item.path) }
     function activateRecentPlaylist(index) {
         win.navigate("player")
-        player.openUrls([platform.fileUrl(homePlaylists.get(index, "filePath"))], true)
+        win.openPlaylist(platform.fileUrl(playlistItems[index].filePath))
     }
     property var videoItems: []
     property var musicItems: []
     property var folderItems: []
+    property var playlistItems: []
+
+    function visitStats(kind, path) {
+        const property = kind === "playlist" ? "homePlaylistVisitCountsJson" : "homeFolderVisitCountsJson"
+        try { return JSON.parse(Theme.store[property] || "{}")[path] || { count: 0, last: 0 } }
+        catch (error) { return { count: 0, last: 0 } }
+    }
+    function visitOrder(kind, a, b) {
+        const left = visitStats(kind, a)
+        const right = visitStats(kind, b)
+        return right.count - left.count || right.last - left.last
+    }
+    function playlistLabel(name) { return name.replace(/\.(m3u8?|pls|xspf)$/i, "") }
+    function frequentFolders() {
+        let folders = mediaLibrary.roots.map(path => ({ path: path, title: path.split("/").filter(Boolean).pop() || path }))
+        folders.sort((a, b) => visitOrder("folder", a.path, b.path) || a.title.localeCompare(b.title))
+        if (sortByName) folders.sort((a, b) => a.title.localeCompare(b.title))
+        if (searchText.trim().length)
+            folders = folders.filter(item => item.title.toLowerCase().includes(searchText.trim().toLowerCase()))
+        return folders
+    }
+    function frequentPlaylists() {
+        let playlists = []
+        for (let index = 0; index < homePlaylists.count; ++index)
+            playlists.push({ fileName: homePlaylists.get(index, "fileName"), filePath: homePlaylists.get(index, "filePath") })
+        playlists.sort((a, b) => visitOrder("playlist", a.filePath, b.filePath)
+                       || playlistLabel(a.fileName).localeCompare(playlistLabel(b.fileName)))
+        if (sortByName) playlists.sort((a, b) => playlistLabel(a.fileName).localeCompare(playlistLabel(b.fileName)))
+        return playlists
+    }
+    function refreshFrequentVisits() {
+        folderItems = frequentFolders()
+        playlistItems = frequentPlaylists()
+    }
 
     function refreshContent() {
         contentRevision++
@@ -82,11 +116,7 @@ Rectangle {
             tracks = tracks.filter(item => [item.title, item.artist, item.album, item.genre, item.path]
                 .join(" ").toLowerCase().includes(searchText.trim().toLowerCase()))
         musicItems = tracks
-        let folders = mediaLibrary.roots.map(path => ({ path: path, title: path.split("/").filter(Boolean).pop() || path }))
-        if (sortByName) folders.sort((a, b) => a.title.localeCompare(b.title))
-        if (searchText.trim().length)
-            folders = folders.filter(item => item.title.toLowerCase().includes(searchText.trim().toLowerCase()))
-        folderItems = folders
+        refreshFrequentVisits()
     }
     function videoThumbnailReady(index) {
         const card = videoRepeater.itemAt(index)
@@ -107,6 +137,7 @@ Rectangle {
         showDirs: false
         showDotAndDotDot: false
         caseSensitive: false
+        onCountChanged: root.playlistItems = root.frequentPlaylists()
     }
     Connections {
         target: mediaLibrary
@@ -435,17 +466,18 @@ Rectangle {
                     }
                 }
                 Repeater {
-                    model: Math.min(homePlaylists.count, root.sidePanel ? 3 : 6)
+                    model: Math.min(root.playlistItems.length, root.sidePanel ? 3 : 6)
                     delegate: Item {
                         required property int index
                         objectName: (root.sidePanel ? "home-side-playlist-" : "home-main-playlist-") + index
+                        readonly property var playlist: root.playlistItems[index]
                         Layout.fillWidth: true
                         Layout.leftMargin: root.sidePanel ? 24 : 16
                         Layout.rightMargin: 12
                         Layout.preferredHeight: root.sidePanel ? 42 : 34
                         activeFocusOnTab: true
                         Accessible.role: Accessible.Button
-                        Accessible.name: homePlaylists.get(index, "fileName") + ", playlist"
+                        Accessible.name: root.playlistLabel(playlist.fileName) + ", playlist"
                         Accessible.focusable: true
                         Keys.onPressed: event => {
                             if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
@@ -464,14 +496,14 @@ Rectangle {
                             anchors.fill: parent
                             spacing: root.sidePanel ? 17 : 9
                             Icon { name: "playlist"; size: root.sidePanel ? 20 : 16; color: Theme.icon }
-                            NText { text: homePlaylists.get(index, "fileName"); font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
+                            NText { text: root.playlistLabel(playlist.fileName); font.pixelSize: root.sidePanel ? 13 : 11; color: root.sidePanel ? Theme.librarySideText : Theme.text; elide: Text.ElideRight; Layout.fillWidth: true }
                         }
                         HoverHandler { id: playlistRowHover }
                         TapHandler { onTapped: { parent.forceActiveFocus(); root.activateRecentPlaylist(index) } }
                     }
                 }
                 NText {
-                    visible: homePlaylists.count === 0
+                    visible: root.playlistItems.length === 0
                     text: "No playlists yet"
                     dim: true
                     font.pixelSize: 10
@@ -479,7 +511,7 @@ Rectangle {
                     Layout.bottomMargin: 4
                 }
                 NButton {
-                    visible: homePlaylists.count === 0
+                    visible: root.playlistItems.length === 0
                     text: "Create playlist"
                     icon: "playlist"
                     Layout.fillWidth: true

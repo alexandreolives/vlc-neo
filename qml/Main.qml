@@ -82,6 +82,8 @@ ApplicationWindow {
     readonly property bool audioVisualizerActive: audioVisualizerPopup.selectedMode !== "disabled"
     property string navigationPage: "home"
     property var navigationHistory: []
+    property string lastOpenedPlaylistPath: ""
+    property double lastOpenedPlaylistAt: 0
     property string rightPanel: ""          // "" | queue | settings
     property bool startupVolumePending: true
     property bool restoringWindowGeometry: true
@@ -237,6 +239,28 @@ ApplicationWindow {
         }
     }
     function togglePanel(name) { rightPanel = rightPanel === name ? "" : name }
+    function rememberHomeVisit(kind, path) {
+        if (!path || !path.length) return
+        const property = kind === "playlist" ? "homePlaylistVisitCountsJson" : "homeFolderVisitCountsJson"
+        let visits = ({})
+        try { visits = JSON.parse(Theme.store[property] || "{}") || ({}) } catch (error) { visits = ({}) }
+        const entry = visits[path] || { count: 0, last: 0 }
+        visits[path] = { count: Math.min(1000000, Number(entry.count) + 1 || 1), last: Date.now() }
+        const paths = Object.keys(visits).sort((a, b) => Number(visits[b].last) - Number(visits[a].last))
+        for (const stalePath of paths.slice(100)) delete visits[stalePath]
+        Theme.store[property] = JSON.stringify(visits)
+        homeView.refreshFrequentVisits()
+        sideHomeView.refreshFrequentVisits()
+    }
+    function openPlaylist(url) {
+        const path = platform.localPath(url)
+        const now = Date.now()
+        if (path.length && path === lastOpenedPlaylistPath && now - lastOpenedPlaylistAt < 400) return
+        lastOpenedPlaylistPath = path
+        lastOpenedPlaylistAt = now
+        rememberHomeVisit("playlist", path)
+        player.openUrls([url], true)
+    }
     function openSidePanel(page) {
         if (!sidePanelOpen) {
             sideReturnPage = navigationPage
@@ -303,6 +327,7 @@ ApplicationWindow {
         else openSidePanel("home")
     }
     function openFolderSidePanel(path) {
+        if (path && path.length) rememberHomeVisit("folder", path)
         openSidePanel("folder")
         if (path && path.length) libraryPanel.folder = platform.fileUrl(path)
     }
