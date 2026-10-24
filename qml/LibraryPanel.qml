@@ -50,6 +50,7 @@ Rectangle {
     signal openFiles()
     signal indexFolder()
     signal openNetworkStream(string category)
+    signal showMoreOptions(var anchor)
 
     function recentItems() {
         recentRevision
@@ -438,7 +439,14 @@ Rectangle {
             IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
             IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
             IconButton { visible: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
-            IconButton { visible: root.figmaSidePanel; icon: "more"; tip: "More options" }
+            IconButton {
+                id: genericSideMoreButton
+                objectName: "sidepanel-more-button-generic"
+                visible: root.figmaSidePanel
+                icon: "more"
+                tip: "More options"
+                onClicked: root.showMoreOptions(genericSideMoreButton)
+            }
             IconButton { visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
             IconButton { visible: !root.figmaSidePanel; icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
         }
@@ -1068,7 +1076,13 @@ Rectangle {
             IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
             IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
             NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 0; Layout.fillWidth: true }
-            IconButton { icon: "more"; tip: "More options" }
+            IconButton {
+                id: musicSideMoreButton
+                objectName: "sidepanel-more-button-music"
+                icon: "more"
+                tip: "More options"
+                onClicked: root.showMoreOptions(musicSideMoreButton)
+            }
             IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
         }
 
@@ -1345,7 +1359,13 @@ Rectangle {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            IconButton { icon: "more"; tip: "Network options" }
+            IconButton {
+                id: networkSideMoreButton
+                objectName: "sidepanel-more-button-network"
+                icon: "more"
+                tip: "More options"
+                onClicked: root.showMoreOptions(networkSideMoreButton)
+            }
             IconButton { icon: "open"; tip: "Open full library page"; onClicked: win.navigate(win.navigationPage) }
         }
 

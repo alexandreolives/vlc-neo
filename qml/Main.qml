@@ -73,6 +73,7 @@ ApplicationWindow {
     property rect pipRestoreGeometry: Qt.rect(0, 0, 0, 0)
     property bool pipWasMaximized: false
     property bool libraryOpen: false
+    property var sidePanelActionAnchor: null
     property bool libraryFullPage: false
     property bool musicSidebarOpen: false
     property bool folderSidebarOpen: false
@@ -321,6 +322,11 @@ ApplicationWindow {
         rightPanel = ""
         navigate(returnPage, false)
         libraryFullPage = returnFullPage
+    }
+    function openSidePanelActions(anchor) {
+        sidePanelActionAnchor = anchor
+        const p = anchor.mapToItem(keyCatcher, 0, anchor.height)
+        sidePanelActionsMenu.popup(Math.max(4, p.x - 22), Math.max(4, p.y + 4))
     }
     function currentMediaFolder() {
         return player.folderPath.length
@@ -837,6 +843,7 @@ ApplicationWindow {
                     onOpenFiles: openFilesDialog.open()
                     onIndexFolder: indexFolderDialog.open()
                     onOpenNetworkStream: (category) => networkDialog.openForCategory(category)
+                    onShowMoreOptions: (anchor) => win.openSidePanelActions(anchor)
                 }
 
                 Rectangle {
@@ -1091,6 +1098,77 @@ ApplicationWindow {
         NMenuItem { text: "Preferences…"; iconName: "settings"; shortcutText: "Ctrl+P"; onTriggered: settingsDialog.open() }
         NMenuSeparator {}
         NMenuItem { text: "Quit"; iconName: "x"; shortcutText: "Ctrl+Q"; onTriggered: win.close() }
+    }
+
+    NMenu {
+        id: sidePanelActionsMenu
+        objectName: "sidepanel-actions-menu"
+        parent: keyCatcher
+        onClosed: win.focusKeys()
+        NMenuItem {
+            objectName: "sidepanel-action-add-file"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Add File"
+            iconName: "add"
+            onTriggered: openFilesDialog.open()
+        }
+        NMenuItem {
+            objectName: "sidepanel-action-add-folder"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Add Folder"
+            iconName: "new-folder-two-tone"
+            onTriggered: openFolderDialog.open()
+        }
+        NMenuItem {
+            objectName: "sidepanel-action-edit-subtitles"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Edit Subtitle Tracks"
+            iconName: "subtitle-2461-9663"
+            enabled: player.hasMedia
+            onTriggered: tracksPopup.openFor("spu", win.sidePanelActionAnchor)
+        }
+        NMenuItem {
+            objectName: "sidepanel-action-edit-audio"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Edit Audio Tracks"
+            iconName: "audio-two-tone"
+            enabled: player.hasMedia
+            onTriggered: tracksPopup.openFor("audio", win.sidePanelActionAnchor)
+        }
+        NMenuItem {
+            objectName: "sidepanel-action-resync"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Resync"
+            iconName: "refresh-two-tone"
+            enabled: player.hasMedia
+            onTriggered: { player.setSubtitleDelay(0); player.setAudioDelay(0) }
+        }
+        NMenuItem {
+            objectName: "sidepanel-action-info"
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: "Info"
+            iconName: "info-two-tone"
+            enabled: player.hasMedia
+            onTriggered: mediaPropertiesDialog.open()
+        }
     }
 
     NMenu {

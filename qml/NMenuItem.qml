@@ -6,6 +6,8 @@ import Neo 1.0
 MenuItem {
     id: root
     property string iconName: icon.name
+    property int iconSize: 15
+    property int labelSize: Theme.fontBody
     property string shortcutText: action && action.shortcut ? String(action.shortcut) : ""
     implicitHeight: 32
     leftPadding: 10
@@ -28,13 +30,14 @@ MenuItem {
                 anchors.centerIn: parent
                 visible: root.checkable ? root.checked : root.iconName.length > 0
                 name: root.checkable ? "check" : root.iconName
-                size: 15
+                size: root.iconSize
                 color: root.checkable || root.highlighted ? Theme.accent : Theme.icon
             }
         }
         NText {
             text: root.text
             Layout.fillWidth: true
+            font.pixelSize: root.labelSize
             color: root.enabled ? Theme.text : Theme.textFaint
         }
         NText {

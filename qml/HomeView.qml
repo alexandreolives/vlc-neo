@@ -170,7 +170,13 @@ Rectangle {
                     IconButton { icon: "arrow-left"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Back"; onClicked: win.goBack() }
                     IconButton { icon: "arrow-right"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Forward"; enabled: false }
                     NText { text: "Home"; font.pixelSize: root.sidePanel ? 14 : 12; color: root.sidePanel ? Theme.librarySideTitle : Theme.text; Layout.leftMargin: root.sidePanel ? 3 : 0; Layout.fillWidth: true }
-                    IconButton { icon: "more"; tip: "More options" }
+                    IconButton {
+                        id: homeSideMoreButton
+                        objectName: root.sidePanel ? "home-sidepanel-more-button" : "home-non-side-more-button"
+                        icon: "more"
+                        tip: "More options"
+                        onClicked: win.openSidePanelActions(homeSideMoreButton)
+                    }
                     IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border; visible: !root.sidePanel }
@@ -552,7 +558,13 @@ Rectangle {
                     text: root.searchText
                     onTextEdited: { root.searchText = text; root.refreshContent() }
                 }
-                IconButton { icon: "more"; tip: "More options" }
+                IconButton {
+                    id: homeFullMoreButton
+                    objectName: root.sidePanel ? "home-non-fullpage-more-button" : "home-fullpage-more-button"
+                    icon: "more"
+                    tip: "More options"
+                    onClicked: win.openSidePanelActions(homeFullMoreButton)
+                }
             }
 
             Rectangle { visible: !root.sidePanel; Layout.fillWidth: true; height: 1; color: Theme.border }

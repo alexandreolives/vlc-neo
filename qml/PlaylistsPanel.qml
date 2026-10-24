@@ -52,7 +52,13 @@ Rectangle {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            IconButton { icon: "more"; tip: "Playlist options" }
+            IconButton {
+                id: playlistSideMoreButton
+                objectName: "playlist-sidepanel-more-button"
+                icon: "more"
+                tip: "More options"
+                onClicked: win.openSidePanelActions(playlistSideMoreButton)
+            }
             IconButton { objectName: "playlist-expand"; icon: "open"; tip: "Open full library page"; onClicked: root.openLibraryPage() }
         }
 
