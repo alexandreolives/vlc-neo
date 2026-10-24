@@ -963,8 +963,7 @@ ApplicationWindow {
             visible: !onboarding.visible || onboarding.themePreviewActive || win.topHot || opacity > 0.01
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.leftMargin: (parent === keyCatcher && navigationRail.visible ? navigationRail.width : 0)
-                                + (onboarding.themePreviewActive ? onboarding.themePreviewInset : 0)
+            anchors.leftMargin: onboarding.themePreviewActive ? onboarding.themePreviewInset : 0
             anchors.rightMargin: onboarding.themePreviewActive ? onboarding.themePreviewInset : 0
             y: onboarding.themePreviewActive ? onboarding.themePreviewTop
                : onboarding.visible ? (win.topHot ? 0 : -height)
@@ -1005,17 +1004,15 @@ ApplicationWindow {
         NavigationRail {
             id: navigationRail
             anchors.left: parent.left
-            anchors.top: parent.top
             anchors.bottom: parent.bottom
+            y: topBar.y + topBar.height
             currentPage: win.navigationPage
             shown: win.sideNavigationShown
             musicCategoryActive: libraryPanel.musicSidePage === "categories"
             expanded: win.libraryFullPage || (!win.libraryOpen && win.navigationPage === "home")
-            canGoBack: win.canGoBack
             visible: !onboarding.visible && (!win.overlayMode || win.chromeShown)
                      && (shown || width > 0.5)
             onNavigate: (page) => win.navigateFromRail(page)
-            onBackRequested: win.goBack()
         }
 
         ResumePill {

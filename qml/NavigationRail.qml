@@ -10,10 +10,8 @@ Rectangle {
     property string currentPage: "home"
     property bool expanded: false
     property bool shown: false
-    property bool canGoBack: false
     property bool musicCategoryActive: true
     signal navigate(string page)
-    signal backRequested()
 
     width: !shown ? 0 : expanded ? Math.max(112, Math.min(210, Math.round(win.width * 0.11)))
                                  : Math.max(30, Math.min(50, Math.round(win.width * 0.026)))
@@ -22,20 +20,6 @@ Rectangle {
     clip: true
     Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
     Behavior on opacity { NumberAnimation { duration: 140 } }
-
-    RailButton {
-        objectName: "navigation-back"
-        anchors.top: parent.top
-        anchors.topMargin: 5
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: root.expanded ? root.width - 10 : 26
-        height: root.expanded ? 40 : 26
-        visible: root.canGoBack
-        iconName: "arrow-left"
-        label: "Back"
-        page: "__back"
-        onClicked: root.backRequested()
-    }
 
     function focusPage(page) {
         for (const button of buttonList.children) {
@@ -65,7 +49,7 @@ Rectangle {
     ColumnLayout {
         id: buttonList
         anchors.top: parent.top
-        anchors.topMargin: root.expanded ? 54 : 38
+        anchors.topMargin: root.expanded ? 20 : 14
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: root.expanded ? 2 : 3
 
