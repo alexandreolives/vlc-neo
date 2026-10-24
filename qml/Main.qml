@@ -267,6 +267,8 @@ ApplicationWindow {
             sideReturnPage = navigationPage
             sideReturnFullPage = libraryFullPage
         }
+        libraryPanel.sideFolderHistory = []
+        libraryPanel.sidePanelForwardHistory = []
         navigationPage = page || "playlist"
         libraryFullPage = false
         libraryOpen = true

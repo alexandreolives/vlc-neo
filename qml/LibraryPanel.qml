@@ -15,6 +15,7 @@ Rectangle {
     property bool compactFolderSidebar: false
     property bool figmaSidePanel: false
     property var sideFolderHistory: []
+    property var sidePanelForwardHistory: []
     property string musicSidePage: "categories"
     property string musicSideFolderRoot: ""
     property var musicSideHistory: []
@@ -131,8 +132,34 @@ Rectangle {
         if (normalized === musicLocation) return "My Songs"
         return normalized.split("/").filter(Boolean).pop() || "My Songs"
     }
+    function canGoForwardFromSidePanel() {
+        return sidePanelForwardHistory.length > 0
+    }
+    function goForwardFromSidePanel() {
+        if (!sidePanelForwardHistory.length) return
+        const destination = sidePanelForwardHistory[sidePanelForwardHistory.length - 1]
+        sidePanelForwardHistory = sidePanelForwardHistory.slice(0, -1)
+        if (destination.kind === "folder") {
+            sideFolderHistory = sideFolderHistory.concat([root.folder])
+            root.folder = destination.folder
+            root.section = destination.section
+            root.mediaType = destination.mediaType
+            return
+        }
+        if (destination.kind === "music-folder-root") {
+            musicSideFolderRoot = destination.value
+            mediaLibrary.model.search = destination.search
+            return
+        }
+        if (destination.kind === "music-page") {
+            musicSideHistory = musicSideHistory.concat([musicSidePage])
+            musicSidePage = destination.value
+            mediaLibrary.model.view = ["albums", "artists", "genres"].includes(musicSidePage) ? musicSidePage : "tracks"
+        }
+    }
     function goBackFromSidePanel() {
         if (win.navigationPage === "music" && musicSideFolderRoot.length) {
+            sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "music-folder-root", value: musicSideFolderRoot, search: mediaLibrary.model.search }])
             musicSideFolderRoot = ""
             mediaLibrary.model.search = ""
             return
@@ -141,11 +168,13 @@ Rectangle {
             const currentPath = platform.localPath(root.folder)
             const musicRoot = root.musicRootForPath(currentPath)
             if (musicRoot.length && currentPath !== musicRoot && sideFolderHistory.length) {
+                sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "folder", folder: root.folder, section: root.section, mediaType: root.mediaType }])
                 root.folder = sideFolderHistory[sideFolderHistory.length - 1]
                 sideFolderHistory = sideFolderHistory.slice(0, -1)
                 return
             }
             if (sideFolderHistory.length) {
+                sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "folder", folder: root.folder, section: root.section, mediaType: root.mediaType }])
                 root.folder = sideFolderHistory[sideFolderHistory.length - 1]
                 sideFolderHistory = sideFolderHistory.slice(0, -1)
             }
@@ -158,6 +187,7 @@ Rectangle {
             return
         }
         if (win.navigationPage === "music" && musicSideHistory.length) {
+            sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "music-page", value: musicSidePage }])
             musicSidePage = musicSideHistory[musicSideHistory.length - 1]
             musicSideHistory = musicSideHistory.slice(0, -1)
             if (["albums", "artists", "genres"].includes(musicSidePage))
@@ -167,6 +197,7 @@ Rectangle {
             return
         }
         if (sideFolderHistory.length) {
+            sidePanelForwardHistory = sidePanelForwardHistory.concat([{ kind: "folder", folder: root.folder, section: root.section, mediaType: root.mediaType }])
             root.folder = sideFolderHistory[sideFolderHistory.length - 1]
             sideFolderHistory = sideFolderHistory.slice(0, -1)
             return
@@ -175,10 +206,16 @@ Rectangle {
     }
     function openMusicSidePage(page) {
         musicSideHistory = musicSideHistory.concat([musicSidePage])
+        sidePanelForwardHistory = []
         musicSideFolderRoot = ""
         musicSidePage = page
         mediaLibrary.model.search = ""
         mediaLibrary.model.view = ["albums", "artists", "genres"].includes(page) ? page : "tracks"
+    }
+    function openMusicSideRoot(path) {
+        sidePanelForwardHistory = []
+        musicSideFolderRoot = path
+        mediaLibrary.model.search = ""
     }
     function musicSideItemCount() {
         if (musicSidePage === "categories") return visibleMusicCategories().length
@@ -236,17 +273,21 @@ Rectangle {
         return result
     }
     function openFolder(url) {
-        if (root.figmaSidePanel) sideFolderHistory = sideFolderHistory.concat([root.folder])
+        if (root.figmaSidePanel) {
+            if (root.folder.toString() !== url.toString()) sideFolderHistory = sideFolderHistory.concat([root.folder])
+            sidePanelForwardHistory = []
+        }
         win.rememberHomeVisit("folder", platform.localPath(url))
         root.folder = url
         root.section = "folder"
     }
-    onFigmaSidePanelChanged: if (figmaSidePanel) sideFolderHistory = []
+    onFigmaSidePanelChanged: if (figmaSidePanel) { sideFolderHistory = []; sidePanelForwardHistory = [] }
     Connections {
         target: win
         function onNavigationPageChanged() {
             if (!root.figmaSidePanel) return
             root.sideFolderHistory = []
+            root.sidePanelForwardHistory = []
             if (win.navigationPage === "music") {
                 root.musicSidePage = "categories"
                 root.musicSideFolderRoot = ""
@@ -381,6 +422,7 @@ Rectangle {
             Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
             spacing: root.figmaSidePanel ? 6 : 2
             IconButton {
+                objectName: "sidepanel-back-generic"
                 icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
                 iconSize: root.figmaSidePanel ? 24 : 18
                 iconOffsetX: root.figmaSidePanel ? -2 : 0
@@ -388,7 +430,7 @@ Rectangle {
                 visible: root.figmaSidePanel || root.section === "folder"
                 onClicked: root.figmaSidePanel ? root.goBackFromSidePanel() : root.openFolder(files.parentFolder)
             }
-            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: false }
+            IconButton { objectName: "sidepanel-forward-generic"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             Chips {
                 visible: !root.wide
                 model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
@@ -1074,7 +1116,7 @@ Rectangle {
             Layout.rightMargin: 17
             spacing: 6
             IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
-            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
+            IconButton { objectName: "sidepanel-forward-music"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 0; Layout.fillWidth: true }
             IconButton {
                 id: musicSideMoreButton
@@ -1222,8 +1264,7 @@ Rectangle {
                         onActiveFocusChanged: if (activeFocus) root.keepSideItemVisible(musicSideRootsFlickable, this)
                         Keys.onPressed: event => {
                             if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
-                                root.musicSideFolderRoot = modelData
-                                mediaLibrary.model.search = ""
+                                root.openMusicSideRoot(modelData)
                                 event.accepted = true
                             }
                         }
@@ -1241,8 +1282,7 @@ Rectangle {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 parent.forceActiveFocus()
-                                root.musicSideFolderRoot = modelData
-                                mediaLibrary.model.search = ""
+                                root.openMusicSideRoot(modelData)
                             }
                         }
                     }
@@ -1351,7 +1391,7 @@ Rectangle {
             Layout.preferredHeight: 52
             spacing: 6
             IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
-            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
+            IconButton { objectName: "sidepanel-forward-network"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             NText {
                 text: "Network"
                 font.pixelSize: 14
