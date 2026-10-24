@@ -22,6 +22,10 @@ Rectangle {
     property bool musicSideSortByName: false
     property bool musicSideCompactView: false
     property bool musicSearchOpen: false
+    property bool networkSideSearchOpen: false
+    property bool networkSideSortByName: false
+    property bool networkSideCompactView: false
+    property string networkSideSearchText: ""
     property bool folderSearchOpen: false
     property alias folderSearchButton: compactFolderSearchButton
     property alias folderPinButton: compactFolderPinButton
@@ -30,7 +34,7 @@ Rectangle {
     property alias musicItemCountText: musicItemCountLabel.text
     property alias figmaMusicItemCountText: musicSidePanelCount.text
     property url folder: StandardPaths.writableLocation(StandardPaths.MoviesLocation)
-    property string section: "folder"   // home | folder | recent | music
+    property string section: "folder"   // home | folder | recent | music | network
     property string sortBy: "name"
     property string folderViewMode: "grid"
     property string mediaType: "all"   // all | video | audio
@@ -45,6 +49,7 @@ Rectangle {
     property alias albumViewButton: musicViewAlbums
     signal openFiles()
     signal indexFolder()
+    signal openNetworkStream(string category)
 
     function recentItems() {
         recentRevision
@@ -73,6 +78,7 @@ Rectangle {
         Theme.store.pinned = list.join("\n")
     }
     function sidePanelTitle() {
+        if (win.navigationPage === "network") return "Network"
         if (win.navigationPage === "music") {
             if (musicSidePage === "songs" && musicSideFolderRoot.length)
                 return "…  ▸  Songs  ▸  " + musicSideRootLabel(musicSideFolderRoot)
@@ -218,6 +224,16 @@ Rectangle {
         if (musicSideSortByName) result.sort((a, b) => a.label.localeCompare(b.label))
         return result
     }
+    function visibleNetworkCategories() {
+        const query = networkSideSearchOpen ? networkSideSearchText.trim().toLowerCase() : ""
+        const categories = [
+            { key: "podcast", label: "Podcasts" },
+            { key: "radio", label: "Radio" }
+        ]
+        const result = query.length ? categories.filter(item => item.label.toLowerCase().includes(query)) : categories
+        if (networkSideSortByName) result.sort((a, b) => a.label.localeCompare(b.label))
+        return result
+    }
     function openFolder(url) {
         if (root.figmaSidePanel) sideFolderHistory = sideFolderHistory.concat([root.folder])
         win.rememberHomeVisit("folder", platform.localPath(url))
@@ -349,8 +365,9 @@ Rectangle {
     }
 
     ColumnLayout {
-        visible: !(root.figmaSidePanel && root.section === "music"
-                   && ["categories", "songs"].includes(root.musicSidePage))
+        visible: root.section !== "network"
+                 && !(root.figmaSidePanel && root.section === "music"
+                      && ["categories", "songs"].includes(root.musicSidePage))
         anchors.fill: parent
         spacing: 0
 
@@ -1300,6 +1317,165 @@ Rectangle {
                 visible: parent.visible && parent.count === 0
                 text: "No songs in this folder"
                 color: Theme.librarySideText
+                font.pixelSize: 12
+            }
+        }
+    }
+
+    ColumnLayout {
+        id: networkSidePanel
+        objectName: "network-sidepanel"
+        anchors.fill: parent
+        visible: root.section === "network"
+        spacing: 0
+        z: 1
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 18
+            Layout.rightMargin: 17
+            Layout.preferredHeight: 52
+            spacing: 6
+            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
+            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
+            NText {
+                text: "Network"
+                font.pixelSize: 14
+                color: root.figmaSidePanel ? Theme.librarySideTitle : Theme.text
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
+            IconButton { icon: "more"; tip: "Network options" }
+            IconButton { icon: "open"; tip: "Open full library page"; onClicked: win.navigate(win.navigationPage) }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 20
+            Layout.rightMargin: 17
+            Layout.preferredHeight: 52
+            spacing: 5
+            NText {
+                visible: !root.networkSideSearchOpen
+                text: root.visibleNetworkCategories().length + (root.visibleNetworkCategories().length === 1 ? " item" : " items")
+                color: root.figmaSidePanel ? Theme.librarySideText : Theme.textDim
+                font.pixelSize: 12
+                Layout.fillWidth: true
+            }
+            NField {
+                objectName: "network-sidepanel-search-field"
+                visible: root.networkSideSearchOpen
+                Layout.fillWidth: true
+                placeholderText: "Search"
+                text: root.networkSideSearchText
+                onTextEdited: root.networkSideSearchText = text
+            }
+            IconButton { icon: "sort"; tip: "Sort"; checked: root.networkSideSortByName; onClicked: root.networkSideSortByName = !root.networkSideSortByName }
+            IconButton { icon: "list"; tip: "View options"; checked: root.networkSideCompactView; onClicked: root.networkSideCompactView = !root.networkSideCompactView }
+            IconButton {
+                icon: root.networkSideSearchOpen ? "close" : "search"
+                tip: root.networkSideSearchOpen ? "Close search" : "Search"
+                onClicked: {
+                    root.networkSideSearchOpen = !root.networkSideSearchOpen
+                    if (!root.networkSideSearchOpen) root.networkSideSearchText = ""
+                }
+            }
+        }
+
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+
+        Item {
+            objectName: "network-sidepanel-add"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            Layout.topMargin: 16
+            Layout.leftMargin: 25
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: "Add Network Stream"
+            Accessible.focusable: true
+            Keys.onPressed: event => {
+                if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                    root.openNetworkStream("")
+                    event.accepted = true
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusSmall
+                color: networkAddMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: parent.activeFocus ? 1 : 0
+                border.color: Theme.accent
+            }
+            Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add Network Stream"; font.pixelSize: 13; color: root.figmaSidePanel ? Theme.librarySideText : Theme.text }
+            MouseArea {
+                id: networkAddMouse
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: { parent.forceActiveFocus(); root.openNetworkStream("") }
+            }
+        }
+
+        ListView {
+            objectName: "network-sidepanel-categories"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.topMargin: 3
+            clip: true
+            model: root.visibleNetworkCategories()
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            delegate: Item {
+                required property int index
+                required property var modelData
+                objectName: "network-sidepanel-category-" + modelData.key
+                width: ListView.view.width
+                height: root.networkSideCompactView ? 36 : 44
+                activeFocusOnTab: true
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.label
+                Accessible.focusable: true
+                Keys.onPressed: event => {
+                    if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                        root.openNetworkStream(modelData.key)
+                        event.accepted = true
+                    }
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    color: networkCategoryMouse.containsMouse ? Theme.hover : "transparent"
+                    border.width: parent.activeFocus ? 1 : 0
+                    border.color: Theme.accent
+                }
+                Icon {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "streaming"
+                    size: 18
+                    color: Theme.icon
+                }
+                NText {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 62
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData.label
+                    font.pixelSize: 13
+                    color: root.figmaSidePanel ? Theme.librarySideText : Theme.text
+                }
+                MouseArea {
+                    id: networkCategoryMouse
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: { parent.forceActiveFocus(); root.openNetworkStream(modelData.key) }
+                }
+            }
+            NText {
+                anchors.centerIn: parent
+                visible: parent.count === 0
+                text: "No matching items"
+                color: root.figmaSidePanel ? Theme.librarySideText : Theme.textDim
                 font.pixelSize: 12
             }
         }

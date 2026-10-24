@@ -6,7 +6,8 @@ import Neo 1.0
 Modal {
     id: root
     objectName: "network-stream-dialog"
-    title: "Open Network Stream"
+    title: root.sourceCategory === "podcast" ? "Open Podcast Feed"
+           : root.sourceCategory === "radio" ? "Open Radio Stream" : "Open Network Stream"
     width: Math.min(1048, win.width - 32)
     height: Math.min(632, win.height - 32)
     bodyMargin: 22
@@ -18,8 +19,14 @@ Modal {
     footerBottomMargin: 22
     property var networkUrls: []
     property bool urlsValid: false
+    property string sourceCategory: ""
     property alias sourceText: urlList.text
     property alias playlistTitle: playlistName.text
+
+    function openForCategory(category) {
+        sourceCategory = category || ""
+        open()
+    }
 
     function parseUrls() {
         const lines = urlList.text.split(/\r?\n/)
@@ -55,8 +62,19 @@ Modal {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 14
-            NText { text: "Network URL"; font.pixelSize: 16; font.weight: Font.Normal }
-            NText { text: "You can enter multiple links to load."; dim: true; font.pixelSize: 14 }
+            NText {
+                text: root.sourceCategory === "podcast" ? "Podcast Feed URL"
+                      : root.sourceCategory === "radio" ? "Radio Stream URL" : "Network URL"
+                font.pixelSize: 16
+                font.weight: Font.Normal
+            }
+            NText {
+                text: root.sourceCategory === "podcast" ? "Enter one or more podcast feed links to load."
+                      : root.sourceCategory === "radio" ? "Enter one or more radio stream links to load."
+                      : "You can enter multiple links to load."
+                dim: true
+                font.pixelSize: 14
+            }
             TextArea {
                 id: urlList
                 objectName: "network-urls"
@@ -68,7 +86,9 @@ Modal {
                 selectionColor: Theme.accent
                 font.pixelSize: Theme.fontBody
                 wrapMode: TextEdit.WrapAnywhere
-                placeholderText: "e.g., https://www.example.com/stream.avi"
+                placeholderText: root.sourceCategory === "podcast" ? "e.g., https://www.example.com/podcast.rss"
+                                : root.sourceCategory === "radio" ? "e.g., https://www.example.com/radio-stream"
+                                : "e.g., https://www.example.com/stream.avi"
                 background: Rectangle {
                     radius: Theme.radiusSmall
                     color: Theme.field

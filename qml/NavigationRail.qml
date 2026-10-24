@@ -57,7 +57,7 @@ Rectangle {
         RailButton { iconName: "home"; activeIconName: "home-active"; label: "Home"; page: "home" }
         RailButton { iconName: "videos"; activeIconName: "videos-active"; label: "Videos"; page: "videos" }
         RailButton { iconName: "songs"; selectedIconName: "songs-selected"; activeIconName: "songs-active"; label: "Music"; page: "music" }
-        RailButton { iconName: "streaming"; activeIconName: "streaming-active"; label: "Network"; page: "streaming" }
+        RailButton { iconName: "streaming"; activeIconName: "streaming-active"; label: "Network"; page: "network" }
         RailButton { iconName: "playlist"; activeIconName: "playlist-active"; label: "Playlists"; page: "playlist" }
         RailButton { iconName: "recent"; label: "Recent"; page: "recent" }
 

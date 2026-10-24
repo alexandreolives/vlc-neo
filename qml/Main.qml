@@ -298,6 +298,12 @@ ApplicationWindow {
             mediaLibrary.model.search = ""
             mediaLibrary.model.view = "tracks"
             break
+        case "network":
+            libraryPanel.section = "network"
+            libraryPanel.mediaType = "all"
+            libraryPanel.networkSideSearchText = ""
+            libraryPanel.networkSideSearchOpen = false
+            break
         case "recent":
             libraryPanel.section = "recent"
             libraryPanel.mediaType = "all"
@@ -340,7 +346,7 @@ ApplicationWindow {
             openSidePanel("playlist")
             return
         }
-        if (!["videos", "folder", "music", "recent"].includes(page)) {
+        if (!["videos", "folder", "music", "network", "recent"].includes(page)) {
             navigate(page)
             return
         }
@@ -355,7 +361,7 @@ ApplicationWindow {
     function navigate(page, recordHistory) {
         if (page === "streaming") { networkDialog.open(); return }
         if (page === "add") { openFilesDialog.open(); return }
-        if (!["home", "videos", "folder", "playlist", "music", "recent", "player"].includes(page)) return
+        if (!["home", "videos", "folder", "playlist", "music", "network", "recent", "player"].includes(page)) return
         if (recordHistory !== false && navigationPage !== page)
             navigationHistory = navigationHistory.concat([navigationPage]).slice(-30)
         sideReturnPage = ""
@@ -397,6 +403,13 @@ ApplicationWindow {
             libraryPanel.section = "music"
             libraryPanel.mediaType = "audio"
             mediaLibrary.model.view = "tracks"
+            libraryOpen = false
+            rightPanel = ""
+            break
+        case "network":
+            libraryFullPage = true
+            libraryPanel.section = "network"
+            libraryPanel.mediaType = "all"
             libraryOpen = false
             rightPanel = ""
             break
@@ -823,6 +836,7 @@ ApplicationWindow {
                     Layout.preferredWidth: win.libraryPaneLayoutWidth
                     onOpenFiles: openFilesDialog.open()
                     onIndexFolder: indexFolderDialog.open()
+                    onOpenNetworkStream: (category) => networkDialog.openForCategory(category)
                 }
 
                 Rectangle {
@@ -1141,7 +1155,7 @@ ApplicationWindow {
     }
 
     // ------------------------------------------------------------ dialogs
-    NetworkDialog { id: networkDialog; onClosed: win.focusKeys() }
+    NetworkDialog { id: networkDialog; onClosed: { sourceCategory = ""; win.focusKeys() } }
     CastDialog { id: castDialog }
     MediaPropertiesDialog { id: mediaPropertiesDialog; onClosed: win.focusKeys() }
     ConvertDialog { id: convertDialog; onClosed: win.focusKeys() }
