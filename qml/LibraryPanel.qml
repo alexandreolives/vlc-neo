@@ -165,7 +165,7 @@ Rectangle {
     function musicSideItemCount() {
         if (musicSidePage === "categories") return visibleMusicCategories().length
         if (musicSidePage === "songs") return musicSideFolderRoot.length ? musicSideTracks().length : mediaLibrary.roots.length
-        return mediaLibrary.model.itemCount()
+        return mediaLibrary.model.count
     }
     function musicSideCountText() {
         const count = musicSideItemCount()
@@ -177,7 +177,7 @@ Rectangle {
         const rootPath = musicLocalPath(musicSideFolderRoot)
         const query = mediaLibrary.model.search.trim().toLowerCase()
         const tracks = []
-        for (let index = 0; index < mediaLibrary.model.itemCount(); ++index) {
+        for (let index = 0; index < mediaLibrary.model.count; ++index) {
             const item = mediaLibrary.model.itemAt(index)
             if (item.kind !== "audio" || item.isGroup) continue
             const path = musicLocalPath(item.path)
@@ -414,6 +414,7 @@ Rectangle {
             Layout.preferredHeight: 52
             spacing: 4
             NText {
+                objectName: "music-sidepanel-toolbar-count"
                 visible: !root.musicSideSearchOpen
                 text: root.musicSideCountText()
                 dim: true
