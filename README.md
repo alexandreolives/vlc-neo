@@ -171,7 +171,7 @@ episodes. A shortcut to search OpenSubtitles for the current title is included.
 
 **Library side panels**
 <p>
-  <img src="docs/screenshots/home-sidebar.png" alt="VLC Neo Home side panel with recently watched media, music, folders and playlists" width="49%">
+  <img src="docs/screenshots/home-sidebar.png" alt="VLC Neo Home side panel with recent videos and music, folders, playlists and frequently listened artists" width="49%">
   <img src="docs/screenshots/playlists-sidebar.png" alt="VLC Neo playlist side panel with create action and saved playlists" width="49%">
   <img src="docs/screenshots/network-sidebar.png" alt="VLC Neo Network side panel with network stream, podcast and radio actions" width="49%">
 </p>

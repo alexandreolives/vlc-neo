@@ -82,6 +82,8 @@ QtObject {
         property string layout: ""
         property string homeFolderVisitCountsJson: "{}"
         property string homePlaylistVisitCountsJson: "{}"
+        property string homeArtistListenCountsJson: "{}"
+        property string homeLastArtistMediaUrl: ""
         property int controlLayoutVersion: 0
         property bool showSeekThumbnails: true
         property string favoriteMediaJson: "[]"

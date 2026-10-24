@@ -38,6 +38,11 @@ Rectangle {
         win.navigate("player")
         player.openUrls([platform.fileUrl(item.path)], true)
     }
+    function activateFrequentArtist(item) {
+        win.navigate("music")
+        mediaLibrary.model.view = "artists"
+        mediaLibrary.model.search = item.artist
+    }
     function activateVisitedFolder(item) { win.openFolderSidePanel(item.path) }
     function activateRecentPlaylist(index) {
         win.navigate("player")
@@ -45,8 +50,50 @@ Rectangle {
     }
     property var videoItems: []
     property var musicItems: []
+    property var artistItems: []
     property var folderItems: []
     property var playlistItems: []
+
+    function artistListenStats() {
+        try { return JSON.parse(Theme.store.homeArtistListenCountsJson || "{}") }
+        catch (error) { return ({}) }
+    }
+    function recordArtistListen(artistName, mediaUrl) {
+        const artist = String(artistName || "").trim()
+        const url = String(mediaUrl || "")
+        if (!artist.length || !url.length || Theme.store.homeLastArtistMediaUrl === url)
+            return
+        const stats = artistListenStats()
+        const entry = stats[artist] || { count: 0, last: 0 }
+        stats[artist] = { count: Math.min(1000000, Number(entry.count) + 1 || 1), last: Date.now() }
+        const artists = Object.keys(stats).sort((a, b) => Number(stats[b].last) - Number(stats[a].last))
+        for (const staleArtist of artists.slice(100)) delete stats[staleArtist]
+        Theme.store.homeArtistListenCountsJson = JSON.stringify(stats)
+        Theme.store.homeLastArtistMediaUrl = url
+        refreshArtistItems()
+    }
+    function recordCurrentArtistListen() {
+        if (!player.playing || player.hasVideo) return
+        recordArtistListen(player.artist, player.mediaUrl.toString())
+    }
+    function refreshArtistItems() {
+        const byArtist = ({})
+        for (const item of musicItems) {
+            const artist = String(item.artist || "").trim()
+            if (!artist.length || byArtist[artist]) continue
+            byArtist[artist] = { artist: artist, path: item.path, artwork: item.artwork }
+        }
+        const stats = artistListenStats()
+        const artists = Object.keys(byArtist).map(name => byArtist[name])
+        artists.sort((a, b) => {
+            const left = stats[a.artist] || { count: 0, last: 0 }
+            const right = stats[b.artist] || { count: 0, last: 0 }
+            return Number(right.count) - Number(left.count)
+                    || Number(right.last) - Number(left.last)
+                    || a.artist.localeCompare(b.artist)
+        })
+        artistItems = artists
+    }
 
     function visitStats(kind, path) {
         const property = kind === "playlist" ? "homePlaylistVisitCountsJson" : "homeFolderVisitCountsJson"
@@ -116,6 +163,7 @@ Rectangle {
             tracks = tracks.filter(item => [item.title, item.artist, item.album, item.genre, item.path]
                 .join(" ").toLowerCase().includes(searchText.trim().toLowerCase()))
         musicItems = tracks
+        refreshArtistItems()
         refreshFrequentVisits()
     }
     function videoThumbnailReady(index) {
@@ -127,8 +175,17 @@ Rectangle {
     onVisibleChanged: if (visible) refreshContent()
     Connections {
         target: player
-        function onRecentMediaChanged() { root.refreshContent() }
-        function onStateChanged() { root.refreshContent() }
+        function onRecentMediaChanged() { if (root.visible) root.refreshContent() }
+        function onStateChanged() {
+            if (!root.visible) return
+            root.recordCurrentArtistListen()
+            root.refreshContent()
+        }
+        function onMediaChanged() {
+            if (!root.visible) return
+            root.recordCurrentArtistListen()
+            root.refreshContent()
+        }
     }
     FolderListModel {
         id: homePlaylists
@@ -141,8 +198,8 @@ Rectangle {
     }
     Connections {
         target: mediaLibrary
-        function onRootsChanged() { root.refreshContent() }
-        function onIndexedCountChanged() { root.refreshContent() }
+        function onRootsChanged() { if (root.visible) root.refreshContent() }
+        function onIndexedCountChanged() { if (root.visible) root.refreshContent() }
     }
 
     ScrollView {
@@ -536,6 +593,81 @@ Rectangle {
                     Layout.leftMargin: 12
                     Layout.rightMargin: 12
                     onClicked: root.createPlaylist()
+                }
+                RowLayout {
+                    visible: root.artistItems.length > 0
+                    Layout.fillWidth: true
+                    Layout.leftMargin: root.sidePanel ? 20 : 16
+                    Layout.rightMargin: 18
+                    Layout.topMargin: root.sidePanel ? 24 : 18
+                    Layout.bottomMargin: root.sidePanel ? 14 : 7
+                    NText {
+                        text: "Frequently Listened Artists"
+                        font.pixelSize: root.sidePanel ? 14 : 12
+                        color: root.sidePanel ? Theme.librarySideText : Theme.text
+                        Layout.fillWidth: true
+                    }
+                    IconButton {
+                        objectName: "home-side-see-all-artists"
+                        visible: root.sidePanel
+                        icon: "chevron-right"
+                        iconSize: 13
+                        tip: "See all artists"
+                        onClicked: {
+                            win.navigate("music")
+                            mediaLibrary.model.view = "artists"
+                            mediaLibrary.model.search = ""
+                        }
+                    }
+                }
+                Repeater {
+                    model: root.artistItems.slice(0, root.sidePanel ? 3 : 6)
+                    delegate: Item {
+                        required property int index
+                        required property var modelData
+                        objectName: (root.sidePanel ? "home-side-artist-" : "home-main-artist-") + index
+                        Layout.fillWidth: true
+                        Layout.leftMargin: root.sidePanel ? 26 : 16
+                        Layout.rightMargin: 12
+                        Layout.preferredHeight: root.sidePanel ? 42 : 34
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.Button
+                        Accessible.name: modelData.artist + ", artist"
+                        Accessible.focusable: true
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                                root.activateFrequentArtist(modelData)
+                                event.accepted = true
+                            }
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Theme.radiusSmall
+                            color: artistRowHover.hovered ? Theme.hover : "transparent"
+                            border.width: parent.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+                        }
+                        RowLayout {
+                            anchors.fill: parent
+                            spacing: root.sidePanel ? 11 : 9
+                            Icon {
+                                name: "artist"
+                                size: root.sidePanel ? 20 : 16
+                                Layout.preferredWidth: root.sidePanel ? 25 : 20
+                                Layout.preferredHeight: root.sidePanel ? 25 : 20
+                                color: Theme.icon
+                            }
+                            NText {
+                                text: modelData.artist
+                                font.pixelSize: root.sidePanel ? 13 : 11
+                                color: root.sidePanel ? Theme.librarySideText : Theme.text
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
+                        HoverHandler { id: artistRowHover }
+                        TapHandler { onTapped: { parent.forceActiveFocus(); root.activateFrequentArtist(modelData) } }
+                    }
                 }
             }
 
