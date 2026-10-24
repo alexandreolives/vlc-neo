@@ -40,9 +40,9 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 18
-            Layout.rightMargin: 27
+            Layout.rightMargin: 17
             Layout.preferredHeight: 52
-            spacing: 2
+            spacing: 6
             IconButton { icon: "arrow-left"; tip: "Back"; enabled: false }
             IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
             NText {
@@ -59,9 +59,9 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 20
-            Layout.rightMargin: 27
+            Layout.rightMargin: 17
             Layout.preferredHeight: 52
-            spacing: 4
+            spacing: 5
             NText { visible: !root.searchOpen; text: root.fileCount() + (root.fileCount() === 1 ? " item" : " items"); color: Theme.librarySideText; font.pixelSize: 12; Layout.fillWidth: true }
             NField {
                 visible: root.searchOpen
