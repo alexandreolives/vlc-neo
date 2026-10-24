@@ -733,7 +733,7 @@ Rectangle {
             Layout.fillHeight: true
             Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
             Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
-            Layout.topMargin: root.figmaSidePanel ? (root.isVideosRootSidePanel() ? 4 : 15) : (root.wide && !root.compactFolderSidebar ? 58 : 0)
+            Layout.topMargin: root.figmaSidePanel ? (root.isVideosRootSidePanel() ? 4 : 15) : (root.wide && !root.compactFolderSidebar ? 22 : 0)
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds

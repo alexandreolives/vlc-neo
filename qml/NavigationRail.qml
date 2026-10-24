@@ -50,7 +50,7 @@ Rectangle {
     ColumnLayout {
         id: buttonList
         anchors.top: parent.top
-        anchors.topMargin: root.expanded ? 20 : 2
+        anchors.topMargin: root.expanded ? 14 : 2
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 2
 
