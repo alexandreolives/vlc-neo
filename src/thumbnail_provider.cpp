@@ -18,6 +18,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <algorithm>
 #include <atomic>
+#include <limits>
 
 namespace {
 
@@ -32,7 +33,7 @@ constexpr int kWaveformWidth = 768;
 constexpr int kWaveformHeight = 28;
 constexpr int kWaveformSampleRate = 8000;
 
-QString cacheKey(const QString &path, qint64 second, qint64 durationSeconds,
+QString cacheKey(const QString &path, qint64 timeMs, qint64 durationSeconds,
                  const QString &effect, const QSize &size)
 {
     const QFileInfo file(path);
@@ -40,8 +41,8 @@ QString cacheKey(const QString &path, qint64 second, qint64 durationSeconds,
         .arg(file.canonicalFilePath(), QString::number(file.size()),
              QString::number(file.lastModified().toMSecsSinceEpoch()),
              durationSeconds > 0 ? QStringLiteral("wave:%1").arg(durationSeconds)
-             : !effect.isEmpty() ? QStringLiteral("effect:%1:%2").arg(effect).arg(second)
-                                 : QStringLiteral("frame:%1:%2x%3").arg(second).arg(size.width())
+             : !effect.isEmpty() ? QStringLiteral("effect:%1:%2").arg(effect).arg(timeMs)
+                                 : QStringLiteral("frame:%1:%2x%3").arg(timeMs).arg(size.width())
                                        .arg(size.height()));
 }
 
@@ -54,15 +55,20 @@ QString mediaPath(const QString &id)
     return query.queryItemValue(QStringLiteral("path"), QUrl::FullyDecoded);
 }
 
-qint64 timeSecond(const QString &id)
+qint64 timeMilliseconds(const QString &id)
 {
     const qsizetype queryStart = id.indexOf(QLatin1Char('?'));
     if (queryStart < 0)
         return -1;
+    const QUrlQuery query(id.mid(queryStart + 1));
     bool ok = false;
-    const qint64 second = QUrlQuery(id.mid(queryStart + 1))
-                             .queryItemValue(QStringLiteral("t")).toLongLong(&ok);
-    return ok && second >= 0 ? second : -1;
+    if (query.hasQueryItem(QStringLiteral("tms"))) {
+        const qint64 milliseconds = query.queryItemValue(QStringLiteral("tms")).toLongLong(&ok);
+        return ok && milliseconds >= 0 ? milliseconds : -1;
+    }
+    const qint64 seconds = query.queryItemValue(QStringLiteral("t")).toLongLong(&ok);
+    return ok && seconds >= 0 && seconds <= std::numeric_limits<qint64>::max() / 1000
+        ? seconds * 1000 : -1;
 }
 
 qint64 waveformDuration(const QString &id)
@@ -209,13 +215,14 @@ public:
             m_vlc = QStandardPaths::findExecutable(QStringLiteral("vlc"));
     }
 
-    QImage image(const QString &path, qint64 second, qint64 durationSeconds, const QSize &requestedSize,
+    QImage image(const QString &path, qint64 timeMs, qint64 durationSeconds, const QSize &requestedSize,
                  const QString &effect, const std::shared_ptr<std::atomic<bool>> &cancelled)
     {
         if (m_stopping.load(std::memory_order_relaxed) || cancelled->load(std::memory_order_relaxed))
             return {};
         const bool waveform = durationSeconds > 0;
-        if (m_vlc.isEmpty() || (!waveform && second < 0))
+        if ((waveform && m_vlc.isEmpty()) || (!waveform && m_vlc.isEmpty() && m_ffmpeg.isEmpty())
+            || (!waveform && timeMs < 0))
             return {};
 
         const QFileInfo info(path);
@@ -230,7 +237,7 @@ public:
             outputSize.setWidth(qMax(1, outputSize.width()));
             outputSize.setHeight(qMax(1, outputSize.height()));
         }
-        const QString key = cacheKey(path, second, durationSeconds, effect, outputSize);
+        const QString key = cacheKey(path, timeMs, durationSeconds, effect, outputSize);
         {
             QMutexLocker locker(&m_cacheMutex);
             if (const QImage *cached = m_cache.object(key))
@@ -264,7 +271,8 @@ public:
             process.setProcessEnvironment(environment);
             process.setProgram(m_ffmpeg);
             process.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"),
-                                  QStringLiteral("error"), QStringLiteral("-ss"), QString::number(second),
+                                  QStringLiteral("error"), QStringLiteral("-ss"),
+                                  QString::number(timeMs / 1000.0, 'f', 3),
                                   QStringLiteral("-i"), info.absoluteFilePath(), QStringLiteral("-frames:v"),
                                   QStringLiteral("1"), QStringLiteral("-vf"),
                                   QStringLiteral("scale=%1:%2:force_original_aspect_ratio=decrease")
@@ -327,8 +335,8 @@ public:
                               QStringLiteral("--scene-prefix=frame"),
                               QStringLiteral("--scene-path=%1").arg(outputDir.path()),
                               QStringLiteral("--scene-format=jpg"),
-                              QStringLiteral("--start-time=%1").arg(second),
-                              QStringLiteral("--stop-time=%1").arg(second + 0.2),
+                              QStringLiteral("--start-time=%1").arg(QString::number(timeMs / 1000.0, 'f', 3)),
+                              QStringLiteral("--stop-time=%1").arg(QString::number((timeMs + 200) / 1000.0, 'f', 3)),
                               QStringLiteral("--run-time=2"), info.absoluteFilePath()});
         process.setProcessChannelMode(QProcess::SeparateChannels);
         process.start();
@@ -512,9 +520,9 @@ class ThumbnailResponse final : public QQuickImageResponse
 {
 public:
     ThumbnailResponse(std::shared_ptr<ThumbnailProvider::Service> service,
-                      const QString &path, qint64 second, qint64 durationSeconds,
+                      const QString &path, qint64 timeMs, qint64 durationSeconds,
                       const QSize &requestedSize, const QString &effect)
-        : m_service(std::move(service)), m_path(path), m_second(second),
+        : m_service(std::move(service)), m_path(path), m_timeMs(timeMs),
           m_durationSeconds(durationSeconds), m_requestedSize(requestedSize), m_effect(effect)
     {
         connect(&m_watcher, &QFutureWatcher<QImage>::finished, this, [this] {
@@ -560,12 +568,12 @@ public:
 
         const auto serviceCopy = m_service;
         m_watcher.setFuture(QtConcurrent::run(serviceCopy->pool(), [serviceCopy, path = m_path,
-                                                                    second = m_second,
+                                                                    timeMs = m_timeMs,
                                                                     durationSeconds = m_durationSeconds,
                                                                     requestedSize = m_requestedSize,
                                                                     effect = m_effect,
                                                                     cancelSignal = m_cancelSignal] {
-            const QImage image = serviceCopy->image(path, second, durationSeconds, requestedSize,
+            const QImage image = serviceCopy->image(path, timeMs, durationSeconds, requestedSize,
                                                     effect, cancelSignal);
             serviceCopy->releaseJob();
             return image;
@@ -593,7 +601,7 @@ private:
     std::shared_ptr<ThumbnailProvider::Service> m_service;
     QFutureWatcher<QImage> m_watcher;
     QString m_path;
-    qint64 m_second = -1;
+    qint64 m_timeMs = -1;
     qint64 m_durationSeconds = 0;
     QSize m_requestedSize;
     QString m_effect;
@@ -625,6 +633,6 @@ void ThumbnailProvider::waitForJobs()
 
 QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, const QSize &requestedSize)
 {
-    return new ThumbnailResponse(m_service, mediaPath(id), timeSecond(id), waveformDuration(id),
+    return new ThumbnailResponse(m_service, mediaPath(id), timeMilliseconds(id), waveformDuration(id),
                                  requestedSize, videoEffect(id));
 }

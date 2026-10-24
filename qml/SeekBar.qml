@@ -39,6 +39,9 @@ FocusScope {
     property int pendingThumbnailSecond: -1
     property int requestedThumbnailSecond: -1
     property int displayedThumbnailSecond: -1
+    property int pendingThumbnailTimeMs: -1
+    property int requestedThumbnailTimeMs: -1
+    property int displayedThumbnailTimeMs: -1
     property bool thumbnailRequestInFlight: false
     readonly property bool thumbnailPreviewEnabled: Theme.store.showSeekThumbnails
     readonly property bool thumbnailReady: thumbnail.status === Image.Ready
@@ -48,41 +51,49 @@ FocusScope {
         if (!thumbnailPreviewEnabled || !player.hasVideo || !player.mediaUrl.toString().startsWith("file:")) {
             thumbnailSource = ""
             pendingThumbnailSecond = -1
+            pendingThumbnailTimeMs = -1
             return false
         }
         const path = platform.localPath(player.mediaUrl)
         if (!path.length) {
             thumbnailSource = ""
             pendingThumbnailSecond = -1
+            pendingThumbnailTimeMs = -1
             return false
         }
-        const seconds = Math.max(0, Math.floor(timeMs / 1000))
-        if (!thumbnailRequestInFlight && seconds === displayedThumbnailSecond) {
+        // Five preview samples per second keep fast scrubbing responsive without
+        // starting an extraction for every pointer pixel.
+        const frameTimeMs = Math.max(0, Math.floor(timeMs / 200) * 200)
+        if (!thumbnailRequestInFlight && frameTimeMs === displayedThumbnailTimeMs) {
             pendingThumbnailSecond = -1
+            pendingThumbnailTimeMs = -1
             return true
         }
-        pendingThumbnailSecond = seconds
-        if (!thumbnailRequestInFlight && seconds !== displayedThumbnailSecond) {
+        pendingThumbnailTimeMs = frameTimeMs
+        pendingThumbnailSecond = Math.floor(frameTimeMs / 1000)
+        if (!thumbnailRequestInFlight && frameTimeMs !== displayedThumbnailTimeMs) {
             if (!thumbnailRequestTimer.running) thumbnailRequestTimer.start()
         }
         return true
     }
 
     function pumpThumbnailRequest() {
-        if (thumbnailRequestInFlight || pendingThumbnailSecond < 0 || !mouse.containsMouse
+        if (thumbnailRequestInFlight || pendingThumbnailTimeMs < 0 || !mouse.containsMouse
                 || !thumbnailPreviewEnabled || !player.hasVideo)
             return
-        const seconds = pendingThumbnailSecond
+        const frameTimeMs = pendingThumbnailTimeMs
         pendingThumbnailSecond = -1
-        if (seconds === displayedThumbnailSecond)
+        pendingThumbnailTimeMs = -1
+        if (frameTimeMs === displayedThumbnailTimeMs)
             return
         const path = platform.localPath(player.mediaUrl)
         if (!path.length)
             return
-        requestedThumbnailSecond = seconds
+        requestedThumbnailTimeMs = frameTimeMs
+        requestedThumbnailSecond = Math.floor(frameTimeMs / 1000)
         thumbnailRequestInFlight = true
         thumbnailSource = "image://thumbnail/frame?path=" + encodeURIComponent(path)
-                + "&t=" + seconds
+                + "&tms=" + frameTimeMs
         thumbnailRequestInFlight = thumbnail.status === Image.Loading
         if (!thumbnailRequestInFlight)
             thumbnailRequestFinished()
@@ -90,11 +101,15 @@ FocusScope {
 
     function thumbnailRequestFinished() {
         thumbnailRequestInFlight = false
-        if (thumbnail.status === Image.Ready || thumbnail.status === Image.Error)
-            displayedThumbnailSecond = requestedThumbnailSecond
-        if (pendingThumbnailSecond === displayedThumbnailSecond)
+        if (thumbnail.status === Image.Ready || thumbnail.status === Image.Error) {
+            displayedThumbnailTimeMs = requestedThumbnailTimeMs
+            displayedThumbnailSecond = Math.floor(requestedThumbnailTimeMs / 1000)
+        }
+        if (pendingThumbnailTimeMs === displayedThumbnailTimeMs) {
             pendingThumbnailSecond = -1
-        if (pendingThumbnailSecond >= 0 && pendingThumbnailSecond !== displayedThumbnailSecond
+            pendingThumbnailTimeMs = -1
+        }
+        if (pendingThumbnailTimeMs >= 0 && pendingThumbnailTimeMs !== displayedThumbnailTimeMs
                 && mouse.containsMouse && thumbnailPreviewEnabled && !thumbnailRequestTimer.running)
             thumbnailRequestTimer.start()
     }
@@ -132,8 +147,11 @@ FocusScope {
             if (!root.thumbnailPreviewEnabled) {
                 thumbnailRequestTimer.stop()
                 root.pendingThumbnailSecond = -1
+                root.pendingThumbnailTimeMs = -1
                 root.requestedThumbnailSecond = -1
                 root.displayedThumbnailSecond = -1
+                root.requestedThumbnailTimeMs = -1
+                root.displayedThumbnailTimeMs = -1
                 root.thumbnailRequestInFlight = false
                 root.thumbnailSource = ""
             }
@@ -144,8 +162,11 @@ FocusScope {
         function onMediaChanged() {
             thumbnailRequestTimer.stop()
             root.pendingThumbnailSecond = -1
+            root.pendingThumbnailTimeMs = -1
             root.displayedThumbnailSecond = -1
             root.requestedThumbnailSecond = -1
+            root.displayedThumbnailTimeMs = -1
+            root.requestedThumbnailTimeMs = -1
             root.thumbnailRequestInFlight = false
             root.thumbnailSource = ""
             root.waveformSource = ""
@@ -319,6 +340,7 @@ FocusScope {
         onEntered: if (player.hasVideo && root.thumbnailPreviewEnabled) root.requestThumbnail(root.hoveredTimeMs)
         onExited: {
             root.pendingThumbnailSecond = -1
+            root.pendingThumbnailTimeMs = -1
             thumbnailRequestTimer.stop()
         }
         onPositionChanged: (e) => {
