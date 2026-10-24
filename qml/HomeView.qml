@@ -259,7 +259,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 21 : 18
+                    Layout.topMargin: root.sidePanel ? 20 : 18
                     Layout.bottomMargin: root.sidePanel ? 11 : 7
                     NText {
                         text: "Continue Watching"
@@ -349,8 +349,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 25 : 18
-                    Layout.bottomMargin: root.sidePanel ? 16 : 7
+                    Layout.topMargin: root.sidePanel ? 28 : 18
+                    Layout.bottomMargin: root.sidePanel ? 15 : 7
                     NText {
                         text: "Listen Again"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -436,7 +436,7 @@ Rectangle {
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
                     Layout.topMargin: root.sidePanel ? 24 : 18
-                    Layout.bottomMargin: root.sidePanel ? 12 : 7
+                    Layout.bottomMargin: root.sidePanel ? 13 : 7
                     NText {
                         text: "Frequently Visited Folders"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -516,8 +516,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 24 : 18
-                    Layout.bottomMargin: root.sidePanel ? 14 : 7
+                    Layout.topMargin: root.sidePanel ? 26 : 18
+                    Layout.bottomMargin: root.sidePanel ? 11 : 7
                     NText {
                         text: "Frequently Visited Playlists"
                         font.pixelSize: root.sidePanel ? 14 : 12
@@ -598,8 +598,8 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.leftMargin: root.sidePanel ? 20 : 16
                     Layout.rightMargin: 18
-                    Layout.topMargin: root.sidePanel ? 24 : 18
-                    Layout.bottomMargin: root.sidePanel ? 14 : 7
+                    Layout.topMargin: root.sidePanel ? 28 : 18
+                    Layout.bottomMargin: root.sidePanel ? 13 : 7
                     NText {
                         text: "Frequently Listened Artists"
                         font.pixelSize: root.sidePanel ? 14 : 12
