@@ -167,9 +167,9 @@ Rectangle {
                     Layout.rightMargin: root.sidePanel ? 17 : 8
                     Layout.preferredHeight: root.sidePanel ? 52 : 36
                     spacing: 3
-                    IconButton { icon: "arrow-left"; tip: "Back"; onClicked: win.goBack() }
-                    IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
-                    NText { text: "Home"; font.pixelSize: root.sidePanel ? 14 : 12; color: root.sidePanel ? Theme.librarySideTitle : Theme.text; Layout.fillWidth: true }
+                    IconButton { icon: "arrow-left"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Back"; onClicked: win.goBack() }
+                    IconButton { icon: "arrow-right"; iconSize: root.sidePanel ? 24 : 18; iconOffsetX: root.sidePanel ? -4 : 0; tip: "Forward"; enabled: false }
+                    NText { text: "Home"; font.pixelSize: root.sidePanel ? 14 : 12; color: root.sidePanel ? Theme.librarySideTitle : Theme.text; Layout.leftMargin: root.sidePanel ? 3 : 0; Layout.fillWidth: true }
                     IconButton { icon: "more"; tip: "More options" }
                     IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate("home") }
                 }

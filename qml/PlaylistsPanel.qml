@@ -43,8 +43,8 @@ Rectangle {
             Layout.rightMargin: 17
             Layout.preferredHeight: 52
             spacing: 6
-            IconButton { icon: "arrow-left"; tip: "Back"; enabled: false }
-            IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
+            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; enabled: false }
+            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
             NText {
                 text: "Playlists"
                 font.pixelSize: 14

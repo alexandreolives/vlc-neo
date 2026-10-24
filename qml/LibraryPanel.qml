@@ -364,11 +364,13 @@ Rectangle {
             spacing: root.figmaSidePanel ? 6 : 2
             IconButton {
                 icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
+                iconSize: root.figmaSidePanel ? 24 : 18
+                iconOffsetX: root.figmaSidePanel ? -2 : 0
                 tip: root.figmaSidePanel ? "Back" : "Up"
                 visible: root.figmaSidePanel || root.section === "folder"
                 onClicked: root.figmaSidePanel ? root.goBackFromSidePanel() : root.openFolder(files.parentFolder)
             }
-            IconButton { icon: "arrow-right"; tip: "Forward"; visible: root.figmaSidePanel; enabled: false }
+            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: false }
             Chips {
                 visible: !root.wide
                 model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
@@ -1046,8 +1048,8 @@ Rectangle {
             Layout.leftMargin: 18
             Layout.rightMargin: 17
             spacing: 6
-            IconButton { icon: "arrow-left"; tip: "Back"; onClicked: root.goBackFromSidePanel() }
-            IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
+            IconButton { icon: "arrow-left"; iconSize: 24; iconOffsetX: -2; tip: "Back"; onClicked: root.goBackFromSidePanel() }
+            IconButton { icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; enabled: false }
             NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 0; Layout.fillWidth: true }
             IconButton { icon: "more"; tip: "More options" }
             IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
@@ -1086,7 +1088,7 @@ Rectangle {
             objectName: "music-sidepanel-add"
             Layout.fillWidth: true
             Layout.preferredHeight: 36
-            Layout.topMargin: 16
+            Layout.topMargin: 18
             Layout.leftMargin: 25
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
@@ -1116,6 +1118,7 @@ Rectangle {
             visible: root.musicSidePage === "categories"
             Layout.fillWidth: true
             Layout.fillHeight: visible
+            Layout.topMargin: 1
             contentWidth: width
             contentHeight: musicSideCategoriesContent.implicitHeight
             clip: true
