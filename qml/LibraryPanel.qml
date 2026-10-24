@@ -98,6 +98,12 @@ Rectangle {
         }
         return "Library"
     }
+    function isVideosRootSidePanel() {
+        if (!root.figmaSidePanel || root.section !== "folder" || root.mediaType !== "video")
+            return false
+        return platform.localPath(root.folder)
+                === platform.localPath(StandardPaths.writableLocation(StandardPaths.MoviesLocation))
+    }
     function musicLocalPath(path) {
         const value = path.toString()
         return value.startsWith("file:") ? platform.localPath(path) : value
@@ -542,6 +548,35 @@ Rectangle {
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
         Item {
+            objectName: "videos-sidepanel-add"
+            visible: root.isVideosRootSidePanel()
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            Layout.topMargin: visible ? 16 : 0
+            Layout.leftMargin: 25
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: "Add media"
+            Accessible.focusable: true
+            Keys.onPressed: event => {
+                if ((event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !event.isAutoRepeat) {
+                    root.openFiles()
+                    event.accepted = true
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusSmall
+                color: addVideoMediaMouse.containsMouse ? Theme.hover : "transparent"
+                border.width: parent.activeFocus ? 1 : 0
+                border.color: Theme.accent
+            }
+            Icon { anchors.left: parent.left; anchors.leftMargin: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 16; color: Theme.icon }
+            NText { anchors.left: parent.left; anchors.leftMargin: 36; anchors.verticalCenter: parent.verticalCenter; text: "Add"; font.pixelSize: 13; color: Theme.librarySideText }
+            MouseArea { id: addVideoMediaMouse; anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { parent.forceActiveFocus(); root.openFiles() } }
+        }
+
+        Item {
             objectName: "music-sidepanel-add-library"
             visible: root.figmaSidePanel && root.section === "music"
                      && !["categories", "songs"].includes(root.musicSidePage)
@@ -670,7 +705,7 @@ Rectangle {
             Layout.fillHeight: true
             Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
             Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
-            Layout.topMargin: root.figmaSidePanel ? 15 : (root.wide && !root.compactFolderSidebar ? 58 : 0)
+            Layout.topMargin: root.figmaSidePanel ? (root.isVideosRootSidePanel() ? 4 : 15) : (root.wide && !root.compactFolderSidebar ? 58 : 0)
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds
