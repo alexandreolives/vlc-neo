@@ -203,6 +203,7 @@ public:
     {
         m_pool.setMaxThreadCount(kMaxWorkers);
         m_pool.setExpiryTimeout(10000);
+        m_ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
         m_vlc = QStandardPaths::findExecutable(QStringLiteral("cvlc"));
         if (m_vlc.isEmpty())
             m_vlc = QStandardPaths::findExecutable(QStringLiteral("vlc"));
@@ -238,6 +239,71 @@ public:
 
         if (waveform)
             return makeWaveform(info.absoluteFilePath(), key, durationSeconds, cancelled);
+
+        const auto finishFrame = [&](QImage decoded) {
+            if (decoded.isNull() || decoded.width() > kOutputWidth || decoded.height() > kOutputHeight)
+                return QImage();
+            if (effect == QLatin1String("preview-set"))
+                decoded = makeVideoEffectPreviewSet(decoded);
+            else
+                decoded = applyVideoEffectPreview(std::move(decoded), effect);
+            if (cancelled->load(std::memory_order_relaxed))
+                return QImage();
+            QMutexLocker locker(&m_cacheMutex);
+            m_cache.insert(key, decoded);
+            return decoded;
+        };
+
+        // Timeline hover can request several frames in quick succession. FFmpeg's
+        // image pipe avoids VLC's scene-filter startup and temporary-file overhead;
+        // VLC remains the fallback for systems without FFmpeg or unsupported media.
+        if (!m_ffmpeg.isEmpty()) {
+            QProcess process;
+            QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+            environment.remove(QStringLiteral("VLC_PLUGIN_PATH"));
+            process.setProcessEnvironment(environment);
+            process.setProgram(m_ffmpeg);
+            process.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"),
+                                  QStringLiteral("error"), QStringLiteral("-ss"), QString::number(second),
+                                  QStringLiteral("-i"), info.absoluteFilePath(), QStringLiteral("-frames:v"),
+                                  QStringLiteral("1"), QStringLiteral("-vf"),
+                                  QStringLiteral("scale=%1:%2:force_original_aspect_ratio=decrease")
+                                      .arg(outputSize.width()).arg(outputSize.height()),
+                                  QStringLiteral("-f"), QStringLiteral("image2pipe"),
+                                  QStringLiteral("-vcodec"), QStringLiteral("mjpeg"), QStringLiteral("pipe:1")});
+            process.setProcessChannelMode(QProcess::SeparateChannels);
+            process.start();
+            if (process.waitForStarted(1500)) {
+                QByteArray encoded;
+                QElapsedTimer frameTimer;
+                frameTimer.start();
+                while (process.state() != QProcess::NotRunning && frameTimer.elapsed() < 5000
+                       && !m_stopping.load(std::memory_order_relaxed)
+                       && !cancelled->load(std::memory_order_relaxed)) {
+                    process.waitForReadyRead(80);
+                    encoded += process.readAllStandardOutput();
+                    process.readAllStandardError();
+                    if (encoded.size() > 2 * 1024 * 1024)
+                        break;
+                }
+                encoded += process.readAllStandardOutput();
+                process.readAllStandardError();
+                if (m_stopping.load(std::memory_order_relaxed) || cancelled->load(std::memory_order_relaxed)
+                    || encoded.size() > 2 * 1024 * 1024) {
+                    process.kill();
+                    process.waitForFinished(1000);
+                    return {};
+                }
+                if (process.state() != QProcess::NotRunning) {
+                    process.kill();
+                    process.waitForFinished(1000);
+                } else if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0) {
+                    const QImage decoded = QImage::fromData(encoded, "JPEG");
+                    if (!decoded.isNull())
+                        return finishFrame(decoded);
+                }
+            }
+        }
 
         QTemporaryDir outputDir;
         if (!outputDir.isValid())
@@ -298,21 +364,7 @@ public:
             return {};
         const QByteArray encoded = frameFile.readAll();
         QImage decoded = QImage::fromData(encoded, "JPEG");
-        if (decoded.isNull() || decoded.width() > kOutputWidth || decoded.height() > kOutputHeight)
-            return {};
-
-        if (effect == QLatin1String("preview-set"))
-            decoded = makeVideoEffectPreviewSet(decoded);
-        else
-            decoded = applyVideoEffectPreview(std::move(decoded), effect);
-
-        if (cancelled->load(std::memory_order_relaxed))
-            return {};
-        {
-            QMutexLocker locker(&m_cacheMutex);
-            m_cache.insert(key, decoded);
-        }
-        return decoded;
+        return finishFrame(std::move(decoded));
     }
 
     QImage makeWaveform(const QString &path, const QString &key, qint64 durationSeconds,
@@ -446,6 +498,7 @@ public:
 private:
     BoundedImageCache m_cache;
     QMutex m_cacheMutex;
+    QString m_ffmpeg;
     QString m_vlc;
     QThreadPool m_pool;
     std::atomic<int> m_responses{0};
