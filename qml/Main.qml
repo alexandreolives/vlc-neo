@@ -275,14 +275,14 @@ ApplicationWindow {
             musicSidePage: libraryPanel.musicSidePage,
             musicSideFolderRoot: libraryPanel.musicSideFolderRoot,
             musicSearch: mediaLibrary.model.search,
-            musicView: mediaLibrary.model.view
+            musicView: mediaLibrary.model.view,
+            sideFolderHistory: libraryPanel.sideFolderHistory.slice(),
+            sidePanelForwardHistory: libraryPanel.sidePanelForwardHistory.slice(),
+            musicSideHistory: libraryPanel.musicSideHistory.slice()
         }
     }
     function restoreSidePanelRoute(route) {
         if (!route) return
-        libraryPanel.sideFolderHistory = []
-        libraryPanel.sidePanelForwardHistory = []
-        libraryPanel.musicSideHistory = []
         navigationPage = route.page
         libraryFullPage = false
         libraryOpen = true
@@ -295,6 +295,9 @@ ApplicationWindow {
         libraryPanel.searchText = route.searchText
         libraryPanel.musicSidePage = route.musicSidePage
         libraryPanel.musicSideFolderRoot = route.musicSideFolderRoot
+        libraryPanel.sideFolderHistory = route.sideFolderHistory.slice()
+        libraryPanel.sidePanelForwardHistory = route.sidePanelForwardHistory.slice()
+        libraryPanel.musicSideHistory = route.musicSideHistory.slice()
         mediaLibrary.model.search = route.musicSearch
         mediaLibrary.model.view = route.musicView
         rightPanel = ""
