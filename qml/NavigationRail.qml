@@ -86,7 +86,8 @@ Rectangle {
 
         background: Rectangle {
             radius: 4
-            color: control.down ? Theme.raised : (control.hovered ? Theme.hover : "transparent")
+            color: control.selected || control.down ? Theme.raised
+                  : (control.hovered ? Theme.hover : "transparent")
             border.width: control.activeFocus ? 1 : 0
             border.color: Theme.accent
         }
