@@ -103,7 +103,7 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 12
+                spacing: 20
                 Icon { name: "plus"; size: 16; color: createPlaylistMouse.containsMouse ? Theme.accent : Theme.icon; anchors.verticalCenter: parent.verticalCenter }
                 NText { text: "Create playlist"; font.pixelSize: 13; color: Theme.librarySideText; anchors.verticalCenter: parent.verticalCenter }
             }
@@ -151,7 +151,7 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 26
                     anchors.rightMargin: 12
-                    spacing: 12
+                    spacing: 16
                     Item {
                         Layout.preferredWidth: 20
                         Layout.preferredHeight: 20
