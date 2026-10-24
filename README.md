@@ -152,7 +152,7 @@ episodes. A shortcut to search OpenSubtitles for the current title is included.
 > Player and media screenshots generally use the [Sintel](https://durian.blender.org/)
 > trailer, © Blender Foundation, licensed CC BY 3.0. The current
 > `player.webp`, `customize.webp` and `video-effects-flower.webp` use the public [MDN CC0 flower video](https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4).
-> `home-sidebar.png` uses generated color-bar video fixtures and tagged demo audio; its media artwork is test content, not a Figma export.
+> `home.webp` and `home-sidebar.png` use generated color-bar video fixtures and tagged demo audio; their media artwork is test content, not a Figma export.
 > `scripts/screenshots.sh` regenerates captures with Sintel; the preference
 > screens come from `scripts/smoke-test.sh`.
 
