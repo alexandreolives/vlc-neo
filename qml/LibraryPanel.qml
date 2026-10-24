@@ -1191,10 +1191,10 @@ Rectangle {
                 }
                 RowLayout {
                     anchors.fill: parent
-                    // Match the 36 px cover inset in the Figma track rows.
-                    anchors.leftMargin: 36
+                    // Figma places track covers 20 px inside the pane and 10 px before the title.
+                    anchors.leftMargin: 20
                     anchors.rightMargin: 18
-                    spacing: 6
+                    spacing: 10
                     Rectangle {
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
