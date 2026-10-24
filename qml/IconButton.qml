@@ -12,7 +12,8 @@ Rectangle {
     property bool accentWhenChecked: true
     property string tip
     readonly property bool hovered: mouse.containsMouse
-    property color iconColor: checked && accentWhenChecked ? Theme.accent : (hovered ? Theme.text : Theme.icon)
+    property color iconColor: !enabled ? Theme.textFaint
+                            : checked && accentWhenChecked ? Theme.accent : (hovered ? Theme.text : Theme.icon)
     signal clicked()
     signal rightClicked()
 
