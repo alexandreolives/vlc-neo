@@ -1609,7 +1609,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         x: root.folderViewMode === "list" ? root.mapFromItem(win.contentItem, 6, 0).x : parent.width - width - 12
         anchors.bottomMargin: 6
-        width: Math.min(390, root.width * 0.34)
+        width: Math.min(Math.min(390, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
         height: width * 0.87
         radius: 12
         color: Theme.bar

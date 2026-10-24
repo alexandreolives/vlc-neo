@@ -33,7 +33,7 @@ constexpr int kWaveformHeight = 28;
 constexpr int kWaveformSampleRate = 8000;
 
 QString cacheKey(const QString &path, qint64 second, qint64 durationSeconds,
-                 const QString &effect)
+                 const QString &effect, const QSize &size)
 {
     const QFileInfo file(path);
     return QStringLiteral("%1\n%2\n%3\n%4")
@@ -41,7 +41,8 @@ QString cacheKey(const QString &path, qint64 second, qint64 durationSeconds,
              QString::number(file.lastModified().toMSecsSinceEpoch()),
              durationSeconds > 0 ? QStringLiteral("wave:%1").arg(durationSeconds)
              : !effect.isEmpty() ? QStringLiteral("effect:%1:%2").arg(effect).arg(second)
-                                 : QStringLiteral("frame:%1").arg(second));
+                                 : QStringLiteral("frame:%1:%2x%3").arg(second).arg(size.width())
+                                       .arg(size.height()));
 }
 
 QString mediaPath(const QString &id)
@@ -207,7 +208,7 @@ public:
             m_vlc = QStandardPaths::findExecutable(QStringLiteral("vlc"));
     }
 
-    QImage image(const QString &path, qint64 second, qint64 durationSeconds,
+    QImage image(const QString &path, qint64 second, qint64 durationSeconds, const QSize &requestedSize,
                  const QString &effect, const std::shared_ptr<std::atomic<bool>> &cancelled)
     {
         if (m_stopping.load(std::memory_order_relaxed) || cancelled->load(std::memory_order_relaxed))
@@ -220,7 +221,15 @@ public:
         if (!info.isFile() || !info.isReadable())
             return {};
 
-        const QString key = cacheKey(path, second, durationSeconds, effect);
+        QSize outputSize(kOutputWidth, kOutputHeight);
+        if (durationSeconds <= 0 && effect.isEmpty() && requestedSize.isValid()
+            && requestedSize.width() > 0 && requestedSize.height() > 0) {
+            outputSize = requestedSize;
+            outputSize.scale(kOutputWidth, kOutputHeight, Qt::KeepAspectRatio);
+            outputSize.setWidth(qMax(1, outputSize.width()));
+            outputSize.setHeight(qMax(1, outputSize.height()));
+        }
+        const QString key = cacheKey(path, second, durationSeconds, effect, outputSize);
         {
             QMutexLocker locker(&m_cacheMutex);
             if (const QImage *cached = m_cache.object(key))
@@ -246,8 +255,10 @@ public:
                               // The caller only needs one representative frame. Capturing the
                               // first few frames avoids scene-ratio's 30-frame delay and keeps
                               // startup and temporary image writes short.
-                              QStringLiteral("--scene-ratio=1"), QStringLiteral("--scene-width=480"),
-                              QStringLiteral("--scene-height=270"), QStringLiteral("--scene-prefix=frame"),
+                              QStringLiteral("--scene-ratio=1"),
+                              QStringLiteral("--scene-width=%1").arg(outputSize.width()),
+                              QStringLiteral("--scene-height=%1").arg(outputSize.height()),
+                              QStringLiteral("--scene-prefix=frame"),
                               QStringLiteral("--scene-path=%1").arg(outputDir.path()),
                               QStringLiteral("--scene-format=jpg"),
                               QStringLiteral("--start-time=%1").arg(second),
@@ -449,9 +460,9 @@ class ThumbnailResponse final : public QQuickImageResponse
 public:
     ThumbnailResponse(std::shared_ptr<ThumbnailProvider::Service> service,
                       const QString &path, qint64 second, qint64 durationSeconds,
-                      const QString &effect)
+                      const QSize &requestedSize, const QString &effect)
         : m_service(std::move(service)), m_path(path), m_second(second),
-          m_durationSeconds(durationSeconds), m_effect(effect)
+          m_durationSeconds(durationSeconds), m_requestedSize(requestedSize), m_effect(effect)
     {
         connect(&m_watcher, &QFutureWatcher<QImage>::finished, this, [this] {
             if (!m_cancelled.load(std::memory_order_relaxed)) {
@@ -498,9 +509,11 @@ public:
         m_watcher.setFuture(QtConcurrent::run(serviceCopy->pool(), [serviceCopy, path = m_path,
                                                                     second = m_second,
                                                                     durationSeconds = m_durationSeconds,
+                                                                    requestedSize = m_requestedSize,
                                                                     effect = m_effect,
                                                                     cancelSignal = m_cancelSignal] {
-            const QImage image = serviceCopy->image(path, second, durationSeconds, effect, cancelSignal);
+            const QImage image = serviceCopy->image(path, second, durationSeconds, requestedSize,
+                                                    effect, cancelSignal);
             serviceCopy->releaseJob();
             return image;
         }));
@@ -529,6 +542,7 @@ private:
     QString m_path;
     qint64 m_second = -1;
     qint64 m_durationSeconds = 0;
+    QSize m_requestedSize;
     QString m_effect;
     QImage m_image;
     std::atomic<bool> m_cancelled{false};
@@ -556,8 +570,8 @@ void ThumbnailProvider::waitForJobs()
     m_service->waitForJobs();
 }
 
-QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, const QSize &)
+QQuickImageResponse *ThumbnailProvider::requestImageResponse(const QString &id, const QSize &requestedSize)
 {
     return new ThumbnailResponse(m_service, mediaPath(id), timeSecond(id), waveformDuration(id),
-                                 videoEffect(id));
+                                 requestedSize, videoEffect(id));
 }

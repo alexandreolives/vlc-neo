@@ -36,6 +36,10 @@ FocusScope {
                                         ? Math.round(mouse.mouseX / root.width * player.length) : 0
     property string thumbnailSource: ""
     property string waveformSource: ""
+    property int pendingThumbnailSecond: -1
+    property int requestedThumbnailSecond: -1
+    property int displayedThumbnailSecond: -1
+    property bool thumbnailRequestInFlight: false
     readonly property bool thumbnailPreviewEnabled: Theme.store.showSeekThumbnails
     readonly property bool thumbnailReady: thumbnail.status === Image.Ready
     readonly property bool waveformReady: waveform.status === Image.Ready
@@ -43,16 +47,56 @@ FocusScope {
     function requestThumbnail(timeMs) {
         if (!thumbnailPreviewEnabled || !player.hasVideo || !player.mediaUrl.toString().startsWith("file:")) {
             thumbnailSource = ""
+            pendingThumbnailSecond = -1
             return false
         }
         const path = platform.localPath(player.mediaUrl)
         if (!path.length) {
             thumbnailSource = ""
+            pendingThumbnailSecond = -1
             return false
         }
         const seconds = Math.max(0, Math.floor(timeMs / 1000))
-        thumbnailSource = "image://thumbnail/frame?path=" + encodeURIComponent(path) + "&t=" + seconds
+        if (!thumbnailRequestInFlight && seconds === displayedThumbnailSecond) {
+            pendingThumbnailSecond = -1
+            return true
+        }
+        pendingThumbnailSecond = seconds
+        if (!thumbnailRequestInFlight && seconds !== displayedThumbnailSecond) {
+            if (!thumbnailRequestTimer.running) thumbnailRequestTimer.start()
+        }
         return true
+    }
+
+    function pumpThumbnailRequest() {
+        if (thumbnailRequestInFlight || pendingThumbnailSecond < 0 || !mouse.containsMouse
+                || !thumbnailPreviewEnabled || !player.hasVideo)
+            return
+        const seconds = pendingThumbnailSecond
+        pendingThumbnailSecond = -1
+        if (seconds === displayedThumbnailSecond)
+            return
+        const path = platform.localPath(player.mediaUrl)
+        if (!path.length)
+            return
+        requestedThumbnailSecond = seconds
+        thumbnailRequestInFlight = true
+        thumbnailSource = "image://thumbnail/frame?path=" + encodeURIComponent(path)
+                + "&t=" + seconds
+        thumbnailRequestInFlight = thumbnail.status === Image.Loading
+        if (!thumbnailRequestInFlight)
+            thumbnailRequestFinished()
+    }
+
+    function thumbnailRequestFinished() {
+        thumbnailRequestInFlight = false
+        if (thumbnail.status === Image.Ready || thumbnail.status === Image.Error)
+            displayedThumbnailSecond = requestedThumbnailSecond
+        if (pendingThumbnailSecond === displayedThumbnailSecond)
+            pendingThumbnailSecond = -1
+        if (pendingThumbnailSecond >= 0 && pendingThumbnailSecond !== displayedThumbnailSecond
+                && mouse.containsMouse && thumbnailPreviewEnabled && !thumbnailRequestTimer.running)
+            thumbnailRequestTimer.start()
     }
 
     function requestWaveform() {
@@ -67,22 +111,30 @@ FocusScope {
     }
 
     Timer {
-        id: thumbnailDebounce
-        interval: 220
-        onTriggered: {
-            if (mouse.containsMouse && player.hasVideo && root.thumbnailPreviewEnabled)
-                root.requestThumbnail(root.hoveredTimeMs)
-        }
+        id: thumbnailRequestTimer
+        interval: 45
+        onTriggered: root.pumpThumbnailRequest()
+    }
+    Timer {
+        id: thumbnailHoverTicker
+        interval: 140
+        repeat: true
+        running: mouse.containsMouse && player.hasVideo && root.thumbnailPreviewEnabled
+        onTriggered: root.requestThumbnail(root.hoveredTimeMs)
     }
     onHoveredTimeMsChanged: {
         if (mouse.containsMouse && player.hasVideo && thumbnailPreviewEnabled)
-            thumbnailDebounce.restart()
+            requestThumbnail(hoveredTimeMs)
     }
     Connections {
         target: Theme.store
         function onShowSeekThumbnailsChanged() {
             if (!root.thumbnailPreviewEnabled) {
-                thumbnailDebounce.stop()
+                thumbnailRequestTimer.stop()
+                root.pendingThumbnailSecond = -1
+                root.requestedThumbnailSecond = -1
+                root.displayedThumbnailSecond = -1
+                root.thumbnailRequestInFlight = false
                 root.thumbnailSource = ""
             }
         }
@@ -90,7 +142,11 @@ FocusScope {
     Connections {
         target: player
         function onMediaChanged() {
-            thumbnailDebounce.stop()
+            thumbnailRequestTimer.stop()
+            root.pendingThumbnailSecond = -1
+            root.displayedThumbnailSecond = -1
+            root.requestedThumbnailSecond = -1
+            root.thumbnailRequestInFlight = false
             root.thumbnailSource = ""
             root.waveformSource = ""
         }
@@ -217,10 +273,17 @@ FocusScope {
                 Layout.preferredHeight: 158
                 visible: root.thumbnailPreviewEnabled && root.thumbnailSource.length > 0 && status !== Image.Error
                 source: root.thumbnailSource
-                sourceSize: Qt.size(480, 270)
+                sourceSize: Qt.size(320, 180)
                 fillMode: Image.PreserveAspectFit
                 cache: false
                 asynchronous: true
+                retainWhileLoading: true
+                onStatusChanged: {
+                    if (status === Image.Loading)
+                        root.thumbnailRequestInFlight = true
+                    else if (root.thumbnailRequestInFlight)
+                        root.thumbnailRequestFinished()
+                }
             }
             NText {
                 id: bubbleText
@@ -253,11 +316,15 @@ FocusScope {
         cursorShape: Qt.PointingHandCursor
         function posAt(x) { return Math.max(0, Math.min(1, x / root.width)) }
         onPressed: (e) => root.dragPosition = posAt(e.x)
-        onEntered: if (player.hasVideo && root.thumbnailPreviewEnabled) thumbnailDebounce.restart()
-        onExited: thumbnailDebounce.stop()
+        onEntered: if (player.hasVideo && root.thumbnailPreviewEnabled) root.requestThumbnail(root.hoveredTimeMs)
+        onExited: {
+            root.pendingThumbnailSecond = -1
+            thumbnailRequestTimer.stop()
+        }
         onPositionChanged: (e) => {
             if (pressed) root.dragPosition = posAt(e.x)
-            if (containsMouse && player.hasVideo && root.thumbnailPreviewEnabled) thumbnailDebounce.restart()
+            if (containsMouse && player.hasVideo && root.thumbnailPreviewEnabled)
+                root.requestThumbnail(root.hoveredTimeMs)
         }
         onClicked: root.forceActiveFocus()
         onReleased: (e) => { player.seek(posAt(e.x)); root.forceActiveFocus() }

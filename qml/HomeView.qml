@@ -11,6 +11,7 @@ Rectangle {
     objectName: "home-screen"
     color: root.sidePanel ? Theme.librarySidePanel : Theme.window
     property alias miniVideoHost: homeMiniVideoSurface
+    property alias miniPlayerItem: homeMiniPlayer
     property int contentRevision: 0
     property string searchText: ""
     property bool sortByName: false
@@ -960,7 +961,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.rightMargin: 16
         anchors.bottomMargin: 16
-        width: Math.min(380, Math.max(220, root.width * 0.32))
+        width: Math.min(Math.min(380, Math.max(220, root.width * 0.32)), Math.max(0, root.width - 32))
         height: homeMiniVideoSurface.height + 64
         radius: 10
         color: Theme.bar
