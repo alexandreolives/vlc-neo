@@ -5,6 +5,7 @@ import QtCore
 // Design tokens taken from the Figma file (VLC Redesign, Juxtopposed).
 QtObject {
     id: theme
+    property string homeLastArtistMediaUrl: ""
 
     readonly property var accents: ["#D37918", "#B9443B", "#A08E32", "#2E9E4A", "#2AA3B3",
                                     "#2F5FC4", "#8A3FD1", "#C64AA4", "#9A9A9A"]
@@ -83,7 +84,6 @@ QtObject {
         property string homeFolderVisitCountsJson: "{}"
         property string homePlaylistVisitCountsJson: "{}"
         property string homeArtistListenCountsJson: "{}"
-        property string homeLastArtistMediaUrl: ""
         property int controlLayoutVersion: 0
         property bool showSeekThumbnails: true
         property string favoriteMediaJson: "[]"

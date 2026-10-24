@@ -61,7 +61,7 @@ Rectangle {
     function recordArtistListen(artistName, mediaUrl) {
         const artist = String(artistName || "").trim()
         const url = String(mediaUrl || "")
-        if (!artist.length || !url.length || Theme.store.homeLastArtistMediaUrl === url)
+        if (!artist.length || !url.length || Theme.homeLastArtistMediaUrl === url)
             return
         const stats = artistListenStats()
         const entry = stats[artist] || { count: 0, last: 0 }
@@ -69,7 +69,7 @@ Rectangle {
         const artists = Object.keys(stats).sort((a, b) => Number(stats[b].last) - Number(stats[a].last))
         for (const staleArtist of artists.slice(100)) delete stats[staleArtist]
         Theme.store.homeArtistListenCountsJson = JSON.stringify(stats)
-        Theme.store.homeLastArtistMediaUrl = url
+        Theme.homeLastArtistMediaUrl = url
         refreshArtistItems()
     }
     function recordCurrentArtistListen() {
@@ -177,7 +177,8 @@ Rectangle {
         target: player
         function onRecentMediaChanged() { if (root.visible) root.refreshContent() }
         function onStateChanged() {
-            root.recordCurrentArtistListen()
+            if (player.playing) root.recordCurrentArtistListen()
+            else Theme.homeLastArtistMediaUrl = ""
             if (root.visible) root.refreshContent()
         }
         function onMediaChanged() {
