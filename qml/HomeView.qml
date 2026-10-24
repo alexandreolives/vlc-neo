@@ -177,14 +177,12 @@ Rectangle {
         target: player
         function onRecentMediaChanged() { if (root.visible) root.refreshContent() }
         function onStateChanged() {
-            if (!root.visible) return
             root.recordCurrentArtistListen()
-            root.refreshContent()
+            if (root.visible) root.refreshContent()
         }
         function onMediaChanged() {
-            if (!root.visible) return
             root.recordCurrentArtistListen()
-            root.refreshContent()
+            if (root.visible) root.refreshContent()
         }
     }
     FolderListModel {
