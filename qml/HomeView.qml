@@ -1181,31 +1181,34 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real pressX: 0
+                property real pressY: 0
                 property real pointerOffsetX: 0
                 property real pointerOffsetY: 0
-                property real pendingOffsetX: homeMiniPlayer.dragOffsetX
-                property real pendingOffsetY: homeMiniPlayer.dragOffsetY
+                property bool dragStarted: false
                 onPressed: (mouse) => {
+                    pressX = mouse.x
+                    pressY = mouse.y
+                    dragStarted = false
                     const point = mapToItem(homeMiniPlayer.parent, mouse.x, mouse.y)
                     pointerOffsetX = point.x - homeMiniPlayer.x
                     pointerOffsetY = point.y - homeMiniPlayer.y
-                    pendingOffsetX = homeMiniPlayer.dragOffsetX
-                    pendingOffsetY = homeMiniPlayer.dragOffsetY
                 }
                 onPositionChanged: (mouse) => {
                     if (!pressed) return
+                    if (!dragStarted && Math.abs(mouse.x - pressX) + Math.abs(mouse.y - pressY) < 8) return
+                    dragStarted = true
+                    homeMiniPlayer.dragging = true
                     const point = mapToItem(homeMiniPlayer.parent, mouse.x, mouse.y)
                     const maxX = Math.max(0, homeMiniPlayer.parent.width - homeMiniPlayer.width)
                     const maxY = Math.max(0, homeMiniPlayer.parent.height - homeMiniPlayer.height)
                     const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
                     const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
-                    pendingOffsetX = xNow - homeMiniPlayer.defaultX
-                    pendingOffsetY = yNow - homeMiniPlayer.defaultY
+                    homeMiniPlayer.dragOffsetX = xNow - homeMiniPlayer.defaultX
+                    homeMiniPlayer.dragOffsetY = yNow - homeMiniPlayer.defaultY
                 }
-                onReleased: {
-                    homeMiniPlayer.dragOffsetX = pendingOffsetX
-                    homeMiniPlayer.dragOffsetY = pendingOffsetY
-                }
+                onReleased: homeMiniPlayer.dragging = false
+                onCanceled: homeMiniPlayer.dragging = false
             }
             anchors.left: parent.left
             anchors.right: parent.right

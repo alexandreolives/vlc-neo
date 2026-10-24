@@ -1846,31 +1846,31 @@ Rectangle {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real pressX: 0
+                property real pressY: 0
                 property real pointerOffsetX: 0
                 property real pointerOffsetY: 0
-                property real pendingOffsetX: miniPlayer.dragOffsetX
-                property real pendingOffsetY: miniPlayer.dragOffsetY
                 onPressed: (mouse) => {
+                    pressX = mouse.x
+                    pressY = mouse.y
                     const point = mapToItem(miniPlayer.parent, mouse.x, mouse.y)
                     pointerOffsetX = point.x - miniPlayer.x
                     pointerOffsetY = point.y - miniPlayer.y
-                    pendingOffsetX = miniPlayer.dragOffsetX
-                    pendingOffsetY = miniPlayer.dragOffsetY
                 }
                 onPositionChanged: (mouse) => {
                     if (!pressed) return
+                    if (!miniPlayer.dragging && Math.abs(mouse.x - pressX) + Math.abs(mouse.y - pressY) < 8) return
+                    miniPlayer.dragging = true
                     const point = mapToItem(miniPlayer.parent, mouse.x, mouse.y)
                     const maxX = Math.max(0, miniPlayer.parent.width - miniPlayer.width)
                     const maxY = Math.max(0, miniPlayer.parent.height - miniPlayer.height)
                     const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
                     const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
-                    pendingOffsetX = xNow - miniPlayer.defaultX
-                    pendingOffsetY = yNow - miniPlayer.defaultY
+                    miniPlayer.dragOffsetX = xNow - miniPlayer.defaultX
+                    miniPlayer.dragOffsetY = yNow - miniPlayer.defaultY
                 }
-                onReleased: {
-                    miniPlayer.dragOffsetX = pendingOffsetX
-                    miniPlayer.dragOffsetY = pendingOffsetY
-                }
+                onReleased: miniPlayer.dragging = false
+                onCanceled: miniPlayer.dragging = false
             }
             anchors.left: parent.left
             anchors.right: parent.right
