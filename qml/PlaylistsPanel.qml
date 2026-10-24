@@ -121,7 +121,7 @@ Rectangle {
             objectName: "playlist-library-list"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: 3
+            Layout.topMargin: 6
             clip: true
             model: playlists
             boundsBehavior: Flickable.StopAtBounds
