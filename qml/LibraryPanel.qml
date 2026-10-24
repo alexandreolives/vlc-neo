@@ -485,7 +485,9 @@ Rectangle {
             }
             IconButton {
                 objectName: "library-folder-view-toggle"
-                icon: root.folderViewMode === "grid" ? "list" : "grid"
+                icon: root.figmaSidePanel
+                      ? (root.folderViewMode === "grid" ? "grid" : "list")
+                      : (root.folderViewMode === "grid" ? "list" : "grid")
                 tip: root.folderViewMode === "grid" ? "List view" : "Grid view"
                 Accessible.name: tip
                 onClicked: root.folderViewMode = root.folderViewMode === "grid" ? "list" : "grid"
