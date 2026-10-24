@@ -347,9 +347,9 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: root.figmaSidePanel ? 0 : (root.compactFolderSidebar ? 18 : (root.wide && root.section === "folder" ? 8 : 0))
             Layout.leftMargin: root.figmaSidePanel ? 18 : 8
-            Layout.rightMargin: root.figmaSidePanel ? 27 : 8
+            Layout.rightMargin: root.figmaSidePanel ? 17 : 8
             Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
-            spacing: 2
+            spacing: root.figmaSidePanel ? 6 : 2
             IconButton {
                 icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
                 tip: root.figmaSidePanel ? "Back" : "Up"
@@ -370,7 +370,7 @@ Rectangle {
                       : (root.section === "recent" ? "Recent media" : (root.section === "music" ? (root.compactMusicSidebar ? "Songs  ›  My Songs" : "Music library") : "Home"))
                 font.pixelSize: root.figmaSidePanel ? 14 : 12
                 color: root.figmaSidePanel ? Theme.librarySideTitle : Theme.text
-                Layout.leftMargin: 8
+                Layout.leftMargin: root.figmaSidePanel ? 0 : 8
                 Layout.fillWidth: true
             }
             Item { Layout.fillWidth: true }
@@ -416,9 +416,9 @@ Rectangle {
             visible: root.figmaSidePanel && root.section === "music"
             Layout.fillWidth: true
             Layout.leftMargin: 20
-            Layout.rightMargin: 27
+            Layout.rightMargin: 17
             Layout.preferredHeight: 52
-            spacing: 4
+            spacing: 5
             NText {
                 objectName: "music-sidepanel-toolbar-count"
                 visible: !root.musicSideSearchOpen
@@ -1001,11 +1001,11 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 52
             Layout.leftMargin: 18
-            Layout.rightMargin: 27
-            spacing: 2
+            Layout.rightMargin: 17
+            spacing: 6
             IconButton { icon: "arrow-left"; tip: "Back"; onClicked: root.goBackFromSidePanel() }
             IconButton { icon: "arrow-right"; tip: "Forward"; enabled: false }
-            NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 8; Layout.fillWidth: true }
+            NText { text: root.sidePanelTitle(); font.pixelSize: 14; color: Theme.librarySideTitle; Layout.leftMargin: 0; Layout.fillWidth: true }
             IconButton { icon: "more"; tip: "More options" }
             IconButton { icon: "open"; tip: "Open full page"; onClicked: win.navigate(win.navigationPage) }
         }
@@ -1014,8 +1014,8 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 52
             Layout.leftMargin: 20
-            Layout.rightMargin: 27
-            spacing: 4
+            Layout.rightMargin: 17
+            spacing: 5
             NText {
                 id: musicSidePanelCount
                 objectName: "music-sidepanel-item-count"
