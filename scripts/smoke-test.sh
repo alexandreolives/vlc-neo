@@ -1274,8 +1274,8 @@ check "Home's side-pane More button opens the shared VLC actions menu" "$out" "h
 check "Playlists' side-pane More button opens the shared VLC actions menu" "$out" "playlistMore=true"
 check "Music's side-pane More button opens the shared VLC actions menu" "$out" "musicMore=true"
 check "Videos' side-pane More button opens the shared VLC actions menu" "$out" "videosMore=true"
-out=$(run "500:onboarding.close(); win.width=1920; win.height=1080; player.openLocation('$E1',true)|+1200:win.openSidePanel('home')|+200:click-item:home-sidepanel-open-full-page|+350:'homeExpand=' + (navigationPage === 'home' && !libraryOpen && !libraryFullPage && !sideHomeView.visible && homeView.visible && navigationRail.expanded && player.hasVideo && video.parent === homeView.miniVideoHost)|+100:quit")
-check "Home's open button follows Figma to the full Home page with a mini-player" "$out" "homeExpand=true"
+out=$(run "500:onboarding.close(); win.width=1920; win.height=1080; player.openLocation('$E1',true)|+1200:win.openSidePanel('home')|+200:click-item:home-sidepanel-open-full-page|+350:'homeExpand=' + (navigationPage === 'folder' && libraryFullPage && !libraryOpen && libraryPanel.section === 'folder' && platform.localPath(libraryPanel.folder) === player.folderPath && !videoArea.visible && video.parent === libraryPanel.miniVideoHost)|+100:quit")
+check "Home's open button follows Figma to the current folder browser with a mini-player" "$out" "homeExpand=true"
 out=$(run "500:onboarding.close(); win.width=1920; win.height=1080; player.openLocation('$E1',true)|+1200:win.openSidePanel('playlist')|+200:click-item:playlist-expand|+300:'playlistExpand=' + (navigationPage === 'folder' && libraryFullPage && !libraryOpen && libraryPanel.section === 'folder' && platform.localPath(libraryPanel.folder) === player.folderPath && !videoArea.visible && video.parent === libraryPanel.miniVideoHost)|+100:quit")
 check "Playlists' open button follows Figma to the current folder's full-page view" "$out" "playlistExpand=true"
 
