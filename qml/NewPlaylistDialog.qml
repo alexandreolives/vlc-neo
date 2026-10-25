@@ -20,9 +20,17 @@ Modal {
     property alias coverPreview: coverImage
 
     function iconForMedia(url) {
-        const path = platform.localPath(url)
-        const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
+        const source = url.toString().split(/[?#]/)[0]
+        const path = platform.localPath(url) || source
+        const fileName = path.slice(path.lastIndexOf("/") + 1)
+        const extension = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase()
         return audioExtensions.indexOf(extension) >= 0 ? "music" : "video-file"
+    }
+    function displayMediaName(url) {
+        const source = url.toString().split(/[?#]/)[0]
+        const fileName = source.slice(source.lastIndexOf("/") + 1)
+        try { return decodeURIComponent(fileName) }
+        catch (error) { return fileName }
     }
 
     function addFiles(files) {
@@ -190,7 +198,7 @@ Modal {
                                     anchors.leftMargin: 8
                                     anchors.rightMargin: 4
                                     Icon { objectName: "playlist-selected-file-icon-" + index; name: root.iconForMedia(modelData); size: 13 }
-                                    NText { text: decodeURIComponent(modelData.toString().split("/").pop()); Layout.fillWidth: true; font.pixelSize: 11; elide: Text.ElideMiddle }
+                                    NText { text: root.displayMediaName(modelData); Layout.fillWidth: true; font.pixelSize: 11; elide: Text.ElideMiddle }
                                     IconButton { icon: "x"; iconSize: 12; tip: "Remove file"; onClicked: root.removeFile(index) }
                                 }
                             }
