@@ -1314,6 +1314,15 @@ check "the Home mini-player next button advances the VLC queue without leaving H
 check "the Home mini-player previous button returns to the prior VLC queue item without leaving Home" "$out" "homeMiniButtonPrevious=true/true"
 check "the Home mini-player expand button opens the player" "$out" "homeMiniButtonExpand=true"
 check "the Home mini-player close button stops playback" "$out" "homeMiniButtonClose=true"
+echo "== full-library mini-player buttons after moving the card"
+out=$(run "500:onboarding.close(); win.width=1920; win.height=1080; player.openUrls([platform.fileUrl('$E1'),platform.fileUrl('$E2')],true)|+1400:win.navigate('folder')|+400:drag-item:mini-player-title:mini-player:90,70|+150:'libraryMiniMovedWithOverlay=' + (libraryPanel.miniPlayerItem.dragOffsetX < -50 && libraryPanel.miniPlayerItem.dragOffsetY < -50 && libraryPanel.miniPlayerOverlay.visible)|+100:move-item:mini-player-play|+50:click-item:mini-player-play|+150:'libraryMiniButtonPause=' + !player.playing|+100:move-item:mini-player-play|+50:click-item:mini-player-play|+150:'libraryMiniButtonResume=' + player.playing|+100:move-item:mini-player-next|+50:click-item:mini-player-next|+700:'libraryMiniButtonNext=' + player.mediaUrl.toString().endsWith('My.Show.S01E02.1080p.mkv')|+100:player.seek(0.5)|+200:move-item:mini-player-previous|+50:click-item:mini-player-previous|+700:'libraryMiniButtonPrevious=' + player.mediaUrl.toString().endsWith('My.Show.S01E01.1080p.mkv')|+100:move-item:mini-player-expand|+50:click-item:mini-player-expand|+250:'libraryMiniButtonExpand=' + (navigationPage === 'player')|+100:win.navigate('folder')|+300:move-item:mini-player-video-drag|+150:move-item:mini-player-close|+50:click-item:mini-player-close|+350:'libraryMiniButtonClose=' + !player.hasVideo|+100:quit" "$E1" "$E2")
+check "the full-library mini-player and hover controls remain visible after dragging" "$out" "libraryMiniMovedWithOverlay=true"
+check "the full-library mini-player pause button pauses VLC after dragging" "$out" "libraryMiniButtonPause=true"
+check "the full-library mini-player play button resumes VLC after dragging" "$out" "libraryMiniButtonResume=true"
+check "the full-library mini-player next button advances the VLC queue after dragging" "$out" "libraryMiniButtonNext=true"
+check "the full-library mini-player previous button returns to the prior VLC queue item after dragging" "$out" "libraryMiniButtonPrevious=true"
+check "the full-library mini-player expand button opens the player after dragging" "$out" "libraryMiniButtonExpand=true"
+check "the full-library mini-player close button stops playback after dragging" "$out" "libraryMiniButtonClose=true"
 for screenshot in navigation-videos.png folder-browser-grid-1920.png folder-browser-list-1920.png; do
     if [ -s "$WORK/$screenshot" ]; then echo "PASS  $screenshot written"; pass=$((pass + 1))
     else echo "FAIL  $screenshot missing"; fail=$((fail + 1)); fi
