@@ -285,8 +285,11 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
                 target, QPointF(control->width() / 2, control->height() / 2)));
         }
         int miniPlayerDragStepsWithAttachedControls = 0;
+        int miniPlayerCardMovementSteps = 0;
         bool miniPlayerControlsFollowedCard = !miniPlayerControlNames.isEmpty()
                                               && miniPlayerControls.size() == miniPlayerControlNames.size();
+        bool miniPlayerCardMovedAtEveryStep = !miniPlayerControlNames.isEmpty();
+        QPointF previousMiniPlayerPosition = target->mapToScene(QPointF(0, 0));
         const QPointF from = source->mapToScene(QPointF(source->width() / 2, source->height() / 2));
         const QPointF to = target->mapToScene(QPointF(offset.at(0).toDouble(), offset.at(1).toDouble()));
         const auto sendMouse = [window](QEvent::Type type, const QPointF &position,
@@ -299,6 +302,15 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
         for (int i = 1; i <= 6; ++i) {
             sendMouse(QEvent::MouseMove, from + (to - from) * (double(i) / 6.0),
                       Qt::NoButton, Qt::LeftButton);
+            if (miniPlayerCardMovedAtEveryStep) {
+                const QPointF currentPosition = target->mapToScene(QPointF(0, 0));
+                const bool cardMoved = qAbs(currentPosition.x() - previousMiniPlayerPosition.x()) > 1.0
+                                       || qAbs(currentPosition.y() - previousMiniPlayerPosition.y()) > 1.0;
+                miniPlayerCardMovedAtEveryStep = cardMoved;
+                if (cardMoved)
+                    ++miniPlayerCardMovementSteps;
+                previousMiniPlayerPosition = currentPosition;
+            }
             if (miniPlayerControlsFollowedCard) {
                 bool attachedAtThisStep = true;
                 for (qsizetype controlIndex = 0; controlIndex < miniPlayerControls.size(); ++controlIndex) {
@@ -319,11 +331,12 @@ void runTestStep(QObject *root, QQuickWindow *window, const QString &action)
         sendMouse(QEvent::MouseButtonRelease, to, Qt::LeftButton, Qt::NoButton);
         if (!miniPlayerControlNames.isEmpty()) {
             const char *viewName = cardName == QLatin1String("home-mini-player") ? "Home" : "Library";
-            if (miniPlayerControlsFollowedCard && miniPlayerDragStepsWithAttachedControls == 6)
-                qInfo("neo test: %s mini-player controls followed card throughout drag (6/6 steps)", viewName);
+            if (miniPlayerControlsFollowedCard && miniPlayerDragStepsWithAttachedControls == 6
+                && miniPlayerCardMovedAtEveryStep && miniPlayerCardMovementSteps == 6)
+                qInfo("neo test: %s mini-player card moved with all six controls (6/6 steps)", viewName);
             else
-                qWarning("neo test: %s mini-player control tracking failed (%d/6 drag steps)", viewName,
-                         miniPlayerDragStepsWithAttachedControls);
+                qWarning("neo test: %s mini-player drag tracking failed (card=%d/6 controls=%d/6 steps)",
+                         viewName, miniPlayerCardMovementSteps, miniPlayerDragStepsWithAttachedControls);
         }
         qInfo("neo test: dragged %s to %s", qPrintable(parts.at(0)), qPrintable(parts.at(1)));
     } else if (action.startsWith(QLatin1String("key:"))) {
