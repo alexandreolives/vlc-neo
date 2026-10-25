@@ -1079,7 +1079,7 @@ Rectangle {
             id: homeMiniPlayerHoverOverlay
             objectName: root.sidePanel ? "side-home-mini-player-hover-overlay" : "home-mini-player-hover-overlay"
             anchors.fill: homeMiniVideoSurface
-            radius: 6
+            radius: 6 * homeMiniPlayer.uiScale
             color: "#99000000"
             opacity: homeMiniPlayer.hoveringVideo || homeMiniPlayer.activeFocus ? 1 : 0
             visible: opacity > 0.01
