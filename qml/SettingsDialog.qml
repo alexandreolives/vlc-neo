@@ -11,7 +11,7 @@ import Neo 1.0
 Modal {
     id: root
     property bool rendererDiscoveryLeaseHeld: false
-    bodyMargin: 8
+    bodyMargin: 0
     width: parent ? parent.width : 1000
     height: parent ? parent.height : 865
     anchors.centerIn: undefined
@@ -135,6 +135,9 @@ Modal {
     property alias skinFileDialogVisible: skinFileDialog.visible
     property alias logFileDialogVisible: logFileDialog.visible
     property alias languageChoiceControl: interfaceLanguageControl
+    property alias categorySearchInput: categoryField
+    property alias settingsCategoryPanel: categoryPanel
+    property alias settingsPageContent: scroll
     readonly property var bufferingProfiles: [
         { label: "Custom", value: "Custom", amount: 0 },
         { label: "Lowest latency", value: "Lowest latency", amount: 100 },
@@ -716,18 +719,21 @@ Modal {
     }
 
     ColumnLayout {
+        x: 10
         y: 0
-        width: root.width - 20
+        width: root.width - 10
         height: root.height - 2
         spacing: 8
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 34
+            Layout.preferredHeight: 52
+            Layout.minimumHeight: 52
+            Layout.maximumHeight: 52
             Layout.rightMargin: 16
             spacing: 32
             Item {
-                Layout.preferredWidth: root.compactCategories ? 112 : 188
+                Layout.preferredWidth: root.compactCategories ? 112 : 200
                 Layout.fillHeight: true
                 NField {
                     id: categoryField
@@ -735,7 +741,7 @@ Modal {
                     anchors.right: parent.right
                     height: 32
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: 3
+                    anchors.verticalCenterOffset: -1
                     leftPadding: 32
                     placeholderText: "Search"
                     onTextChanged: root.categorySearch = text
@@ -749,13 +755,14 @@ Modal {
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.topMargin: -7
+            Layout.topMargin: 0
             spacing: 0
 
         // Category list
         Rectangle {
+            id: categoryPanel
             Layout.fillHeight: true
-            Layout.preferredWidth: root.compactCategories ? 40 : 188
+            Layout.preferredWidth: root.compactCategories ? 40 : 200
             Layout.bottomMargin: 8
             color: Theme.bar
             radius: Theme.radius
@@ -764,7 +771,7 @@ Modal {
                 anchors.fill: parent
                 anchors.leftMargin: root.compactCategories ? 4 : 8
                 anchors.rightMargin: root.compactCategories ? 4 : 8
-                anchors.topMargin: 26
+                anchors.topMargin: 11
                 anchors.bottomMargin: 8
                 contentWidth: availableWidth
                 clip: true
@@ -840,7 +847,7 @@ Modal {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.leftMargin: root.compactCategories ? 12 : 32
-            Layout.topMargin: root.page === "interface" ? 31 : 24
+            Layout.topMargin: root.page === "interface" ? 20 : 12
             contentWidth: availableWidth
             clip: true
 
