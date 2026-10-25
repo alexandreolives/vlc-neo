@@ -14,6 +14,8 @@ Rectangle {
     property alias miniPlayerItem: homeMiniPlayer
     property alias miniPlayerOverlay: homeMiniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerExpandButton: homeMiniPlayerExpandButton
+    property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
     property int contentRevision: 0
     property string searchText: ""
     property bool sortByName: false
@@ -1075,6 +1077,7 @@ Rectangle {
                 onClicked: player.stop()
             }
             IconButton {
+                id: homeMiniPlayerExpandButton
                 objectName: root.sidePanel ? "side-home-mini-player-expand" : "home-mini-player-expand"
                 anchors.right: parent.right
                 anchors.top: parent.top
@@ -1089,6 +1092,7 @@ Rectangle {
                 onClicked: win.navigate("player")
             }
             Row {
+                id: homeMiniPlayerTransportControls
                 anchors.centerIn: parent
                 spacing: 42 * homeMiniPlayer.uiScale
                 IconButton {

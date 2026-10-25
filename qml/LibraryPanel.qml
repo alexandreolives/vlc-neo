@@ -46,6 +46,8 @@ Rectangle {
     property alias miniPlayerItem: miniPlayer
     property alias miniPlayerOverlay: miniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerExpandButton: libraryMiniPlayerExpandButton
+    property alias miniPlayerTransportControls: libraryMiniPlayerTransportControls
     property alias folderViewToggleItem: folderViewToggleButton
     property alias folderListingItem: listing
     property alias indexedListing: musicListing
@@ -1746,6 +1748,7 @@ Rectangle {
                 onClicked: player.stop()
             }
             IconButton {
+                id: libraryMiniPlayerExpandButton
                 objectName: "mini-player-expand"
                 anchors.right: parent.right
                 anchors.top: parent.top
@@ -1760,6 +1763,7 @@ Rectangle {
                 onClicked: win.navigate("player")
             }
             Row {
+                id: libraryMiniPlayerTransportControls
                 anchors.centerIn: parent
                 spacing: 42 * miniPlayer.uiScale
                 IconButton {
