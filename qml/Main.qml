@@ -82,6 +82,23 @@ ApplicationWindow {
     property bool sideReturnFullPage: false
     property var sidePanelRouteHistory: []
     property var sidePanelForwardRouteHistory: []
+    property var rendererDiscoveryClients: []
+    function acquireRendererDiscovery(client) {
+        if (rendererDiscoveryClients.includes(client)) return true
+        const shouldStart = rendererDiscoveryClients.length === 0
+        rendererDiscoveryClients = rendererDiscoveryClients.concat([client])
+        if (shouldStart) player.discoverRenderers(true)
+        return true
+    }
+    function releaseRendererDiscovery(client) {
+        if (!rendererDiscoveryClients.includes(client)) return true
+        rendererDiscoveryClients = rendererDiscoveryClients.filter(item => item !== client)
+        return rendererDiscoveryClients.length === 0 ? player.discoverRenderers(false) : true
+    }
+    function refreshRendererDiscovery() {
+        if (rendererDiscoveryClients.length === 0) return false
+        return player.discoverRenderers(true)
+    }
     readonly property bool audioVisualizerOpen: audioVisualizerPopup.visible
     readonly property bool audioVisualizerActive: audioVisualizerPopup.selectedMode !== "disabled"
     property string navigationPage: "home"

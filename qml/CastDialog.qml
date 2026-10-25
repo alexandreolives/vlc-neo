@@ -12,6 +12,7 @@ Modal {
     bodyMargin: 18
     property string requestedRendererId: ""
     property double connectStartedAt: 0
+    property bool discoveryLeaseHeld: false
 
     function rendererReadyForPlayback(device) {
         return !!device && device.selected
@@ -20,9 +21,18 @@ Modal {
 
     onOpened: {
         picker.searchingTimedOut = false
-        player.discoverRenderers(true)
+        discoveryLeaseHeld = win.acquireRendererDiscovery("cast-dialog")
     }
-    onClosed: win.focusKeys()
+    onClosed: {
+        if (discoveryLeaseHeld) {
+            win.releaseRendererDiscovery("cast-dialog")
+            discoveryLeaseHeld = false
+        }
+        win.focusKeys()
+    }
+    Component.onDestruction: {
+        if (discoveryLeaseHeld) win.releaseRendererDiscovery("cast-dialog")
+    }
 
     RendererPicker {
         id: picker

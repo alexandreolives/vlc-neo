@@ -10,6 +10,7 @@ import Neo 1.0
 // advanced ones further down the same page — no separate "All" maze.
 Modal {
     id: root
+    property bool rendererDiscoveryLeaseHeld: false
     bodyMargin: 8
     width: parent ? parent.width : 1000
     height: parent ? parent.height : 865
@@ -502,7 +503,21 @@ Modal {
         for (const device of devices) if (device.selected) return device.id
         return ""
     }
-    onOpened: { syncSubtitleSizeMode(); readAudioFilters(); syncEqualizerSettings(); loadPictureValues(); syncPlaybackSettings(); syncScrollDirection(); syncPrivacySettings(); syncMetadataNetworkAccess(); syncBufferingProfile(); player.discoverRenderers(true) }
+    onOpened: {
+        syncSubtitleSizeMode()
+        readAudioFilters()
+        syncEqualizerSettings()
+        loadPictureValues()
+        syncPlaybackSettings()
+        syncScrollDirection()
+        syncPrivacySettings()
+        syncMetadataNetworkAccess()
+        syncBufferingProfile()
+        rendererDiscoveryLeaseHeld = win.acquireRendererDiscovery("settings-dialog")
+    }
+    Component.onDestruction: {
+        if (rendererDiscoveryLeaseHeld) win.releaseRendererDiscovery("settings-dialog")
+    }
     onPageChanged: {
         if (page === "controls") syncScrollDirection()
         if (page === "privacy") syncPrivacySettings()
@@ -692,6 +707,10 @@ Modal {
         return undefined
     }
     onClosed: {
+        if (rendererDiscoveryLeaseHeld) {
+            win.releaseRendererDiscovery("settings-dialog")
+            rendererDiscoveryLeaseHeld = false
+        }
         categorySearch = ""
         categoryField.clear()
     }

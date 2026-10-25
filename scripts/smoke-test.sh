@@ -559,6 +559,10 @@ out=$(run "900:'rendererDiscoverySupported=' + player.rendererDiscoverySupported
 check "renderer discovery succeeds when supported and degrades cleanly otherwise" "$out" "rendererCapabilityHandled=true"
 check "discovered renderers are exposed to QML and cleared after stopping" "$out" "rendererDeviceModel=true"
 check "stopping renderer discovery leaves no stale devices" "$out" "rendererDevicesCleared=true"
+out=$(run "200:onboarding.close(); castDialog.open()|+150:'castDiscoveryLease=' + rendererDiscoveryClients.join('/')|+100:settingsDialog.open()|+200:'overlappingDiscoveryLeases=' + rendererDiscoveryClients.join('/')|+100:castDialog.close()|+150:'settingsKeepsDiscovery=' + (rendererDiscoveryClients.length===1 && rendererDiscoveryClients[0]==='settings-dialog')|+100:settingsDialog.close()|+150:'discoveryStopsAfterLastDialog=' + (rendererDiscoveryClients.length===0)|+100:quit")
+check "Cast and Settings dialogs acquire independent renderer-discovery leases" "$out" "overlappingDiscoveryLeases=cast-dialog/settings-dialog"
+check "closing the Cast dialog keeps discovery active for Settings" "$out" "settingsKeepsDiscovery=true"
+check "renderer discovery stops after its final dialog closes" "$out" "discoveryStopsAfterLastDialog=true"
 out=$(run "200:'castRendererReadyStates=' + [castDialog.rendererReadyForPlayback({selected:true,status:'Connected'}),castDialog.rendererReadyForPlayback({selected:true,status:'Playing'}),castDialog.rendererReadyForPlayback({selected:true,status:'Paused'}),castDialog.rendererReadyForPlayback({selected:true,status:'Connecting'}),castDialog.rendererReadyForPlayback({selected:true,status:'Stopped'}),castDialog.rendererReadyForPlayback({selected:false,status:'Connected'})].join('/')|+100:quit")
 check "the cast dialog accepts VLC's connected Chromecast state and active DLNA states" "$out" "castRendererReadyStates=true/true/true/false/false/false"
 echo "== VLC records the playing audio and video"

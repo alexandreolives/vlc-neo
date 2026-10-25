@@ -21,7 +21,7 @@ ColumnLayout {
             tip: "Search again"
             onClicked: {
                 root.searchingTimedOut = false
-                player.discoverRenderers(true)
+                win.refreshRendererDiscovery()
             }
         }
     }

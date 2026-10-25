@@ -1080,15 +1080,21 @@ public:
     {
         if (!enabled) {
             m_ssdpTimer->stop();
-            if (m_activeDlnaId.isEmpty()) {
+            m_ssdpSocket->close();
+            {
                 QMutexLocker locker(&m_rendererMutex);
-                m_dlnaRenderers.clear();
+                for (auto it = m_dlnaRenderers.begin(); it != m_dlnaRenderers.end();) {
+                    if (it.key() != m_activeDlnaId)
+                        it = m_dlnaRenderers.erase(it);
+                    else
+                        ++it;
+                }
             }
             QList<vlc_renderer_discovery_t *> discoveries;
             discoveries.swap(m_rendererDiscoveries);
             for (vlc_renderer_discovery_t *discovery : discoveries)
                 vlc_rd_release(discovery);
-            clearRenderers();
+            clearInactiveRenderers();
             return true;
         }
         const bool ssdpBound = m_ssdpSocket->state() == QAbstractSocket::BoundState
@@ -1678,6 +1684,11 @@ private:
             auto item = m_renderers.find(id);
             if (item == m_renderers.end())
                 return;
+            // Releasing discovery can enqueue removal notifications after the
+            // selected renderer has been intentionally retained. Ignore those
+            // stale notifications once discovery is no longer active.
+            if (m_activeRendererId == id && m_rendererDiscoveries.isEmpty())
+                return;
             vlc_renderer_item_release(item.value());
             m_renderers.erase(item);
             if (m_activeRendererId == id) {
@@ -1697,6 +1708,21 @@ private:
             if (!m_activeRendererId.isEmpty()) {
                 m_activeRendererId.clear();
                 playlist_SetRenderer(m_playlist, nullptr);
+            }
+        }
+        emit rendererDevicesChanged();
+    }
+    void clearInactiveRenderers()
+    {
+        {
+            QMutexLocker locker(&m_rendererMutex);
+            for (auto it = m_renderers.begin(); it != m_renderers.end();) {
+                if (it.key() == m_activeRendererId) {
+                    ++it;
+                    continue;
+                }
+                vlc_renderer_item_release(it.value());
+                it = m_renderers.erase(it);
             }
         }
         emit rendererDevicesChanged();
