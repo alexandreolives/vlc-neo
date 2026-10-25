@@ -51,7 +51,11 @@ Rectangle {
     property alias miniPlayerItem: miniPlayer
     property alias miniPlayerOverlay: miniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerCloseButton: libraryMiniPlayerCloseButton
     property alias miniPlayerExpandButton: libraryMiniPlayerExpandButton
+    property alias miniPlayerPreviousButton: libraryMiniPlayerPreviousButton
+    property alias miniPlayerToggleButton: libraryMiniPlayerToggleButton
+    property alias miniPlayerNextButton: libraryMiniPlayerNextButton
     property alias miniPlayerTransportControls: libraryMiniPlayerTransportControls
     property alias miniPlayerQueueButton: libraryMiniPlayerQueueButton
     property alias folderViewToggleItem: folderViewToggleButton
@@ -1759,12 +1763,14 @@ Rectangle {
             visible: opacity > 0.01
             z: 3
             IconButton {
+                id: libraryMiniPlayerCloseButton
                 objectName: "mini-player-close"
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: 12 * miniPlayer.uiScale
                 icon: "close"
                 iconColor: Theme.text
+                colorAnimationEnabled: false
                 iconSize: 22 * miniPlayer.uiScale
                 implicitWidth: 30 * miniPlayer.uiScale
                 implicitHeight: 30 * miniPlayer.uiScale
@@ -1780,6 +1786,7 @@ Rectangle {
                 anchors.margins: 12 * miniPlayer.uiScale
                 icon: "open"
                 iconColor: Theme.text
+                colorAnimationEnabled: false
                 iconSize: 22 * miniPlayer.uiScale
                 implicitWidth: 30 * miniPlayer.uiScale
                 implicitHeight: 30 * miniPlayer.uiScale
@@ -1792,9 +1799,11 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 42 * miniPlayer.uiScale
                 IconButton {
+                    id: libraryMiniPlayerPreviousButton
                     objectName: "mini-player-previous"
                     icon: "previous"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 26 * miniPlayer.uiScale
                     implicitWidth: 30 * miniPlayer.uiScale
                     implicitHeight: 30 * miniPlayer.uiScale
@@ -1803,9 +1812,11 @@ Rectangle {
                     onClicked: player.previous()
                 }
                 IconButton {
+                    id: libraryMiniPlayerToggleButton
                     objectName: "mini-player-play"
                     icon: player.playing ? "pause" : "play"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 32 * miniPlayer.uiScale
                     implicitWidth: 36 * miniPlayer.uiScale
                     implicitHeight: 36 * miniPlayer.uiScale
@@ -1814,9 +1825,11 @@ Rectangle {
                     onClicked: player.togglePause()
                 }
                 IconButton {
+                    id: libraryMiniPlayerNextButton
                     objectName: "mini-player-next"
                     icon: "next"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 26 * miniPlayer.uiScale
                     implicitWidth: 30 * miniPlayer.uiScale
                     implicitHeight: 30 * miniPlayer.uiScale

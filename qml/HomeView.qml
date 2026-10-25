@@ -14,7 +14,11 @@ Rectangle {
     property alias miniPlayerItem: homeMiniPlayer
     property alias miniPlayerOverlay: homeMiniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerCloseButton: homeMiniPlayerCloseButton
     property alias miniPlayerExpandButton: homeMiniPlayerExpandButton
+    property alias miniPlayerPreviousButton: homeMiniPlayerPreviousButton
+    property alias miniPlayerToggleButton: homeMiniPlayerToggleButton
+    property alias miniPlayerNextButton: homeMiniPlayerNextButton
     property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
     property alias miniPlayerQueueButton: homeMiniPlayerQueueButton
     property Item miniPlayerDockParent: null
@@ -1075,12 +1079,14 @@ Rectangle {
             visible: opacity > 0.01
             z: 3
             IconButton {
+                id: homeMiniPlayerCloseButton
                 objectName: root.sidePanel ? "side-home-mini-player-close" : "home-mini-player-close"
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: 12 * homeMiniPlayer.uiScale
                 icon: "close"
                 iconColor: Theme.text
+                colorAnimationEnabled: false
                 iconSize: 22 * homeMiniPlayer.uiScale
                 implicitWidth: 30 * homeMiniPlayer.uiScale
                 implicitHeight: 30 * homeMiniPlayer.uiScale
@@ -1096,6 +1102,7 @@ Rectangle {
                 anchors.margins: 12 * homeMiniPlayer.uiScale
                 icon: "open"
                 iconColor: Theme.text
+                colorAnimationEnabled: false
                 iconSize: 22 * homeMiniPlayer.uiScale
                 implicitWidth: 30 * homeMiniPlayer.uiScale
                 implicitHeight: 30 * homeMiniPlayer.uiScale
@@ -1108,9 +1115,11 @@ Rectangle {
                 anchors.centerIn: parent
                 spacing: 42 * homeMiniPlayer.uiScale
                 IconButton {
+                    id: homeMiniPlayerPreviousButton
                     objectName: root.sidePanel ? "side-home-mini-player-previous" : "home-mini-player-previous"
                     icon: "previous"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 26 * homeMiniPlayer.uiScale
                     implicitWidth: 30 * homeMiniPlayer.uiScale
                     implicitHeight: 30 * homeMiniPlayer.uiScale
@@ -1119,9 +1128,11 @@ Rectangle {
                     onClicked: win.navigateMiniPlayerTrack(-1)
                 }
                 IconButton {
+                    id: homeMiniPlayerToggleButton
                     objectName: root.sidePanel ? "side-home-mini-player-toggle" : "home-mini-player-toggle"
                     icon: player.playing ? "pause" : "play"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 32 * homeMiniPlayer.uiScale
                     implicitWidth: 36 * homeMiniPlayer.uiScale
                     implicitHeight: 36 * homeMiniPlayer.uiScale
@@ -1130,9 +1141,11 @@ Rectangle {
                     onClicked: player.togglePause()
                 }
                 IconButton {
+                    id: homeMiniPlayerNextButton
                     objectName: root.sidePanel ? "side-home-mini-player-next" : "home-mini-player-next"
                     icon: "next"
                     iconColor: Theme.text
+                    colorAnimationEnabled: false
                     iconSize: 26 * homeMiniPlayer.uiScale
                     implicitWidth: 30 * homeMiniPlayer.uiScale
                     implicitHeight: 30 * homeMiniPlayer.uiScale
