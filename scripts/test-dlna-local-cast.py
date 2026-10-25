@@ -293,9 +293,19 @@ def main() -> int:
             "rendererDisconnected=true",
         )
         failures.extend(label for label in required_output if label not in output)
-        for action in ("SetAVTransportURI", "Play", "Seek", "Pause", "Stop"):
-            if action not in actions:
-                failures.append(f"renderer did not receive {action}")
+        expected_action_counts = {
+            "SetAVTransportURI": 1,
+            "Play": 2,  # initial start plus the one explicit resume
+            "Seek": 2,  # initial position plus the one explicit seek
+            "Pause": 1,
+            "Stop": 1,
+        }
+        for action, expected_count in expected_action_counts.items():
+            actual_count = actions.count(action)
+            if actual_count != expected_count:
+                failures.append(
+                    f"renderer received {action} {actual_count} times; expected {expected_count}"
+                )
         if not transport_uri.startswith(f"http://{interface}:") or "127.0.0.1" in transport_uri:
             failures.append(f"TV received a non-routable media URL: {transport_uri!r}")
         if not media_status:
