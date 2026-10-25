@@ -13,10 +13,17 @@ Modal {
     bodyMargin: 20
     property var mediaFiles: []
     property url coverUrl
+    readonly property var audioExtensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "wav", "wma", "alac", "ape", "mpc", "wv"]
     property alias nameInput: nameField
     property alias mediaFilesDialog: filesDialog
     property alias mediaDropZone: mediaDropArea
     property alias coverPreview: coverImage
+
+    function iconForMedia(url) {
+        const path = platform.localPath(url)
+        const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase()
+        return audioExtensions.indexOf(extension) >= 0 ? "music" : "video-file"
+    }
 
     function addFiles(files) {
         const merged = mediaFiles.slice()
@@ -182,7 +189,7 @@ Modal {
                                     anchors.fill: parent
                                     anchors.leftMargin: 8
                                     anchors.rightMargin: 4
-                                    Icon { name: "video-file"; size: 13 }
+                                    Icon { objectName: "playlist-selected-file-icon-" + index; name: root.iconForMedia(modelData); size: 13 }
                                     NText { text: decodeURIComponent(modelData.toString().split("/").pop()); Layout.fillWidth: true; font.pixelSize: 11; elide: Text.ElideMiddle }
                                     IconButton { icon: "x"; iconSize: 12; tip: "Remove file"; onClicked: root.removeFile(index) }
                                 }

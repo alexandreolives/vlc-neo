@@ -74,13 +74,13 @@ Rectangle {
 
     readonly property var mediaFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav",
-        "*.wma", "*.alac", "*.ape", "*.m3u", "*.m3u8", "*.pls", "*.xspf", "*.iso"]
+        "*.wma", "*.alac", "*.ape", "*.mpc", "*.wv", "*.m3u", "*.m3u8", "*.pls", "*.xspf", "*.iso"]
     readonly property var videoFilters: ["*.mkv", "*.mp4", "*.avi", "*.mov", "*.webm", "*.m4v", "*.wmv", "*.flv", "*.ts",
         "*.m2ts", "*.mpg", "*.mpeg", "*.3gp", "*.ogv", "*.iso"]
     readonly property var videoExtensions: ["mkv", "mp4", "avi", "mov", "webm", "m4v", "wmv", "flv", "ts",
         "m2ts", "mpg", "mpeg", "3gp", "ogv", "iso"]
-    readonly property var audioFilters: ["*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav", "*.wma", "*.alac", "*.ape"]
-    readonly property var audioExt: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "wav", "wma", "alac", "ape"]
+    readonly property var audioFilters: ["*.mp3", "*.flac", "*.ogg", "*.opus", "*.m4a", "*.aac", "*.wav", "*.wma", "*.alac", "*.ape", "*.mpc", "*.wv"]
+    readonly property var audioExt: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "wav", "wma", "alac", "ape", "mpc", "wv"]
 
     function pinnedList() { return Theme.store.pinned.length ? Theme.store.pinned.split("\n") : [] }
     function togglePin(path) {
