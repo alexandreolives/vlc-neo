@@ -968,6 +968,8 @@ ApplicationWindow {
                     compactMusicSidebar: (win.musicSidebarOpen && !win.libraryOpen)
                                          || (win.libraryOpen && win.navigationPage === "music")
                     compactFolderSidebar: win.folderSidebarOpen && !win.libraryOpen
+                    miniPlayerWindowLeftInset: navigationRail.visible ? navigationRail.width : 0
+                    miniPlayerWindowTopInset: middle.anchors.topMargin
                     Layout.fillHeight: true
                     Layout.fillWidth: win.libraryFullPage
                     Layout.preferredWidth: win.libraryPaneLayoutWidth

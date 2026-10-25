@@ -14,6 +14,8 @@ Rectangle {
     property bool compactMusicSidebar: false
     property bool compactFolderSidebar: false
     property bool figmaSidePanel: false
+    property real miniPlayerWindowLeftInset: 0
+    property real miniPlayerWindowTopInset: 0
     property var sideFolderHistory: []
     property var sidePanelForwardHistory: []
     property string musicSidePage: "categories"
@@ -384,7 +386,8 @@ Rectangle {
              + Math.round(cell.thumbnailRect.width) + "/" + Math.round(cell.thumbnailRect.height) + "/"
              + Math.round(miniPlayer.mapToItem(win.contentItem, 0, 0).x) + "/"
              + Math.round(miniPlayer.mapToItem(win.contentItem, 0, 0).y) + "/"
-             + Math.round(miniPlayer.width) + "/" + Math.round(miniPlayer.height)
+             + Math.round(miniPlayer.width) + "/" + Math.round(miniPlayer.height) + "/"
+             + (miniPlayer.parent === win.contentItem && miniPlayer.z > navigationRail.z)
     }
     function videoProgress(name) {
         for (let i = 0; i < files.count; ++i) {
@@ -1631,6 +1634,7 @@ Rectangle {
     FocusScope {
         id: miniPlayer
         objectName: "mini-player"
+        parent: win.contentItem
         visible: root.wide && win.libraryFullPage && player.hasVideo
         activeFocusOnTab: true
         Accessible.name: "Mini player"
@@ -1638,10 +1642,16 @@ Rectangle {
         property real dragOffsetY: 0
         property bool dragging: false
         readonly property real uiScale: Math.min(1, width / 391)
-        readonly property real defaultX: root.folderViewMode === "list" ? 6 : parent.width - width - 12
-        readonly property real defaultY: parent.height - height - 6
-        x: Math.max(0, Math.min(parent.width - width, defaultX + dragOffsetX))
-        y: Math.max(0, Math.min(parent.height - height, defaultY + dragOffsetY))
+        readonly property real minimumX: 6
+        readonly property real maximumX: root.miniPlayerWindowLeftInset + root.width - width - 6
+        readonly property real defaultX: root.folderViewMode === "list"
+                                         ? minimumX
+                                         : Math.max(minimumX, maximumX - 6)
+        readonly property real minimumY: root.miniPlayerWindowTopInset + 6
+        readonly property real maximumY: root.miniPlayerWindowTopInset + root.height - height - 6
+        readonly property real defaultY: maximumY
+        x: Math.max(minimumX, Math.min(maximumX, defaultX + dragOffsetX))
+        y: Math.max(minimumY, Math.min(maximumY, defaultY + dragOffsetY))
         width: Math.min(Math.min(391, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
         height: width * 339 / 391
         z: 2
@@ -1697,10 +1707,10 @@ Rectangle {
                     dragStarted = true
                     miniPlayer.dragging = true
                     const point = mapToItem(miniPlayer.parent, event.x, event.y)
-                    const maxX = Math.max(0, miniPlayer.parent.width - miniPlayer.width)
-                    const maxY = Math.max(0, miniPlayer.parent.height - miniPlayer.height)
-                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
-                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    const xNow = Math.max(miniPlayer.minimumX,
+                                          Math.min(miniPlayer.maximumX, point.x - pointerOffsetX))
+                    const yNow = Math.max(miniPlayer.minimumY,
+                                          Math.min(miniPlayer.maximumY, point.y - pointerOffsetY))
                     miniPlayer.dragOffsetX = xNow - miniPlayer.defaultX
                     miniPlayer.dragOffsetY = yNow - miniPlayer.defaultY
                 }
@@ -1866,10 +1876,10 @@ Rectangle {
                     if (!miniPlayer.dragging && Math.abs(mouse.x - pressX) + Math.abs(mouse.y - pressY) < 8) return
                     miniPlayer.dragging = true
                     const point = mapToItem(miniPlayer.parent, mouse.x, mouse.y)
-                    const maxX = Math.max(0, miniPlayer.parent.width - miniPlayer.width)
-                    const maxY = Math.max(0, miniPlayer.parent.height - miniPlayer.height)
-                    const xNow = Math.max(0, Math.min(maxX, point.x - pointerOffsetX))
-                    const yNow = Math.max(0, Math.min(maxY, point.y - pointerOffsetY))
+                    const xNow = Math.max(miniPlayer.minimumX,
+                                          Math.min(miniPlayer.maximumX, point.x - pointerOffsetX))
+                    const yNow = Math.max(miniPlayer.minimumY,
+                                          Math.min(miniPlayer.maximumY, point.y - pointerOffsetY))
                     miniPlayer.dragOffsetX = xNow - miniPlayer.defaultX
                     miniPlayer.dragOffsetY = yNow - miniPlayer.defaultY
                 }
