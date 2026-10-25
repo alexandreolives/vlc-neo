@@ -35,6 +35,7 @@ add_library(neo_plugin MODULE
   src/player.cpp
   src/player_state_store.cpp
   src/vlc3_player_backend.cpp
+  src/local_media_http_server.cpp
   src/queue_model.cpp
   src/subtitle_matcher.cpp
   src/subtitle_timeline.cpp
@@ -46,6 +47,7 @@ add_library(neo_plugin MODULE
   src/player_state_store.hpp
   src/player_backend.hpp
   src/vlc3_player_backend.hpp
+  src/local_media_http_server.hpp
   src/vlc_addon_uuid.hpp
   src/media_queue_entry.hpp
   src/queue_model.hpp
@@ -80,6 +82,15 @@ target_link_libraries(neo_plugin PRIVATE
 set_target_properties(neo_plugin PROPERTIES PREFIX "lib" OUTPUT_NAME "neo_plugin")
 
 if(BUILD_TESTING)
+  add_executable(local_media_http_server_test
+    tests/local_media_http_server_test.cpp
+    src/local_media_http_server.cpp
+    src/local_media_http_server.hpp
+  )
+  target_include_directories(local_media_http_server_test PRIVATE src)
+  target_link_libraries(local_media_http_server_test PRIVATE Qt6::Core Qt6::Network)
+  add_test(NAME local_media_http_server COMMAND local_media_http_server_test)
+
   add_executable(subtitle_matcher_test
     tests/subtitle_matcher_test.cpp
     src/subtitle_matcher.cpp

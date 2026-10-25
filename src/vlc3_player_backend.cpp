@@ -1,5 +1,6 @@
 #include "vlc3_player_backend.hpp"
 #include "vlc_addon_uuid.hpp"
+#include "local_media_http_server.hpp"
 
 #include <QFileInfo>
 #include <QDebug>
@@ -12,6 +13,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QHostAddress>
+#include <QMimeDatabase>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QUdpSocket>
@@ -123,6 +125,7 @@ public:
     {
         syncHttpProxyEnvironment();
         m_network = new QNetworkAccessManager(this);
+        m_localMediaServer = new LocalMediaHttpServer(this);
         m_ssdpSocket = new QUdpSocket(this);
         connect(m_ssdpSocket, &QUdpSocket::readyRead, this, [this] { readSsdpResponses(); });
         m_ssdpTimer = new QTimer(this);
@@ -142,6 +145,7 @@ public:
     {
         discoverRenderers(false);
         clearRenderers();
+        m_localMediaServer->stop();
         if (m_addonsManager) {
             addons_manager_Delete(m_addonsManager);
             m_addonsManager = nullptr;
@@ -1133,6 +1137,28 @@ public:
                 qWarning().noquote() << "VLC Neo DLNA: selected renderer disappeared" << id;
                 return false;
             }
+            const QUrl previousSourceUrl = m_activeDlnaSourceUrl.isEmpty()
+                ? m_remoteInputState.mediaUrl : m_activeDlnaSourceUrl;
+            if (!m_activeDlnaId.isEmpty() && m_activeDlnaId != id) {
+                const QString oldId = m_activeDlnaId;
+                m_activeDlnaId.clear();
+                m_activeDlnaSourceUrl.clear();
+                m_activeDlnaTransportUrl.clear();
+                m_activeDlnaContentType.clear();
+                m_remotePollTimer->stop();
+                m_remotePollPending = false;
+                m_remoteTransportCommandPending = false;
+                m_remoteInputState = {};
+                m_localMediaServer->stop();
+                sendDlnaAction(oldId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
+                if (m_localPausedByDlna) {
+                    m_localPausedByDlna = false;
+                    playlist_TogglePause(m_playlist);
+                }
+                emit rendererDevicesChanged();
+                emit inputChanged();
+                emit inputEvent(BackendInputEvent::State);
+            }
             QUrl mediaUrl;
             BackendInputState localState;
             if (m_input) {
@@ -1140,22 +1166,77 @@ public:
                 if (input_item_t *item = input_GetItem(m_input))
                     mediaUrl = QUrl(takeString(input_item_GetURI(item)));
             }
+            if ((!mediaUrl.isValid() || mediaUrl.isEmpty()) && !previousSourceUrl.isEmpty())
+                mediaUrl = previousSourceUrl;
             if ((!mediaUrl.isValid() || mediaUrl.isEmpty()) && !m_remoteInputState.mediaUrl.isEmpty())
                 mediaUrl = m_remoteInputState.mediaUrl;
-            if (!mediaUrl.isValid() || (mediaUrl.scheme() != QLatin1String("http")
-                    && mediaUrl.scheme() != QLatin1String("https"))) {
-                qWarning().noquote() << "VLC Neo DLNA: current media is not a network URL" << mediaUrl.toString();
+            if (!mediaUrl.isValid() || mediaUrl.isEmpty()) {
+                qWarning().noquote() << "VLC Neo DLNA: no current media URL is available";
+                return false;
+            }
+            const QString previousDlnaId = m_activeDlnaId;
+            const bool localShouldResumeAfterDlna = previousDlnaId.isEmpty()
+                ? localState.state == 2 : m_localWasPlayingBeforeDlna;
+
+            QUrl transportUrl = mediaUrl;
+            QString contentType;
+            if (mediaUrl.isLocalFile()) {
+                const bool sameMedia = m_activeDlnaId == id && m_activeDlnaSourceUrl == mediaUrl
+                    && m_localMediaServer->isActive();
+                if (sameMedia) {
+                    transportUrl = m_activeDlnaTransportUrl;
+                    contentType = m_activeDlnaContentType;
+                } else {
+                    QString relayError;
+                    const QHostAddress localAddress = LocalMediaHttpServer::routeAddressFor(found->avTransport, &relayError);
+                    if (!localAddress.isNull() && (localAddress.isLoopback() || localAddress.isLinkLocal()))
+                        relayError = QStringLiteral("The route to the renderer uses a non-routable local address");
+                    if (localAddress.isNull() || localAddress.isLoopback() || localAddress.isLinkLocal()
+                        || !m_localMediaServer->start(mediaUrl, localAddress, &transportUrl, &relayError)) {
+                        qWarning().noquote() << "VLC Neo DLNA: cannot serve local media:" << relayError;
+                        if (m_activeDlnaId == id)
+                            failDlnaConnection(id);
+                        return false;
+                    }
+                    contentType = m_localMediaServer->contentType();
+                }
+            } else if (mediaUrl.scheme() == QLatin1String("http")
+                       || mediaUrl.scheme() == QLatin1String("https")) {
+                m_localMediaServer->stop();
+                contentType = QMimeDatabase().mimeTypeForFile(mediaUrl.path(), QMimeDatabase::MatchExtension).name();
+                if (contentType.isEmpty())
+                    contentType = QStringLiteral("application/octet-stream");
+            } else {
+                qWarning().noquote() << "VLC Neo DLNA: unsupported current media URL" << mediaUrl.toString();
                 return false;
             }
 
-            m_localWasPlayingBeforeDlna = localState.state == 2;
+            if (!previousDlnaId.isEmpty() && previousDlnaId != id)
+                sendDlnaAction(previousDlnaId, "Stop", {{QStringLiteral("InstanceID"), QStringLiteral("0")} });
+            bool clearVlcRenderer = false;
+            {
+                QMutexLocker locker(&m_rendererMutex);
+                clearVlcRenderer = !m_activeRendererId.isEmpty();
+                m_activeRendererId.clear();
+            }
+            if (clearVlcRenderer)
+                playlist_SetRenderer(m_playlist, nullptr);
+            m_localWasPlayingBeforeDlna = localShouldResumeAfterDlna;
             m_activeDlnaId = id;
+            m_activeDlnaSourceUrl = mediaUrl;
+            m_activeDlnaTransportUrl = transportUrl;
+            m_activeDlnaContentType = contentType;
+            const bool mediaHasVideo = m_input ? localState.hasVideo
+                : m_remoteInputState.hasVideo || contentType.startsWith(QStringLiteral("video/"))
+                    || mediaUrl.path().endsWith(QStringLiteral(".m3u8"), Qt::CaseInsensitive);
             m_remoteInputState = localState;
             m_remoteInputState.hasInput = true;
-            m_remoteInputState.hasVideo = true;
+            m_remoteInputState.hasVideo = mediaHasVideo;
             m_remoteInputState.state = 1;
             m_remoteInputState.mediaUrl = mediaUrl;
-            m_remoteInputState.title = mediaUrl.fileName().isEmpty() ? found->name : mediaUrl.fileName();
+            const QString mediaTitle = mediaUrl.isLocalFile()
+                ? QFileInfo(mediaUrl.toLocalFile()).fileName() : mediaUrl.fileName();
+            m_remoteInputState.title = mediaTitle.isEmpty() ? found->name : mediaTitle;
             // A local VLC duration does not prove the renderer can seek this stream.
             m_remoteInputState.seekable = false;
             qInfo().noquote() << "VLC Neo DLNA: selecting" << found->name << mediaUrl.toString(QUrl::FullyEncoded);
@@ -1163,12 +1244,12 @@ public:
             emit inputChanged();
 
             sendDlnaAction(id, "GetPositionInfo", {{QStringLiteral("InstanceID"), QStringLiteral("0")}}, false,
-                [this, id, mediaUrl](bool ok, const QByteArray &payload) {
+                [this, id, mediaUrl, transportUrl, contentType](bool ok, const QByteArray &payload) {
                     if (id != m_activeDlnaId)
                         return;
                     const QHash<QString, QString> fields = ok ? soapFields(payload) : QHash<QString, QString>();
                     const QUrl currentUrl(fields.value(QStringLiteral("TrackURI")));
-                    if (currentUrl.isValid() && currentUrl.toString(QUrl::FullyEncoded) == mediaUrl.toString(QUrl::FullyEncoded)) {
+                    if (currentUrl.isValid() && currentUrl.toString(QUrl::FullyEncoded) == transportUrl.toString(QUrl::FullyEncoded)) {
                         m_remoteInputState.timeMs = upnpTimeMs(fields.value(QStringLiteral("RelTime")));
                         const qint64 duration = upnpTimeMs(fields.value(QStringLiteral("TrackDuration")));
                         if (duration > 0)
@@ -1179,13 +1260,17 @@ public:
                         activateDlnaRenderer(id, false);
                         return;
                     }
-                    startDlnaPlayback(id, mediaUrl);
+                    startDlnaPlayback(id, mediaUrl, transportUrl, contentType);
                 });
             return true;
         }
         if (id.isEmpty() && !m_activeDlnaId.isEmpty()) {
             const QString previousId = m_activeDlnaId;
             m_activeDlnaId.clear();
+            m_activeDlnaSourceUrl.clear();
+            m_activeDlnaTransportUrl.clear();
+            m_activeDlnaContentType.clear();
+            m_localMediaServer->stop();
             m_remotePollTimer->stop();
             m_remotePollPending = false;
             m_remoteTransportCommandPending = false;
@@ -1203,6 +1288,10 @@ public:
         if (!m_activeDlnaId.isEmpty()) {
             const QString previousId = m_activeDlnaId;
             m_activeDlnaId.clear();
+            m_activeDlnaSourceUrl.clear();
+            m_activeDlnaTransportUrl.clear();
+            m_activeDlnaContentType.clear();
+            m_localMediaServer->stop();
             m_remotePollTimer->stop();
             m_remotePollPending = false;
             m_remoteTransportCommandPending = false;
@@ -1474,19 +1563,29 @@ private:
             });
     }
 
-    void startDlnaPlayback(const QString &id, const QUrl &mediaUrl)
+    void startDlnaPlayback(const QString &id, const QUrl &mediaUrl,
+                           const QUrl &transportUrl, const QString &contentType)
     {
+        const QString protocolInfo = mediaUrl.isLocalFile()
+            ? QStringLiteral("http-get:*:%1:DLNA.ORG_OP=01").arg(contentType)
+            : QStringLiteral("http-get:*:%1:*").arg(contentType);
+        const QString mediaTitle = mediaUrl.isLocalFile()
+            ? QFileInfo(mediaUrl.toLocalFile()).fileName() : mediaUrl.fileName();
+        const QString sizeAttribute = mediaUrl.isLocalFile()
+            ? QStringLiteral(" size=\"%1\"").arg(m_localMediaServer->contentLength()) : QString();
         const QString didl = QStringLiteral(
             "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" "
             "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
             "xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\">"
             "<item id=\"0\" parentID=\"-1\" restricted=\"1\"><dc:title>%1</dc:title>"
-            "<upnp:class>object.item.videoItem</upnp:class>"
-            "<res protocolInfo=\"http-get:*:application/vnd.apple.mpegurl:*\">%2</res>"
-            "</item></DIDL-Lite>").arg(mediaUrl.fileName().toHtmlEscaped(), mediaUrl.toString(QUrl::FullyEncoded).toHtmlEscaped());
+            "<upnp:class>object.item.%5</upnp:class>"
+            "<res protocolInfo=\"%2\"%3>%4</res>"
+            "</item></DIDL-Lite>").arg(mediaTitle.toHtmlEscaped(), protocolInfo.toHtmlEscaped(), sizeAttribute,
+                transportUrl.toString(QUrl::FullyEncoded).toHtmlEscaped(),
+                m_remoteInputState.hasVideo ? QStringLiteral("videoItem") : QStringLiteral("audioItem"));
         sendDlnaAction(id, "SetAVTransportURI",
             {{QStringLiteral("InstanceID"), QStringLiteral("0")},
-             {QStringLiteral("CurrentURI"), mediaUrl.toString(QUrl::FullyEncoded)},
+             {QStringLiteral("CurrentURI"), transportUrl.toString(QUrl::FullyEncoded)},
              {QStringLiteral("CurrentURIMetaData"), didl}}, false,
             [this, id](bool ok, const QByteArray &) {
                 if (!ok || id != m_activeDlnaId) {
@@ -1502,6 +1601,10 @@ private:
         if (m_activeDlnaId != id)
             return;
         m_activeDlnaId.clear();
+        m_activeDlnaSourceUrl.clear();
+        m_activeDlnaTransportUrl.clear();
+        m_activeDlnaContentType.clear();
+        m_localMediaServer->stop();
         m_remotePollTimer->stop();
         m_remotePollPending = false;
         m_remoteTransportCommandPending = false;
@@ -1663,7 +1766,10 @@ private:
         if (!self || qstrcmp(vlc_renderer_item_type(item), "chromecast") != 0)
             return;
         const QString id = rendererId(item);
-        QMetaObject::invokeMethod(self, [self, id] { self->unregisterRenderer(id); }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(self, [self, id, discovery] {
+            if (self->m_rendererDiscoveries.contains(discovery))
+                self->unregisterRenderer(id);
+        }, Qt::QueuedConnection);
     }
     void registerRenderer(vlc_renderer_item_t *item)
     {
@@ -1809,11 +1915,15 @@ private:
     QHash<QString, DlnaRenderer> m_dlnaRenderers;
     QSet<QString> m_dlnaLocations;
     QNetworkAccessManager *m_network = nullptr;
+    LocalMediaHttpServer *m_localMediaServer = nullptr;
     QUdpSocket *m_ssdpSocket = nullptr;
     QTimer *m_ssdpTimer = nullptr;
     QTimer *m_remotePollTimer = nullptr;
     QString m_activeRendererId;
     QString m_activeDlnaId;
+    QUrl m_activeDlnaSourceUrl;
+    QUrl m_activeDlnaTransportUrl;
+    QString m_activeDlnaContentType;
     BackendInputState m_remoteInputState;
     bool m_remotePollPending = false;
     quint64 m_remoteCommandSerial = 0;
