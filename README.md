@@ -411,29 +411,18 @@ design tokens and every screen are plain QML files under `qml/`.
 ## Roadmap
 
 Remaining roadmap work:
-- **Long-duration waveform previews.** Thumbnail and waveform decoding uses two
-  workers, at most 24 queued/running jobs and a 16 MiB LRU image cache. A single
-  waveform decode now gets a duration-scaled deadline, from 20 seconds up to a
-  hard ten-minute cap, so longer media has time to finish without an unbounded
-  decoder process. Unusually slow media beyond that cap may still lack a preview.
-  Cached image sizes round up to whole KiB so the memory cap never undercounts
-  retained image bytes.
-- **Broader video effect catalog.** The Video side panel previews the current
-  frame with Original, Sepia, Invert, Posterize, Old movie, Gaussian blur,
-  Sharpen, VHS and Grain; selecting a tile changes VLC's active filter chain.
-  Audio equalizer presets also have preview icons and drive VLC.
-- **VLC media and playback profiles.** Named profiles save theme, accent,
-  control layout and a curated set of VLC playback, decoding, buffering, filter
-  and subtitle appearance options. Profiles also save configured video/audio
-  output modules, the ALSA device when VLC exposes that option, screenshot
-  capture settings, and video/audio transcode bitrates.
-- **Conversion profiles and receiver playback.** MP4 (H.264/AAC), MP3 and WebM
-  (VP8/Vorbis) conversion run through VLC with Compact, Balanced and High bitrate
-  presets, or the active profile's transcode bitrates. The stream dialog uses
-  those same profile rates and sends MPEG-TS over UDP or RTP, or serves HTTP for
-  a receiver to pull. VLC renderer discovery is implemented; casting to a
-  reachable physical receiver still needs verification.
-- Translations, plus Windows and macOS builds.
+- **Figma closeout.** The current parity matrix records the remaining mini-player
+  state comparisons, the Hyprland always-on-top check, and visual matching of
+  sample media. The pinned design exports contain no source posters or video
+  files, so matching artwork needs redistributable media supplied for the work.
+- **Physical receiver verification.** VLC Neo implements renderer discovery
+  and DLNA transport control; a reachable Chromecast or other receiver is still
+  needed to verify the complete device-level experience.
+- **Fresh cross-distro CI.** The last recorded Linux Mint and Arch workflow runs
+  predate recent changes. Run the package and smoke workflows against the
+  current branch before treating those platforms as verified.
+- **Translations and other platforms.** Windows and macOS builds are not yet
+  part of the supported verification matrix.
 
 ## License and trademarks
 
