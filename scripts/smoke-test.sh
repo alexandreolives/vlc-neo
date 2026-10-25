@@ -1057,7 +1057,8 @@ if [ -s "$WORK/converted.mp3" ] && command -v ffprobe >/dev/null 2>&1 \
     echo "PASS  VLC produced an MP3 audio stream"; pass=$((pass + 1))
 else
     echo "FAIL  VLC conversion output is missing or invalid"; fail=$((fail + 1)); fi
-out=$(run "1200:'started=' + vlcTasks.convert(platform.fileUrl('$WORK/convert-video.mkv'), platform.fileUrl('$WORK/converted.mp4'), 'mp4')|+6000:'convertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:quit" "$WORK/audio-only.m4a")
+out=$(run "500:player.openLocation('$WORK/convert-video.mkv',true)|+1000:convertDialog.open()|+150:convertDialog.format='mp4'; convertDialog.quality='high'; 'convertQualityPresets=' + (convertDialog.qualityPresets.compact.video === 800 && convertDialog.qualityPresets.compact.audio === 96 && convertDialog.qualityPresets.balanced.video === 2000 && convertDialog.qualityPresets.balanced.audio === 192 && convertDialog.videoBitrateKbps === 5000 && convertDialog.audioBitrateKbps === 320)|+10:convertDialog.outputFile=platform.fileUrl('$WORK/converted.mp4')|+100:click-item:convert-start|+6000:'convertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:quit")
+check "conversion quality presets map to their configured VLC bitrates" "$out" "convertQualityPresets=true"
 check "VLC transcodes video to H.264/AAC MP4" "$out" "convertDone=true"
 if [ -s "$WORK/converted.mp4" ] && command -v ffprobe >/dev/null 2>&1 \
     && file "$WORK/converted.mp4" | grep -q "ISO Media" \
@@ -1066,6 +1067,11 @@ if [ -s "$WORK/converted.mp4" ] && command -v ffprobe >/dev/null 2>&1 \
     echo "PASS  VLC produced an H.264/AAC MP4"; pass=$((pass + 1))
 else
     echo "FAIL  VLC MP4 output is missing or invalid"; fail=$((fail + 1)); fi
+mp4VideoBitrate="$(ffprobe -v error -select_streams v:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "$WORK/converted.mp4" 2>/dev/null || true)"
+if [[ "$mp4VideoBitrate" =~ ^[0-9]+$ ]] && (( mp4VideoBitrate > 1900000 )); then
+    echo "PASS  High quality preset increased the encoded video bitrate to ${mp4VideoBitrate} b/s"; pass=$((pass + 1))
+else
+    echo "FAIL  High quality preset produced an unexpected video bitrate: ${mp4VideoBitrate:-unavailable}"; fail=$((fail + 1)); fi
 out=$(run "1200:'started=' + vlcTasks.convert(platform.fileUrl('$WORK/convert-video.mkv'), platform.fileUrl('$WORK/converted.webm'), 'webm')|+9000:'convertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:quit" "$WORK/audio-only.m4a")
 check "VLC transcodes video to VP8/Vorbis WebM" "$out" "convertDone=true"
 if [ -s "$WORK/converted.webm" ] && command -v ffprobe >/dev/null 2>&1 \

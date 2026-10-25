@@ -424,11 +424,11 @@ Remaining roadmap work:
   control layout and a curated set of VLC playback, decoding, buffering, filter
   and subtitle appearance options. Per-profile capture, device-specific output
   and stream/transcode settings remain to be implemented.
-- **Additional conversion profiles and receiver playback.** MP4 (H.264/AAC),
-  MP3 and WebM (VP8/Vorbis) conversion run through VLC. The stream dialog sends
-  MPEG-TS over UDP or RTP, or serves HTTP for a receiver to pull. VLC renderer
-  discovery is implemented; casting to a reachable physical receiver and more
-  conversion presets still need verification and implementation.
+- **Conversion profiles and receiver playback.** MP4 (H.264/AAC), MP3 and WebM
+  (VP8/Vorbis) conversion run through VLC with Compact, Balanced and High bitrate
+  presets. The stream dialog sends MPEG-TS over UDP or RTP, or serves HTTP for a
+  receiver to pull. VLC renderer discovery is implemented; casting to a reachable
+  physical receiver still needs verification.
 - Translations, plus Windows and macOS builds.
 
 ## License and trademarks

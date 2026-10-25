@@ -14,9 +14,18 @@ Modal {
     property string format: "mp4"
     property url outputFile
     property string errorText: ""
+    property string quality: "balanced"
+    readonly property var qualityPresets: ({
+        compact: { video: 800, audio: 96 },
+        balanced: { video: 2000, audio: 192 },
+        high: { video: 5000, audio: 320 }
+    })
+    readonly property int videoBitrateKbps: qualityPresets[quality].video
+    readonly property int audioBitrateKbps: qualityPresets[quality].audio
 
     onOpened: {
         format = "mp4"
+        quality = "balanced"
         outputFile = ""
         errorText = ""
     }
@@ -38,6 +47,26 @@ Modal {
                 root.outputFile = ""
                 root.errorText = ""
             }
+        }
+        SettingRow {
+            label: "Quality"
+            info: "Choose the video and audio bitrates VLC uses for this conversion."
+            NCombo {
+                objectName: "convert-quality"
+                width: 220
+                model: [{ label: "Compact", value: "compact" },
+                        { label: "Balanced", value: "balanced" },
+                        { label: "High", value: "high" }]
+                current: root.quality
+                onPicked: (value) => root.quality = value
+            }
+        }
+        NText {
+            Layout.fillWidth: true
+            text: root.format === "mp3"
+                  ? root.audioBitrateKbps + " kb/s audio"
+                  : root.videoBitrateKbps + " kb/s video · " + root.audioBitrateKbps + " kb/s audio"
+            dim: true
         }
         NText {
             Layout.fillWidth: true
@@ -83,7 +112,8 @@ Modal {
             enabledState: !vlcTasks.busy && player.hasMedia && root.outputFile.toString().length > 0
             onClicked: {
                 root.errorText = ""
-                if (!vlcTasks.convert(player.mediaUrl, root.outputFile, root.format))
+                if (!vlcTasks.convert(player.mediaUrl, root.outputFile, root.format,
+                                      root.videoBitrateKbps, root.audioBitrateKbps))
                     root.errorText = vlcTasks.status
             }
         }
