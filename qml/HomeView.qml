@@ -1259,7 +1259,7 @@ Rectangle {
             anchors.bottom: parent.bottom
             anchors.leftMargin: 16 * homeMiniPlayer.uiScale
             anchors.rightMargin: 16 * homeMiniPlayer.uiScale
-            anchors.bottomMargin: 16 * homeMiniPlayer.uiScale
+            anchors.bottomMargin: 8 * homeMiniPlayer.uiScale
             spacing: 10 * homeMiniPlayer.uiScale
             Icon { name: "folder"; size: 20 * homeMiniPlayer.uiScale; color: Theme.textDim }
             NText { text: player.folderName; dim: true; font.pixelSize: 14 * homeMiniPlayer.uiScale; Layout.maximumWidth: 70 * homeMiniPlayer.uiScale; elide: Text.ElideRight }
@@ -1276,7 +1276,7 @@ Rectangle {
                 Accessible.name: "Show queue"
                 iconSize: 18 * homeMiniPlayer.uiScale
                 implicitWidth: 30 * homeMiniPlayer.uiScale
-                implicitHeight: 30 * homeMiniPlayer.uiScale
+                implicitHeight: 32 * homeMiniPlayer.uiScale
                 onClicked: win.togglePanel("queue")
             }
         }
