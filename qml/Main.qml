@@ -109,6 +109,9 @@ ApplicationWindow {
     property string lastOpenedPlaylistPath: ""
     property double lastOpenedPlaylistAt: 0
     property string rightPanel: ""          // "" | queue | settings
+    readonly property bool miniPlayerDockedToQueue: rightPanel === "queue" && player.hasVideo
+        && !uiHidden && !onboarding.visible
+        && ((navigationPage === "home" && !libraryOpen) || libraryFullPage)
     property bool startupVolumePending: true
     property bool restoringWindowGeometry: true
     property bool videoFill: false
@@ -980,6 +983,8 @@ ApplicationWindow {
                              || (win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist")
                              || (!win.libraryOpen && win.libraryPaneLayoutWidth > 0.5)
                              || win.musicSidebarOpen || win.folderSidebarOpen
+                    miniPlayerDockParent: win.miniPlayerDockedToQueue && win.libraryFullPage
+                                            ? queuePanel : null
                     wide: true
                     figmaSidePanel: win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist"
                     compactMusicSidebar: (win.musicSidebarOpen && !win.libraryOpen)
@@ -1014,6 +1019,9 @@ ApplicationWindow {
                         id: homeView
                         anchors.fill: parent
                         z: 1
+                        miniPlayerDockParent: win.miniPlayerDockedToQueue
+                                                && win.navigationPage === "home" && !win.libraryOpen
+                                                ? queuePanel : null
                         visible: win.navigationPage === "home" && !win.libraryOpen
                                  && !onboarding.visible && !win.uiHidden
                     }
@@ -1107,14 +1115,18 @@ ApplicationWindow {
                 Item {
                     visible: win.rightPanel.length > 0
                     Layout.fillHeight: true
-                    Layout.preferredWidth: 360
+                    Layout.preferredWidth: win.miniPlayerDockedToQueue ? 391 : 360
                     // In fullscreen auto-hide mode the top bar floats over the
                     // video. Keep the right-side panel below its visible edge.
                     Layout.topMargin: win.fullscreen && win.overlayMode
                                       ? Math.max(0, topBar.y + topBar.height) : 0
                     QueuePanel {
+                        id: queuePanel
                         anchors.fill: parent
                         visible: win.rightPanel === "queue"
+                        reservedBottomHeight: win.miniPlayerDockedToQueue
+                                               ? Math.min(391, width, Math.max(0, (height - miniPlayerDockTopInset - 16) * 391 / 339)) * 339 / 391 + 16
+                                               : 0
                         onAddFiles: enqueueDialog.open()
                         onSavePlaylist: savePlaylistDialog.open()
                     }

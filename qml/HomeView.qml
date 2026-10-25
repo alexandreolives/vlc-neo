@@ -16,6 +16,9 @@ Rectangle {
     property alias miniPlayerHovered: miniPlayerHover.hovered
     property alias miniPlayerExpandButton: homeMiniPlayerExpandButton
     property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
+    property Item miniPlayerDockParent: null
+    property real savedMiniPlayerDragOffsetX: 0
+    property real savedMiniPlayerDragOffsetY: 0
     property int contentRevision: 0
     property string searchText: ""
     property bool sortByName: false
@@ -959,6 +962,7 @@ Rectangle {
 
     FocusScope {
         id: homeMiniPlayer
+        parent: root.miniPlayerDockParent ? root.miniPlayerDockParent : root
         objectName: root.sidePanel ? "side-home-mini-player" : "home-mini-player"
         visible: root.visible && !root.sidePanel && player.hasVideo
         activeFocusOnTab: true
@@ -967,13 +971,29 @@ Rectangle {
         property real dragOffsetY: 0
         property bool dragging: false
         readonly property real uiScale: Math.min(1, width / 391)
-        readonly property real defaultX: parent.width - width - 16
+        readonly property real defaultX: root.miniPlayerDockParent
+                                         ? Math.max(0, (parent.width - width) / 2)
+                                         : parent.width - width - 16
         readonly property real defaultY: parent.height - height - 16
         x: Math.max(0, Math.min(parent.width - width, defaultX + dragOffsetX))
         y: Math.max(0, Math.min(parent.height - height, defaultY + dragOffsetY))
-        width: Math.min(Math.min(391, Math.max(220, root.width * 0.32)), Math.max(0, root.width - 32))
+        width: root.miniPlayerDockParent
+               ? Math.min(391, Math.max(0, parent.width),
+                          Math.max(0, (parent.height - parent.miniPlayerDockTopInset - 16) * 391 / 339))
+               : Math.min(Math.min(391, Math.max(220, root.width * 0.32)), Math.max(0, root.width - 32))
         height: width * 339 / 391
         z: 5
+        onParentChanged: {
+            if (root.miniPlayerDockParent && parent === root.miniPlayerDockParent) {
+                root.savedMiniPlayerDragOffsetX = dragOffsetX
+                root.savedMiniPlayerDragOffsetY = dragOffsetY
+                dragOffsetX = 0
+                dragOffsetY = 0
+            } else if (!root.miniPlayerDockParent && parent === root) {
+                dragOffsetX = root.savedMiniPlayerDragOffsetX
+                dragOffsetY = root.savedMiniPlayerDragOffsetY
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -983,14 +1003,6 @@ Rectangle {
         }
 
         HoverHandler { id: miniPlayerHover }
-        Behavior on x {
-            enabled: !homeMiniPlayer.dragging && !homeMiniPlayerTitleDrag.pressed
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
-        Behavior on y {
-            enabled: !homeMiniPlayer.dragging && !homeMiniPlayerTitleDrag.pressed
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
 
         Item {
             id: homeMiniVideoSurface

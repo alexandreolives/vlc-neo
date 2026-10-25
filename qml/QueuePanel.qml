@@ -8,6 +8,8 @@ Rectangle {
     id: root
     signal addFiles()
     signal savePlaylist()
+    property real reservedBottomHeight: 0
+    readonly property real miniPlayerDockTopInset: 47 // 46 px heading and 1 px divider
     color: Theme.panel
 
     ColumnLayout {
@@ -35,6 +37,7 @@ Rectangle {
             id: list
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.bottomMargin: root.reservedBottomHeight
             clip: true
             model: player.queue
             boundsBehavior: Flickable.StopAtBounds

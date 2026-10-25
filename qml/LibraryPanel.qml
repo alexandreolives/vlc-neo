@@ -16,6 +16,9 @@ Rectangle {
     property bool figmaSidePanel: false
     property real miniPlayerWindowLeftInset: 0
     property real miniPlayerWindowTopInset: 0
+    property Item miniPlayerDockParent: null
+    property real savedMiniPlayerDragOffsetX: 0
+    property real savedMiniPlayerDragOffsetY: 0
     property var sideFolderHistory: []
     property var sidePanelForwardHistory: []
     property string musicSidePage: "categories"
@@ -1634,7 +1637,7 @@ Rectangle {
     FocusScope {
         id: miniPlayer
         objectName: "mini-player"
-        parent: win.contentItem
+        parent: root.miniPlayerDockParent ? root.miniPlayerDockParent : win.contentItem
         visible: root.wide && win.libraryFullPage && player.hasVideo
         activeFocusOnTab: true
         Accessible.name: "Mini player"
@@ -1642,19 +1645,39 @@ Rectangle {
         property real dragOffsetY: 0
         property bool dragging: false
         readonly property real uiScale: Math.min(1, width / 391)
-        readonly property real minimumX: 6
-        readonly property real maximumX: root.miniPlayerWindowLeftInset + root.width - width - 6
-        readonly property real defaultX: root.folderViewMode === "list"
-                                         ? minimumX
-                                         : Math.max(minimumX, maximumX - 6)
-        readonly property real minimumY: root.miniPlayerWindowTopInset + 6
-        readonly property real maximumY: root.miniPlayerWindowTopInset + root.height - height - 6
+        readonly property real minimumX: root.miniPlayerDockParent ? 0 : 6
+        readonly property real maximumX: root.miniPlayerDockParent
+                                         ? Math.max(0, parent.width - width)
+                                         : root.miniPlayerWindowLeftInset + root.width - width - 6
+        readonly property real defaultX: root.miniPlayerDockParent
+                                         ? Math.max(0, (parent.width - width) / 2)
+                                         : root.folderViewMode === "list"
+                                           ? minimumX
+                                           : Math.max(minimumX, maximumX - 6)
+        readonly property real minimumY: root.miniPlayerDockParent ? 0 : root.miniPlayerWindowTopInset + 6
+        readonly property real maximumY: root.miniPlayerDockParent
+                                         ? Math.max(0, parent.height - height - 16)
+                                         : root.miniPlayerWindowTopInset + root.height - height - 6
         readonly property real defaultY: maximumY
         x: Math.max(minimumX, Math.min(maximumX, defaultX + dragOffsetX))
         y: Math.max(minimumY, Math.min(maximumY, defaultY + dragOffsetY))
-        width: Math.min(Math.min(391, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
+        width: root.miniPlayerDockParent
+               ? Math.min(391, Math.max(0, parent.width),
+                          Math.max(0, (parent.height - parent.miniPlayerDockTopInset - 16) * 391 / 339))
+               : Math.min(Math.min(391, Math.max(220, root.width * 0.34)), Math.max(0, root.width - 24))
         height: width * 339 / 391
         z: 2
+        onParentChanged: {
+            if (root.miniPlayerDockParent && parent === root.miniPlayerDockParent) {
+                root.savedMiniPlayerDragOffsetX = dragOffsetX
+                root.savedMiniPlayerDragOffsetY = dragOffsetY
+                dragOffsetX = 0
+                dragOffsetY = 0
+            } else if (!root.miniPlayerDockParent && parent === win.contentItem) {
+                dragOffsetX = root.savedMiniPlayerDragOffsetX
+                dragOffsetY = root.savedMiniPlayerDragOffsetY
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -1664,14 +1687,6 @@ Rectangle {
         }
 
         HoverHandler { id: miniPlayerHover }
-        Behavior on x {
-            enabled: !miniPlayer.dragging && !miniPlayerTitleDrag.pressed
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
-        Behavior on y {
-            enabled: !miniPlayer.dragging && !miniPlayerTitleDrag.pressed
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
 
         Item {
             id: miniVideoSurface
