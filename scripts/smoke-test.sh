@@ -192,11 +192,12 @@ for screenshot in onboarding-welcome.png onboarding-theme.png onboarding-shortcu
 done
 
 echo "== playback, video output, queue"
-out=$(run "2500:'state=' + player.state + ' video=' + player.hasVideo + ' queue=' + player.queue.count + ' len=' + player.length + ' playerChrome=' + navigationPage + '/' + navigationRail.visible + '/' + (topBar.x === 0 && controlBar.x === 0) + ' timeline=' + (controlBar.findControl('seek').visible && controlBar.findControl('seek').objectName === 'control-seek' && Math.abs(controlBar.findControl('seek').mapToItem(controlBar,0,0).y) < 1 && Math.abs(controlBar.findControl('seek').height - controlBar.height) < 1 && controlBar.height === Theme.barHeight && controlBar.findControl('prev').x < controlBar.findControl('play').x && controlBar.findControl('play').x < controlBar.findControl('next').x && controlBar.findControl('next').x < controlBar.findControl('seek').x && controlBar.findControl('seek').x < controlBar.findControl('volume').x)|2700:quit" "$E1" "$E2")
+out=$(run "2500:'state=' + player.state + ' video=' + player.hasVideo + ' queue=' + player.queue.count + ' len=' + player.length + ' playerChrome=' + navigationPage + '/' + navigationRail.visible + '/' + (topBar.x === 0 && controlBar.x === 0) + ' figmaControlBarHeight=' + (Math.round(controlBar.height) === 54 && controlBar.height === Theme.barHeight) + ' timeline=' + (controlBar.findControl('seek').visible && controlBar.findControl('seek').objectName === 'control-seek' && Math.abs(controlBar.findControl('seek').mapToItem(controlBar,0,0).y) < 1 && Math.abs(controlBar.findControl('seek').height - controlBar.height) < 1 && controlBar.height === Theme.barHeight && controlBar.findControl('prev').x < controlBar.findControl('play').x && controlBar.findControl('play').x < controlBar.findControl('next').x && controlBar.findControl('next').x < controlBar.findControl('seek').x && controlBar.findControl('seek').x < controlBar.findControl('volume').x)|2700:quit" "$E1" "$E2")
 check "plays (state 2)" "$out" "state=2"
 check "frames reach the QML video item" "$out" "video=true"
 check "queue has both episodes" "$out" "queue=2"
 check "duration known" "$out" "len=40"
+check "player control bar matches the Figma reference height of 54 px" "$out" "figmaControlBarHeight=true"
 check "player frame hides the navigation rail, keeps the timeline inside its single footer row and aligns the chrome like Figma 247:445" "$out" "playerChrome=player/false/true timeline=true"
 out=$(run "1000:'noSubtitleCues=' + (player.subtitleCues.length === 0)|+100:quit" "$E1")
 check "media without subtitles produces an empty timeline" "$out" "noSubtitleCues=true"
