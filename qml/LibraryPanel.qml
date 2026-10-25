@@ -53,6 +53,7 @@ Rectangle {
     property alias miniPlayerHovered: miniPlayerHover.hovered
     property alias miniPlayerExpandButton: libraryMiniPlayerExpandButton
     property alias miniPlayerTransportControls: libraryMiniPlayerTransportControls
+    property alias miniPlayerQueueButton: libraryMiniPlayerQueueButton
     property alias folderViewToggleItem: folderViewToggleButton
     property alias folderListingItem: listing
     property alias indexedListing: musicListing
@@ -1924,8 +1925,10 @@ Rectangle {
             NText { visible: player.artist.length > 0; text: player.artist; dim: true; font.pixelSize: 14 * miniPlayer.uiScale; Layout.fillWidth: true; elide: Text.ElideRight }
             Item { Layout.fillWidth: true; visible: player.artist.length === 0 }
             IconButton {
+                id: libraryMiniPlayerQueueButton
                 objectName: "mini-player-queue"
                 icon: "list"
+                colorAnimationEnabled: false
                 tip: "Show queue"
                 Accessible.name: "Show queue"
                 iconSize: 18 * miniPlayer.uiScale

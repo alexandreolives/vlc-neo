@@ -16,6 +16,7 @@ Rectangle {
     property alias miniPlayerHovered: miniPlayerHover.hovered
     property alias miniPlayerExpandButton: homeMiniPlayerExpandButton
     property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
+    property alias miniPlayerQueueButton: homeMiniPlayerQueueButton
     property Item miniPlayerDockParent: null
     property real savedMiniPlayerDragOffsetX: 0
     property real savedMiniPlayerDragOffsetY: 0
@@ -1249,8 +1250,10 @@ Rectangle {
             NText { visible: player.artist.length > 0; text: player.artist; dim: true; font.pixelSize: 14 * homeMiniPlayer.uiScale; Layout.fillWidth: true; elide: Text.ElideRight }
             Item { Layout.fillWidth: true; visible: player.artist.length === 0 }
             IconButton {
+                id: homeMiniPlayerQueueButton
                 objectName: root.sidePanel ? "side-home-mini-player-queue" : "home-mini-player-queue"
                 icon: "list"
+                colorAnimationEnabled: false
                 tip: "Show queue"
                 Accessible.name: "Show queue"
                 iconSize: 18 * homeMiniPlayer.uiScale

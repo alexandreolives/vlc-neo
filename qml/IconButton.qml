@@ -10,6 +10,7 @@ Rectangle {
     property real iconOffsetY: 0
     property bool checked: false
     property bool accentWhenChecked: true
+    property bool colorAnimationEnabled: true
     property string tip
     readonly property bool hovered: mouse.containsMouse
     property color iconColor: !enabled ? Theme.textFaint
@@ -27,7 +28,10 @@ Rectangle {
     Accessible.name: tip.length ? tip : icon
     Accessible.role: Accessible.Button
     Accessible.focusable: enabled
-    Behavior on color { ColorAnimation { duration: 90 } }
+    Behavior on color {
+        enabled: root.colorAnimationEnabled
+        ColorAnimation { duration: 90 }
+    }
 
     Keys.onPressed: (event) => {
         if (!enabled || (event.key !== Qt.Key_Space && event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter))
