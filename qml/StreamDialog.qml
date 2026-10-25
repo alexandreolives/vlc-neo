@@ -15,6 +15,20 @@ Modal {
     property string host: "127.0.0.1"
     property string port: "1234"
     property string errorText: ""
+    readonly property int profileVideoBitrateKbps: {
+        player.configRevision
+        return Number(player.config("sout-transcode-vb"))
+    }
+    readonly property int profileAudioBitrateKbps: {
+        player.configRevision
+        return Number(player.config("sout-transcode-ab"))
+    }
+    readonly property int videoBitrateKbps: profileVideoBitrateKbps >= 250
+                                             && profileVideoBitrateKbps <= 20000
+                                           ? profileVideoBitrateKbps : 2000
+    readonly property int audioBitrateKbps: profileAudioBitrateKbps >= 64
+                                             && profileAudioBitrateKbps <= 512
+                                           ? profileAudioBitrateKbps : 192
 
     onOpened: errorText = ""
     function chooseProtocol(value) {
@@ -71,6 +85,12 @@ Modal {
             wrapMode: Text.Wrap
         }
         NText {
+            Layout.fillWidth: true
+            text: "Transcode quality: " + root.videoBitrateKbps + " kb/s video · "
+                  + root.audioBitrateKbps + " kb/s audio"
+            dim: true
+        }
+        NText {
             visible: root.errorText.length > 0 || (vlcTasks.streaming && vlcTasks.status.length > 0)
             Layout.fillWidth: true
             text: root.errorText.length ? root.errorText : vlcTasks.status
@@ -95,7 +115,8 @@ Modal {
                 const subtitleFile = includeSubtitles ? player.activeSubtitleFile : ""
                 const subtitleTrackId = includeSubtitles ? player.activeSubtitleTrackId : -1
                 if (!vlcTasks.streamTo(player.mediaUrl, root.protocol, root.host, targetPort,
-                                       2000, 192, includeSubtitles, subtitleFile, subtitleTrackId))
+                                       root.videoBitrateKbps, root.audioBitrateKbps,
+                                       includeSubtitles, subtitleFile, subtitleTrackId))
                     root.errorText = vlcTasks.status
             }
         }

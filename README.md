@@ -425,13 +425,14 @@ Remaining roadmap work:
 - **VLC media and playback profiles.** Named profiles save theme, accent,
   control layout and a curated set of VLC playback, decoding, buffering, filter
   and subtitle appearance options. Profiles also save configured video/audio
-  output modules and the ALSA device when VLC exposes that option. Per-profile
-  capture and stream/transcode settings remain to be implemented.
+  output modules, the ALSA device when VLC exposes that option, screenshot
+  capture settings, and video/audio transcode bitrates.
 - **Conversion profiles and receiver playback.** MP4 (H.264/AAC), MP3 and WebM
   (VP8/Vorbis) conversion run through VLC with Compact, Balanced and High bitrate
-  presets. The stream dialog sends MPEG-TS over UDP or RTP, or serves HTTP for a
-  receiver to pull. VLC renderer discovery is implemented; casting to a reachable
-  physical receiver still needs verification.
+  presets, or the active profile's transcode bitrates. The stream dialog uses
+  those same profile rates and sends MPEG-TS over UDP or RTP, or serves HTTP for
+  a receiver to pull. VLC renderer discovery is implemented; casting to a
+  reachable physical receiver still needs verification.
 - Translations, plus Windows and macOS builds.
 
 ## License and trademarks

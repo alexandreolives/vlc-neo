@@ -20,12 +20,34 @@ Modal {
         balanced: { video: 2000, audio: 192 },
         high: { video: 5000, audio: 320 }
     })
-    readonly property int videoBitrateKbps: qualityPresets[quality].video
-    readonly property int audioBitrateKbps: qualityPresets[quality].audio
+    readonly property int profileVideoBitrateKbps: {
+        player.configRevision
+        return Number(player.config("sout-transcode-vb"))
+    }
+    readonly property int profileAudioBitrateKbps: {
+        player.configRevision
+        return Number(player.config("sout-transcode-ab"))
+    }
+    readonly property bool profileQualityAvailable: profileVideoBitrateKbps >= 250
+                                                   && profileVideoBitrateKbps <= 20000
+                                                   && profileAudioBitrateKbps >= 64
+                                                   && profileAudioBitrateKbps <= 512
+    readonly property int videoBitrateKbps: quality === "vlc-profile" && profileQualityAvailable
+                                            ? profileVideoBitrateKbps : qualityPresets[quality].video
+    readonly property int audioBitrateKbps: quality === "vlc-profile" && profileQualityAvailable
+                                            ? profileAudioBitrateKbps : qualityPresets[quality].audio
+    readonly property var qualityOptions: profileQualityAvailable
+        ? [{ label: "Compact", value: "compact" },
+           { label: "Balanced", value: "balanced" },
+           { label: "High", value: "high" },
+           { label: "VLC profile", value: "vlc-profile" }]
+        : [{ label: "Compact", value: "compact" },
+           { label: "Balanced", value: "balanced" },
+           { label: "High", value: "high" }]
 
     onOpened: {
         format = "mp4"
-        quality = "balanced"
+        quality = profileQualityAvailable ? "vlc-profile" : "balanced"
         outputFile = ""
         errorText = ""
     }
@@ -54,9 +76,7 @@ Modal {
             NCombo {
                 objectName: "convert-quality"
                 width: 220
-                model: [{ label: "Compact", value: "compact" },
-                        { label: "Balanced", value: "balanced" },
-                        { label: "High", value: "high" }]
+                model: root.qualityOptions
                 current: root.quality
                 onPicked: (value) => root.quality = value
             }
