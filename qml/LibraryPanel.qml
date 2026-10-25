@@ -1742,7 +1742,6 @@ Rectangle {
             opacity: miniPlayerHover.hovered || miniPlayer.activeFocus ? 1 : 0
             visible: opacity > 0.01
             z: 3
-            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             IconButton {
                 objectName: "mini-player-close"
                 anchors.left: parent.left

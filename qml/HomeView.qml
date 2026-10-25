@@ -1061,7 +1061,6 @@ Rectangle {
             opacity: miniPlayerHover.hovered || homeMiniPlayer.activeFocus ? 1 : 0
             visible: opacity > 0.01
             z: 3
-            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             IconButton {
                 objectName: root.sidePanel ? "side-home-mini-player-close" : "home-mini-player-close"
                 anchors.left: parent.left
