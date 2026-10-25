@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Verify a VLC video adjustment changes decoded pixels in the embedded output.
+# Verify embedded VLC filters and video rendered from an HTTP stream.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${NEO_BUILD_DIR:-$HERE/build}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/neo-vlc-filter-render.XXXXXX")"
-trap 'python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" "$WORK"' EXIT
+HTTP_SERVER_PID=""
+cleanup() {
+    if [[ -n "$HTTP_SERVER_PID" ]]; then
+        kill "$HTTP_SERVER_PID" 2>/dev/null || true
+        wait "$HTTP_SERVER_PID" 2>/dev/null || true
+    fi
+    python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" "$WORK"
+}
+trap cleanup EXIT
 
 for tool in ffmpeg convert; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -51,6 +59,57 @@ else
     echo "FAIL VLC adjustment did not produce the expected pixel change (${before_r},${before_g},${before_b} -> ${after_r},${after_g},${after_b})" >&2
     exit 1
 fi
+
+# Exercise the Network Stream path through HTTP and verify decoded pixels in
+# VLC's embedded output, not only the media URL and playing state.
+python3 - "$WORK" >"$WORK/http-server.log" 2>&1 <<'PY' &
+import http.server
+import pathlib
+import sys
+
+directory = pathlib.Path(sys.argv[1])
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        with (directory / "http-requests.log").open("a") as stream:
+            stream.write((fmt % args) + "\n")
+
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0),
+    lambda *args, **kwargs: Handler(*args, directory=str(directory), **kwargs))
+(directory / "http-port").write_text(str(server.server_address[1]))
+server.serve_forever()
+PY
+HTTP_SERVER_PID=$!
+for _ in {1..40}; do
+    [[ -s "$WORK/http-port" ]] && break
+    sleep 0.1
+done
+if [[ ! -s "$WORK/http-port" ]]; then
+    echo "FAIL local HTTP media server did not start" >&2
+    exit 1
+fi
+HTTP_URL="http://127.0.0.1:$(cat "$WORK/http-port")/red.mkv"
+mkdir -p "$WORK/http-sandbox/config/vlc-neo"
+printf '[appearance]\nonboarded=true\n' > "$WORK/http-sandbox/config/vlc-neo/neo.conf"
+http_output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$WORK/http-sandbox" NEO_TIMEOUT=15 \
+    "$HERE/scripts/run-offscreen.sh" \
+    "700:networkDialog.open()|+150:networkDialog.sourceText='$HTTP_URL'|+150:networkDialog.go(true)|+1800:'httpPlayback=' + (player.hasVideo && player.state===2 && player.mediaUrl.toString()==='$HTTP_URL')|+100:grab:$WORK/http-playback.png|+100:quit" 2>&1)"
+printf '%s\n' "$http_output" | grep 'neo test:' || true
+if ! grep -qF 'httpPlayback=true' <<<"$http_output"; then
+    echo "FAIL VLC did not play the HTTP video from the Network Stream dialog" >&2
+    exit 1
+fi
+read -r http_r http_g http_b <<<"$(sample_rgb "$WORK/http-playback.png")"
+if (( http_r > 180 && http_g < 80 && http_b < 80 )); then
+    echo "PASS Network Stream HTTP video renders in embedded VLC (${http_r},${http_g},${http_b})"
+else
+    echo "FAIL Network Stream HTTP video was not rendered in embedded VLC (${http_r},${http_g},${http_b})" >&2
+    exit 1
+fi
+if ! grep -q 'GET /red.mkv' "$WORK/http-requests.log"; then
+    echo "FAIL VLC did not request the media from the HTTP server" >&2
+    exit 1
+fi
+echo "PASS VLC requested the Network Stream media over HTTP"
 
 # The effect tiles must drive VLC's actual embedded video output. A filter-chain
 # setter returning success alone does not prove that the named module rendered.
