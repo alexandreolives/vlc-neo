@@ -13,7 +13,7 @@ Rectangle {
     property alias miniVideoHost: homeMiniVideoSurface
     property alias miniPlayerItem: homeMiniPlayer
     property alias miniPlayerOverlay: homeMiniPlayerHoverOverlay
-    property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerHovered: homeMiniPlayer.hoveringVideo
     property alias miniPlayerCloseButton: homeMiniPlayerCloseButton
     property alias miniPlayerExpandButton: homeMiniPlayerExpandButton
     property alias miniPlayerPreviousButton: homeMiniPlayerPreviousButton
@@ -975,6 +975,8 @@ Rectangle {
         property real dragOffsetX: 0
         property real dragOffsetY: 0
         property bool dragging: false
+        readonly property bool hoveringVideo: miniPlayerHover.hovered
+            && homeMiniVideoSurface.contains(homeMiniVideoSurface.mapFromItem(homeMiniPlayer, miniPlayerHover.point.position))
         readonly property real uiScale: Math.min(1, width / 391)
         readonly property real defaultX: root.miniPlayerDockParent
                                          ? Math.max(0, (parent.width - width) / 2)
@@ -1024,6 +1026,7 @@ Rectangle {
                 anchors.fill: parent
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                hoverEnabled: true
                 property real pressX: 0
                 property real pressY: 0
                 property real pointerOffsetX: 0
@@ -1060,6 +1063,7 @@ Rectangle {
                     }
                 }
             }
+
         }
         Rectangle {
             anchors.fill: homeMiniVideoSurface
@@ -1075,7 +1079,7 @@ Rectangle {
             anchors.fill: homeMiniVideoSurface
             radius: 6
             color: "#99000000"
-            opacity: miniPlayerHover.hovered || homeMiniPlayer.activeFocus ? 1 : 0
+            opacity: homeMiniPlayer.hoveringVideo || homeMiniPlayer.activeFocus ? 1 : 0
             visible: opacity > 0.01
             z: 3
             IconButton {
@@ -1180,7 +1184,7 @@ Rectangle {
                 radius: parent.height / 2
                 x: Math.max(0, Math.min(parent.width - width, parent.width * player.position - width / 2))
                 color: Theme.accent
-                visible: miniPlayerHover.hovered
+                visible: homeMiniPlayer.hoveringVideo
                 Behavior on x { NumberAnimation { duration: 100 } }
             }
             MouseArea {

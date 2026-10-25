@@ -50,7 +50,7 @@ Rectangle {
     property alias miniVideoHost: miniVideoSurface
     property alias miniPlayerItem: miniPlayer
     property alias miniPlayerOverlay: miniPlayerHoverOverlay
-    property alias miniPlayerHovered: miniPlayerHover.hovered
+    property alias miniPlayerHovered: miniPlayer.hoveringVideo
     property alias miniPlayerCloseButton: libraryMiniPlayerCloseButton
     property alias miniPlayerExpandButton: libraryMiniPlayerExpandButton
     property alias miniPlayerPreviousButton: libraryMiniPlayerPreviousButton
@@ -1649,6 +1649,8 @@ Rectangle {
         property real dragOffsetX: 0
         property real dragOffsetY: 0
         property bool dragging: false
+        readonly property bool hoveringVideo: miniPlayerHover.hovered
+            && miniVideoSurface.contains(miniVideoSurface.mapFromItem(miniPlayer, miniPlayerHover.point.position))
         readonly property real uiScale: Math.min(1, width / 391)
         readonly property real minimumX: root.miniPlayerDockParent ? 0 : 6
         readonly property real maximumX: root.miniPlayerDockParent
@@ -1708,6 +1710,7 @@ Rectangle {
                 anchors.fill: parent
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
+                hoverEnabled: true
                 property real pressX: 0
                 property real pressY: 0
                 property real pointerOffsetX: 0
@@ -1759,7 +1762,7 @@ Rectangle {
             anchors.fill: miniVideoSurface
             radius: 6 * miniPlayer.uiScale
             color: "#99000000"
-            opacity: miniPlayerHover.hovered || miniPlayer.activeFocus ? 1 : 0
+            opacity: miniPlayer.hoveringVideo || miniPlayer.activeFocus ? 1 : 0
             visible: opacity > 0.01
             z: 3
             IconButton {
@@ -1858,7 +1861,7 @@ Rectangle {
                 radius: parent.height / 2
                 x: Math.max(0, Math.min(parent.width - width, parent.width * player.position - width / 2))
                 color: Theme.accent
-                visible: miniPlayerHover.hovered
+                visible: miniPlayer.hoveringVideo
                 Behavior on x { NumberAnimation { duration: 100 } }
             }
             MouseArea {
