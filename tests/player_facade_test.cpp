@@ -50,8 +50,23 @@ public:
     bool syncCurrentInput() override { record("syncCurrentInput"); return false; }
     BackendInputState inputState() const override { return input; }
     bool hasInput() const override { return input.hasInput; }
-    void seek(double value) override { record("seek"); position = value; }
-    void seekBy(int) override { record("seekBy"); }
+    void seek(double value) override
+    {
+        record("seek");
+        position = value;
+        if (input.hasInput && input.seekable) {
+            input.position = value;
+            input.timeMs = qRound64(value * input.lengthMs);
+        }
+    }
+    void seekBy(int ms) override
+    {
+        record("seekBy");
+        if (!input.hasInput || !input.seekable || input.lengthMs <= 0)
+            return;
+        input.timeMs = qBound<qint64>(0, input.timeMs + ms, input.lengthMs);
+        input.position = double(input.timeMs) / double(input.lengthMs);
+    }
     void frameStep() override { record("frameStep"); }
     void jumpTo(qint64 value) override { record("jumpTo"); lastJumpMs = value; }
     void toggleRecord() override { record("toggleRecord"); }
@@ -238,6 +253,13 @@ int main(int argc, char **argv)
     player.resume();
     ok &= expect(fake->called("jumpTo") && fake->lastJumpMs == 12000,
                  "the original resume action seeks the injected VLC backend to its saved point");
+    player.seek(0.75);
+    ok &= expect(player.position() == 0.75 && player.time() == 22500,
+                 "absolute seeks update the exposed timeline immediately");
+    player.seekBy(-5000);
+    ok &= expect(player.position() == (17500.0 / 30000.0) && player.time() == 17500,
+                 "relative seeks update the exposed timeline immediately");
+    player.seek(0.4);
     player.addBookmark();
     const QVariantList savedBookmarks = player.bookmarks();
     ok &= expect(savedBookmarks.size() == 1

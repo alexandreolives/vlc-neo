@@ -319,12 +319,23 @@ void Player::previous() { m_backend->previous(); }
 
 void Player::seek(double position)
 {
-    m_backend->seek(qBound(0.0, position, 1.0));
+    const double target = qBound(0.0, position, 1.0);
+    m_backend->seek(target);
+    if (!m_seekable || m_lengthMs <= 0)
+        return;
+    m_position = target;
+    m_timeMs = qRound64(target * m_lengthMs);
+    emit timeChanged();
 }
 
 void Player::seekBy(int ms)
 {
     m_backend->seekBy(ms);
+    if (!m_seekable || m_lengthMs <= 0)
+        return;
+    m_timeMs = qBound<qint64>(0, m_timeMs + ms, m_lengthMs);
+    m_position = double(m_timeMs) / double(m_lengthMs);
+    emit timeChanged();
 }
 
 void Player::setRate(double rate)
