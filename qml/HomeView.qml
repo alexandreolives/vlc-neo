@@ -11,6 +11,7 @@ Rectangle {
     objectName: "home-screen"
     color: root.sidePanel ? Theme.librarySidePanel : Theme.window
     property alias miniVideoHost: homeMiniVideoSurface
+    property alias miniPlayerDragTarget: homeMiniVideoDrag
     property alias miniPlayerItem: homeMiniPlayer
     property alias miniPlayerOverlay: homeMiniPlayerHoverOverlay
     property alias miniPlayerHovered: homeMiniPlayer.hoveringVideo
@@ -1027,6 +1028,7 @@ Rectangle {
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                 property real pressX: 0
                 property real pressY: 0
                 property real pointerOffsetX: 0

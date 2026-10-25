@@ -48,6 +48,7 @@ Rectangle {
     property int filteredCount: 0
     property int recentRevision: 0
     property alias miniVideoHost: miniVideoSurface
+    property alias miniPlayerDragTarget: miniVideoDrag
     property alias miniPlayerItem: miniPlayer
     property alias miniPlayerOverlay: miniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayer.hoveringVideo
@@ -1711,6 +1712,7 @@ Rectangle {
                 z: 1
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                 property real pressX: 0
                 property real pressY: 0
                 property real pointerOffsetX: 0
