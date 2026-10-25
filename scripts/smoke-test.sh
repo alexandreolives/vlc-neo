@@ -1323,6 +1323,12 @@ check "the full-library mini-player next button advances the VLC queue after dra
 check "the full-library mini-player previous button returns to the prior VLC queue item after dragging" "$out" "libraryMiniButtonPrevious=true"
 check "the full-library mini-player expand button opens the player after dragging" "$out" "libraryMiniButtonExpand=true"
 check "the full-library mini-player close button stops playback after dragging" "$out" "libraryMiniButtonClose=true"
+echo "== queue buttons on moved mini-players"
+out=$(run "500:onboarding.close(); win.width=1920; win.height=1080; player.openLocation('$E1',true)|+1400:win.navigate('home')|+350:drag-item:home-mini-player-title:home-mini-player:90,70|+150:click-item:home-mini-player-queue|+150:'homeQueueOpened=' + (rightPanel === 'queue' && homeView.miniPlayerItem.visible)|+100:click-item:home-mini-player-queue|+150:'homeQueueToggleClosed=' + (rightPanel === '')|+150:win.navigate('folder')|+350:drag-item:mini-player-title:mini-player:90,70|+150:click-item:mini-player-queue|+150:'libraryQueueOpened=' + (rightPanel === 'queue' && libraryPanel.miniPlayerItem.visible)|+100:click-item:mini-player-queue|+150:'libraryQueueToggleClosed=' + (rightPanel === '')|+100:quit" "$E1")
+check "the Home mini-player queue button toggles its panel after a drag" "$out" "homeQueueOpened=true"
+check "the Home mini-player queue button closes its panel after a drag" "$out" "homeQueueToggleClosed=true"
+check "the full-library mini-player queue button toggles its panel after a drag" "$out" "libraryQueueOpened=true"
+check "the full-library mini-player queue button closes its panel after a drag" "$out" "libraryQueueToggleClosed=true"
 for screenshot in navigation-videos.png folder-browser-grid-1920.png folder-browser-list-1920.png; do
     if [ -s "$WORK/$screenshot" ]; then echo "PASS  $screenshot written"; pass=$((pass + 1))
     else echo "FAIL  $screenshot missing"; fail=$((fail + 1)); fi
