@@ -1128,14 +1128,19 @@ def check_protocol(protocol, subtitle_path="", media_source=media, embedded_subt
                 with urllib.request.urlopen(url, timeout=1) as response:
                     result["http_status"] = response.status
                     try:
-                        response.fp.raw._sock.settimeout(0.4)
+                        # This response stays open while VLC streams. A short
+                        # socket timeout makes BufferedReader unusable after
+                        # the first idle interval (the next read raises
+                        # "cannot read from timed out object").
+                        response.fp.raw._sock.settimeout(2.0)
                     except (AttributeError, OSError):
                         pass
                     while time.monotonic() < deadline:
                         try:
                             chunk = response.read1(65536)
-                        except TimeoutError:
-                            continue
+                        except (TimeoutError, OSError) as error:
+                            result["error"] = str(error)
+                            break
                         if not chunk:
                             break
                         result["bytes"] += len(chunk)
@@ -1213,7 +1218,14 @@ def check_protocol(protocol, subtitle_path="", media_source=media, embedded_subt
           and valid_payload and decode_ok and subtitle_ok and subtitle_selected)
     if not ok:
         print(run.stdout)
-        print(protocol + "_receiver=" + str(result))
+        print(protocol + "_receiver=" + str({
+            key: value for key, value in result.items() if key != "payload"
+        }) + " payload_bytes=" + str(len(result["payload"])))
+        if result["payload"]:
+            print(protocol + "_probe_exit=" + str(probe.returncode)
+                  + " probe_error=" + probe.stderr[:1000])
+            print(protocol + "_decode_exit=" + str(decoder.returncode)
+                  + " decode_error=" + decoder.stderr[:1000])
         return False
     print("VLC %s delivered %d bytes%s" % (
         protocol.upper(), result["bytes"],
