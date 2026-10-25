@@ -109,7 +109,7 @@ ApplicationWindow {
     property string lastOpenedPlaylistPath: ""
     property double lastOpenedPlaylistAt: 0
     property string rightPanel: ""          // "" | queue | settings
-    readonly property bool miniPlayerDockedToQueue: rightPanel === "queue" && player.hasVideo
+    readonly property bool miniPlayerDockedToQueue: rightPanel === "queue" && (player.hasVideo || player.ended)
         && !uiHidden && !onboarding.visible
         && ((navigationPage === "home" && !libraryOpen) || libraryFullPage)
     property bool startupVolumePending: true

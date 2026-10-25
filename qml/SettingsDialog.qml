@@ -138,6 +138,9 @@ Modal {
     property alias categorySearchInput: categoryField
     property alias settingsCategoryPanel: categoryPanel
     property alias settingsPageContent: scroll
+    property alias openSubtitlesApiKeyField: openSubtitlesApiKeyInput
+    property alias openSubtitlesApiKeySaveAction: openSubtitlesApiKeySaveButton
+    property alias openSubtitlesApiKeyRemoveAction: openSubtitlesApiKeyRemoveButton
     readonly property var bufferingProfiles: [
         { label: "Custom", value: "Custom", amount: 0 },
         { label: "Lowest latency", value: "Lowest latency", amount: 100 },
@@ -1896,30 +1899,40 @@ Modal {
                         visible: root.width >= 800
                         label: "OpenSubtitles API key"
                         info: "Use your own free API key. VLC Neo stores it in your local app settings and sends it only to OpenSubtitles."
-                        NField {
-                            id: openSubtitlesApiKeyInput
-                            objectName: "opensubtitles-api-key"
-                            Layout.preferredWidth: 190
-                            placeholderText: openSubtitles.apiKeyConfigured ? "Key saved" : "Paste your API key"
-                            echoMode: TextInput.Password
-                            onAccepted: {
-                                openSubtitles.setApiKey(text)
-                                clear()
+                        RowLayout {
+                            spacing: 8
+                            NField {
+                                id: openSubtitlesApiKeyInput
+                                objectName: "opensubtitles-api-key"
+                                Accessible.name: "OpenSubtitles API key"
+                                Layout.minimumWidth: 220
+                                Layout.preferredWidth: 280
+                                Layout.fillWidth: true
+                                placeholderText: openSubtitles.apiKeyConfigured ? "Key saved" : "Paste your API key"
+                                echoMode: TextInput.Password
+                                onAccepted: {
+                                    openSubtitles.setApiKey(text)
+                                    clear()
+                                }
                             }
-                        }
-                        NButton {
-                            text: "Save"
-                            enabledState: openSubtitlesApiKeyInput.text.trim().length > 0
-                            onClicked: {
-                                openSubtitles.setApiKey(openSubtitlesApiKeyInput.text)
-                                openSubtitlesApiKeyInput.clear()
+                            NButton {
+                                id: openSubtitlesApiKeySaveButton
+                                objectName: "opensubtitles-api-key-save"
+                                text: "Save"
+                                onClicked: {
+                                    openSubtitles.setApiKey(openSubtitlesApiKeyInput.text)
+                                    openSubtitlesApiKeyInput.clear()
+                                }
+                                enabledState: openSubtitlesApiKeyInput.text.trim().length > 0
                             }
-                        }
-                        NButton {
-                            text: "Remove"
-                            flat: true
-                            enabledState: openSubtitles.apiKeyConfigured
-                            onClicked: openSubtitles.clearApiKey()
+                            NButton {
+                                id: openSubtitlesApiKeyRemoveButton
+                                objectName: "opensubtitles-api-key-remove"
+                                text: "Remove"
+                                flat: true
+                                enabledState: openSubtitles.apiKeyConfigured
+                                onClicked: openSubtitles.clearApiKey()
+                            }
                         }
                     }
                     ColumnLayout {

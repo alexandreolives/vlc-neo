@@ -1644,7 +1644,7 @@ Rectangle {
         id: miniPlayer
         objectName: "mini-player"
         parent: root.miniPlayerDockParent ? root.miniPlayerDockParent : win.contentItem
-        visible: root.wide && win.libraryFullPage && player.hasVideo
+        visible: root.wide && win.libraryFullPage && (player.hasVideo || player.ended)
         activeFocusOnTab: true
         Accessible.name: "Mini player"
         property real dragOffsetX: 0
@@ -1704,6 +1704,12 @@ Rectangle {
             anchors.margins: 8 * miniPlayer.uiScale
             height: width * 9 / 16
             clip: true
+
+            Rectangle {
+                anchors.fill: parent
+                visible: player.ended
+                color: "#000000"
+            }
 
             MouseArea {
                 id: miniVideoDrag
@@ -1819,15 +1825,15 @@ Rectangle {
                 IconButton {
                     id: libraryMiniPlayerToggleButton
                     objectName: "mini-player-play"
-                    icon: player.playing ? "pause" : "play"
+                    icon: player.ended ? "replay" : player.playing ? "pause" : "play"
                     iconColor: Theme.text
                     colorAnimationEnabled: false
                     iconSize: 32 * miniPlayer.uiScale
                     implicitWidth: 36 * miniPlayer.uiScale
                     implicitHeight: 36 * miniPlayer.uiScale
-                    tip: player.playing ? "Pause" : "Play"
-                    Accessible.name: player.playing ? "Pause" : "Play"
-                    onClicked: player.togglePause()
+                    tip: player.ended ? "Replay" : player.playing ? "Pause" : "Play"
+                    Accessible.name: player.ended ? "Replay" : player.playing ? "Pause" : "Play"
+                    onClicked: player.ended ? player.play() : player.togglePause()
                 }
                 IconButton {
                     id: libraryMiniPlayerNextButton

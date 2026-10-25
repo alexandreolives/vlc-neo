@@ -124,6 +124,13 @@ Player::~Player()
 
 void Player::onBackendInputChanged()
 {
+    if (m_backend->hasInput()) {
+        setEnded(false);
+        m_wasPlaying = false;
+        m_hadVideoForMedia = false;
+        m_lastActiveTimeMs = 0;
+        m_lastActiveLengthMs = 0;
+    }
     saveResumePoint();
     const QString equalizer = m_stateStore.equalizerPreset();
     m_backend->setEqualizerEnabled(equalizer, !equalizer.isEmpty() && equalizer != QLatin1String("off"));
@@ -173,6 +180,26 @@ void Player::onBackendInputEvent(BackendInputEvent event)
 
 void Player::refreshCurrentInput()
 {
+    const BackendInputState input = m_backend->inputState();
+    if (!input.hasInput) {
+        const qint64 remainingMs = m_lastActiveLengthMs - m_lastActiveTimeMs;
+        const qint64 endWindowMs = m_lastActiveLengthMs > 0
+                ? qMin<qint64>(1500, qMax<qint64>(250, m_lastActiveLengthMs * 2 / 5))
+                : 0;
+        if (m_wasPlaying && m_hadVideoForMedia && m_lastActiveLengthMs > 0 && m_lastActiveTimeMs > 0
+            && remainingMs >= 0 && remainingMs <= endWindowMs) {
+            setEnded(true);
+            m_position = 1.0;
+            m_lengthMs = m_lastActiveLengthMs;
+            m_timeMs = m_lastActiveLengthMs;
+            m_seekable = false;
+            emit timeChanged();
+            emit mediaChanged();
+        }
+        m_wasPlaying = false;
+    } else if (m_ended) {
+        setEnded(false);
+    }
     const QUrl previousUrl = m_mediaUrl;
     refreshMeta();
     refreshState();
@@ -190,11 +217,31 @@ void Player::refreshCurrentInput()
     m_queue.setCurrentId(m_backend->currentQueueItemId());
 }
 
+void Player::setEnded(bool ended)
+{
+    if (m_ended == ended)
+        return;
+    m_ended = ended;
+    emit endedChanged();
+}
+
 void Player::refreshTime()
 {
     m_timePosted = false;
     const BackendInputState state = m_backend->inputState();
+    if (!state.hasInput && m_ended) {
+        if (m_seekable) {
+            m_seekable = false;
+            emit mediaChanged();
+        }
+        emit timeChanged();
+        return;
+    }
     if (state.hasInput) {
+        if (state.lengthMs > 0) {
+            m_lastActiveTimeMs = state.timeMs;
+            m_lastActiveLengthMs = state.lengthMs;
+        }
         m_position = state.position;
         m_timeMs = state.timeMs;
         m_lengthMs = state.lengthMs;
@@ -217,6 +264,10 @@ void Player::refreshState()
     const int state = input.state;
     const bool recording = input.recording;
     const double rate = input.hasInput ? input.rate : m_backend->playlistState().rate;
+    if (state == 2)
+        m_wasPlaying = true;
+    else if (state == 3)
+        m_wasPlaying = false;
     if (state != m_state) {
         m_state = state;
         emit stateChanged();
@@ -236,6 +287,10 @@ void Player::refreshState()
 void Player::refreshMeta()
 {
     const BackendInputState state = m_backend->inputState();
+    if (!state.hasInput && m_ended) {
+        emit mediaChanged();
+        return;
+    }
     const QString title = state.title;
     const QString artist = state.artist;
     const QString artwork = state.artworkUrl;
@@ -265,7 +320,10 @@ void Player::refreshMeta()
 
 void Player::refreshTracks()
 {
-    m_hasVideo = m_backend->inputState().hasVideo;
+    const BackendInputState state = m_backend->inputState();
+    if (state.hasInput && state.hasVideo)
+        m_hadVideoForMedia = true;
+    m_hasVideo = state.hasInput && state.hasVideo;
     emit tracksChanged();
     emit chaptersChanged();
     applyLinkedSubtitles();
@@ -312,6 +370,10 @@ void Player::rebuildQueue()
 
 void Player::togglePause()
 {
+    if (m_ended) {
+        m_backend->play();
+        return;
+    }
     if (!m_backend->hasInput()) {
         m_backend->play();
         return;
@@ -320,7 +382,12 @@ void Player::togglePause()
 }
 
 void Player::play() { m_backend->play(); }
-void Player::stop() { m_backend->stop(); }
+void Player::stop()
+{
+    m_wasPlaying = false;
+    setEnded(false);
+    m_backend->stop();
+}
 void Player::next() { m_backend->next(); }
 void Player::previous() { m_backend->previous(); }
 
@@ -368,6 +435,11 @@ void Player::frameStep()
 
 void Player::openUrls(const QList<QUrl> &urls, bool playNow)
 {
+    m_wasPlaying = false;
+    setEnded(false);
+    m_hadVideoForMedia = false;
+    m_lastActiveTimeMs = 0;
+    m_lastActiveLengthMs = 0;
     static const QSet<QString> playlistExtensions = {
         QStringLiteral("m3u"), QStringLiteral("m3u8"), QStringLiteral("pls"), QStringLiteral("xspf")
     };

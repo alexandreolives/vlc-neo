@@ -316,6 +316,35 @@ int main(int argc, char **argv)
     ok &= expect(player.playlistName().isEmpty(),
                  "opening standalone media clears the previous playlist label");
 
+    BackendInputState endingInput = input;
+    endingInput.state = 2;
+    endingInput.hasVideo = true;
+    endingInput.position = 0.96;
+    endingInput.timeMs = 29000;
+    fake->publishInputState(endingInput);
+    fake->publishInputState(BackendInputState{});
+    ok &= expect(player.ended() && !player.hasMedia() && !player.hasVideo()
+                 && player.title() == QStringLiteral("Test media")
+                 && player.mediaUrl() == input.mediaUrl
+                 && player.position() == 1.0 && player.time() == player.length(),
+                 "natural video completion keeps its mini-player metadata and exposes a finished timeline");
+    const int playsBeforeReplay = fake->playCalls;
+    player.play();
+    ok &= expect(fake->playCalls == playsBeforeReplay + 1 && player.ended(),
+                 "replay dispatches VLC play and keeps the end card until a new input starts");
+    BackendInputState replayInput = endingInput;
+    replayInput.state = 1;
+    replayInput.position = 0.0;
+    replayInput.timeMs = 0;
+    fake->publishInputState(replayInput);
+    ok &= expect(!player.ended() && player.hasMedia() && player.hasVideo()
+                 && player.position() == 0.0,
+                 "starting the ended VLC item again restores live playback state");
+    player.stop();
+    fake->publishInputState(BackendInputState{});
+    ok &= expect(!player.ended() && player.title().isEmpty(),
+                 "an explicit stop clears the mini-player replay state and metadata");
+
     fake->calls.clear();
     player.stop();
     player.next();

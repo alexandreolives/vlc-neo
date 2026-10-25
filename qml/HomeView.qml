@@ -22,6 +22,7 @@ Rectangle {
     property alias miniPlayerNextButton: homeMiniPlayerNextButton
     property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
     property alias miniPlayerQueueButton: homeMiniPlayerQueueButton
+    property alias miniPlayerTitle: homeMiniPlayerTitle
     property Item miniPlayerDockParent: null
     property real savedMiniPlayerDragOffsetX: 0
     property real savedMiniPlayerDragOffsetY: 0
@@ -970,7 +971,7 @@ Rectangle {
         id: homeMiniPlayer
         parent: root.miniPlayerDockParent ? root.miniPlayerDockParent : root
         objectName: root.sidePanel ? "side-home-mini-player" : "home-mini-player"
-        visible: root.visible && !root.sidePanel && player.hasVideo
+        visible: root.visible && !root.sidePanel && (player.hasVideo || player.ended)
         activeFocusOnTab: true
         Accessible.name: "Mini player"
         property real dragOffsetX: 0
@@ -1020,6 +1021,12 @@ Rectangle {
             anchors.margins: 8 * homeMiniPlayer.uiScale
             height: width * 9 / 16
             clip: true
+
+            Rectangle {
+                anchors.fill: parent
+                visible: player.ended
+                color: "#000000"
+            }
 
             MouseArea {
                 id: homeMiniVideoDrag
@@ -1136,15 +1143,15 @@ Rectangle {
                 IconButton {
                     id: homeMiniPlayerToggleButton
                     objectName: root.sidePanel ? "side-home-mini-player-toggle" : "home-mini-player-toggle"
-                    icon: player.playing ? "pause" : "play"
+                    icon: player.ended ? "replay" : player.playing ? "pause" : "play"
                     iconColor: Theme.text
                     colorAnimationEnabled: false
                     iconSize: 32 * homeMiniPlayer.uiScale
                     implicitWidth: 36 * homeMiniPlayer.uiScale
                     implicitHeight: 36 * homeMiniPlayer.uiScale
-                    tip: player.playing ? "Pause" : "Play"
-                    Accessible.name: player.playing ? "Pause" : "Play"
-                    onClicked: player.togglePause()
+                    tip: player.ended ? "Replay" : player.playing ? "Pause" : "Play"
+                    Accessible.name: player.ended ? "Replay" : player.playing ? "Pause" : "Play"
+                    onClicked: player.ended ? player.play() : player.togglePause()
                 }
                 IconButton {
                     id: homeMiniPlayerNextButton
@@ -1210,6 +1217,7 @@ Rectangle {
             }
         }
         NText {
+            id: homeMiniPlayerTitle
             objectName: root.sidePanel ? "side-home-mini-player-title" : "home-mini-player-title"
             MouseArea {
                 id: homeMiniPlayerTitleDrag

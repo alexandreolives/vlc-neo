@@ -19,6 +19,7 @@ class Player : public QObject
     Q_OBJECT
     Q_PROPERTY(int state READ state NOTIFY stateChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY stateChanged)
+    Q_PROPERTY(bool ended READ ended NOTIFY endedChanged)
     Q_PROPERTY(bool hasMedia READ hasMedia NOTIFY mediaChanged)
     Q_PROPERTY(double position READ position NOTIFY timeChanged)
     Q_PROPERTY(qint64 time READ time NOTIFY timeChanged)
@@ -59,6 +60,7 @@ public:
 
     int state() const { return m_state; }
     bool playing() const { return m_state == 2; }
+    bool ended() const { return m_ended; }
     bool hasMedia() const { return m_backend->hasInput(); }
     double position() const { return m_position; }
     qint64 time() const { return m_timeMs; }
@@ -209,6 +211,7 @@ public:
 
 signals:
     void stateChanged();
+    void endedChanged();
     void mediaChanged();
     void recentMediaChanged();
     void timeChanged();
@@ -251,6 +254,7 @@ private:
     void loadSubtitleTimeline();
     void saveResumePoint();
     void rememberRecent(const QString &mrl);
+    void setEnded(bool ended);
 
     std::unique_ptr<PlayerBackend> m_backend;
     QString m_requestedPlaylistName;
@@ -261,6 +265,11 @@ private:
     QTimer m_subtitleDebounce;
 
     int m_state = 0;
+    bool m_ended = false;
+    bool m_wasPlaying = false;
+    bool m_hadVideoForMedia = false;
+    qint64 m_lastActiveTimeMs = 0;
+    qint64 m_lastActiveLengthMs = 0;
     double m_position = 0.0;
     qint64 m_timeMs = 0;
     qint64 m_lengthMs = 0;
