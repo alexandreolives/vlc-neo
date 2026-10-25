@@ -559,6 +559,8 @@ out=$(run "900:'rendererDiscoverySupported=' + player.rendererDiscoverySupported
 check "renderer discovery succeeds when supported and degrades cleanly otherwise" "$out" "rendererCapabilityHandled=true"
 check "discovered renderers are exposed to QML and cleared after stopping" "$out" "rendererDeviceModel=true"
 check "stopping renderer discovery leaves no stale devices" "$out" "rendererDevicesCleared=true"
+out=$(run "200:'castRendererReadyStates=' + [castDialog.rendererReadyForPlayback({selected:true,status:'Connected'}),castDialog.rendererReadyForPlayback({selected:true,status:'Playing'}),castDialog.rendererReadyForPlayback({selected:true,status:'Paused'}),castDialog.rendererReadyForPlayback({selected:true,status:'Connecting'}),castDialog.rendererReadyForPlayback({selected:true,status:'Stopped'}),castDialog.rendererReadyForPlayback({selected:false,status:'Connected'})].join('/')|+100:quit")
+check "the cast dialog accepts VLC's connected Chromecast state and active DLNA states" "$out" "castRendererReadyStates=true/true/true/false/false/false"
 echo "== VLC records the playing audio and video"
 mkdir -p "$WORK/recordings"
 out=$(run "6000:player.setConfig('input-record-path','$WORK/recordings'); player.toggleRecord()|+5000:'recordingActive=' + player.recording + '/' + (player.time > 7000)|+100:player.toggleRecord()|+2500:'recordingStopped=' + !player.recording|+100:quit" --avcodec-hw=none "$WORK/recording-test.mkv")

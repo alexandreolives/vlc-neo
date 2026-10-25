@@ -13,6 +13,11 @@ Modal {
     property string requestedRendererId: ""
     property double connectStartedAt: 0
 
+    function rendererReadyForPlayback(device) {
+        return !!device && device.selected
+                && ["Connected", "Playing", "Paused"].includes(device.status)
+    }
+
     onOpened: {
         picker.searchingTimedOut = false
         player.discoverRenderers(true)
@@ -38,7 +43,7 @@ Modal {
         running: root.requestedRendererId.length > 0
         onTriggered: {
             const device = player.rendererDevices.find(item => item.id === root.requestedRendererId)
-            if (device && device.status === "Playing") {
+            if (root.rendererReadyForPlayback(device)) {
                 root.requestedRendererId = ""
                 win.toast("Casting", "Playback controls are connected to " + device.name + ".")
                 root.close()
