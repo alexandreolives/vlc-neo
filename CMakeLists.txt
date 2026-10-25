@@ -207,6 +207,14 @@ if(BUILD_TESTING)
   target_include_directories(bounded_image_cache_test PRIVATE src)
   target_link_libraries(bounded_image_cache_test PRIVATE Qt6::Core Qt6::Gui)
   add_test(NAME bounded_image_cache COMMAND bounded_image_cache_test)
+
+  add_executable(waveform_decode_policy_test
+    tests/waveform_decode_policy_test.cpp
+    src/waveform_decode_policy.hpp
+  )
+  target_include_directories(waveform_decode_policy_test PRIVATE src)
+  target_link_libraries(waveform_decode_policy_test PRIVATE Qt6::Core)
+  add_test(NAME waveform_decode_policy COMMAND waveform_decode_policy_test)
 endif()
 
 set(NEO_PLUGIN_DIR "$ENV{HOME}/.local/lib/vlc-neo/plugins/gui" CACHE PATH "Where libneo_plugin.so is installed")

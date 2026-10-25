@@ -1,5 +1,6 @@
 #include "thumbnail_provider.hpp"
 #include "bounded_image_cache.hpp"
+#include "waveform_decode_policy.hpp"
 
 #include <QElapsedTimer>
 #include <QDir>
@@ -378,7 +379,6 @@ public:
     QImage makeWaveform(const QString &path, const QString &key, qint64 durationSeconds,
                         const std::shared_ptr<std::atomic<bool>> &cancelled)
     {
-        constexpr int kTimeoutMs = 20000;
         if (cancelled->load(std::memory_order_relaxed))
             return {};
         const int binCount = kWaveformWidth;
@@ -407,7 +407,8 @@ public:
         bool hasDanglingByte = false;
         QElapsedTimer elapsed;
         elapsed.start();
-        while (process.state() != QProcess::NotRunning && elapsed.elapsed() < kTimeoutMs
+        const int timeoutMs = WaveformDecodePolicy::timeoutMs(durationSeconds);
+        while (process.state() != QProcess::NotRunning && elapsed.elapsed() < timeoutMs
                && !m_stopping.load(std::memory_order_relaxed)
                && !cancelled->load(std::memory_order_relaxed)) {
             process.waitForReadyRead(100);

@@ -413,9 +413,11 @@ design tokens and every screen are plain QML files under `qml/`.
 Remaining roadmap work:
 - **Long-duration waveform previews.** Thumbnail and waveform decoding uses two
   workers, at most 24 queued/running jobs and a 16 MiB LRU image cache. A single
-  waveform decode still stops after 20 seconds, so unusually slow media may not
-  produce a preview. Cached image sizes round up to whole KiB so the memory cap
-  never undercounts retained image bytes.
+  waveform decode now gets a duration-scaled deadline, from 20 seconds up to a
+  hard ten-minute cap, so longer media has time to finish without an unbounded
+  decoder process. Unusually slow media beyond that cap may still lack a preview.
+  Cached image sizes round up to whole KiB so the memory cap never undercounts
+  retained image bytes.
 - **Broader video effect catalog.** The Video side panel previews the current
   frame with Original, Sepia, Invert, Posterize, Old movie, Gaussian blur,
   Sharpen, VHS and Grain; selecting a tile changes VLC's active filter chain.
