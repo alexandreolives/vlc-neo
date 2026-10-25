@@ -418,9 +418,6 @@ Remaining roadmap work:
 - **Physical receiver verification.** VLC Neo implements renderer discovery
   and DLNA transport control; a reachable Chromecast or other receiver is still
   needed to verify the complete device-level experience.
-- **Fresh cross-distro CI.** The last recorded Linux Mint and Arch workflow runs
-  predate recent changes. Run the package and smoke workflows against the
-  current branch before treating those platforms as verified.
 - **Translations and other platforms.** Windows and macOS builds are not yet
   part of the supported verification matrix.
 
