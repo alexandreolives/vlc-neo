@@ -77,7 +77,7 @@ for effect in "${effects[@]}"; do
     fi
     convert "$WORK/effect-$effect.png" -crop 450x400+300+100 +repage "$WORK/effect-$effect-crop.png"
     changed_pixels="$(compare -metric AE "$WORK/effect-original-crop.png" "$WORK/effect-$effect-crop.png" null: 2>&1 || true)"
-    if [[ "$changed_pixels" =~ ^[0-9]+$ ]] && (( changed_pixels > 0 )); then
+    if awk -v diff="$changed_pixels" 'BEGIN { split(diff, parts, /[ (]/); exit !(parts[1] + 0 > 0) }'; then
         echo "PASS VLC $effect filter changes embedded video output ($changed_pixels pixels)"
     else
         echo "FAIL VLC $effect filter did not change embedded video output (${changed_pixels:-no pixel diff})" >&2
