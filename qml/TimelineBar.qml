@@ -8,6 +8,8 @@ Rectangle {
     objectName: "timeline-bar"
     property alias contentItem: seekBar
     property alias seekControl: seekBar
+    property alias elapsedText: elapsedText
+    property alias durationText: durationText
     property bool compact: width < 720
     property bool tiny: width < 400
 
@@ -20,6 +22,7 @@ Rectangle {
         spacing: root.tiny ? 0 : root.compact ? 2 : 8
 
         NText {
+            id: elapsedText
             objectName: "timeline-elapsed"
             visible: !root.tiny
             Layout.preferredWidth: root.compact ? 48 : 64
@@ -27,7 +30,7 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             text: player.formatTime(player.time)
             horizontalAlignment: Text.AlignHCenter
-            dim: true
+            color: Theme.icon
             font.pixelSize: root.compact ? 10 : 13
             font.features: { "tnum": 1 }
         }
@@ -41,6 +44,7 @@ Rectangle {
         }
 
         NText {
+            id: durationText
             objectName: "timeline-duration"
             visible: !root.tiny
             Layout.preferredWidth: root.compact ? 48 : 64
@@ -48,7 +52,7 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             text: player.formatTime(player.length)
             horizontalAlignment: Text.AlignHCenter
-            dim: true
+            color: Theme.icon
             font.pixelSize: root.compact ? 10 : 13
             font.features: { "tnum": 1 }
         }
