@@ -981,7 +981,8 @@ check "long waveform jobs are canceled while both decode workers are active" "$o
 check "short waveform requests finish after both long jobs are canceled" "$out" "replacementWaveformsReady=true/true"
 
 echo "== track popup dismissal"
-out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'tabFocus=' + tracksPopup.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+100:'defaultAudioTrackSelected=' + player.tracks('audio').some(track => track.id >= 0 && track.selected)|+100:'tabFocus=' + tracksPopup.focusTab('audio')|+100:key:Space|+100:'tabKeyboard=' + (tracksPopup.tab === 'audio')|+100:tracksPopup.close()|+100:quit" "$E1")
+check "the first available audio track is selected by default" "$out" "defaultAudioTrackSelected=true"
 check "track popup tabs accept keyboard focus" "$out" "tabFocus=true"
 check "Space activates the focused audio tab" "$out" "tabKeyboard=true"
 out=$(run "1200:tracksPopup.openFor('spu', controlBar.findControl('subtitle'))|+150:keyCatcher.forceActiveFocus()|+100:key:Esc|+100:'escapeClosed=' + !tracksPopup.visible|+100:quit" "$E1")
@@ -1000,9 +1001,16 @@ check "track popup repositions within compact window bounds" "$out" "popupFitsCo
 if [ -s "$WORK/track-popup-compact.png" ]; then echo "PASS  compact track popup screenshot written"; pass=$((pass + 1))
 else echo "FAIL  compact track popup screenshot missing"; fail=$((fail + 1)); fi
 
+echo "== audio and subtitle popup bounds in fullscreen"
+out=$(run "700:onboarding.close(); Theme.store.autoHideMode='fullscreen'; Theme.store.showControlsFullscreen=false; win.width=1920; win.height=1080; player.openLocation('$E1',true)|+900:win.setFullscreen(true); win.topHot=true; win.bottomHot=true|+250:tracksPopup.openFor('audio',controlBar.findControl('audio'))|+200:'fullscreenAudioPopupFits=' + (() => { const p=tracksPopup.parent.mapToItem(keyCatcher,tracksPopup.x,tracksPopup.y); return tracksPopup.visible && p.x >= 0 && p.y >= topBar.y + topBar.height - 1 && p.x + tracksPopup.width <= keyCatcher.width && p.y + tracksPopup.height <= keyCatcher.height })()|+100:tracksPopup.openFor('spu',controlBar.findControl('subtitle'))|+200:'fullscreenSubtitlePopupFits=' + (() => { const p=tracksPopup.parent.mapToItem(keyCatcher,tracksPopup.x,tracksPopup.y); return tracksPopup.visible && p.x >= 0 && p.y >= topBar.y + topBar.height - 1 && p.x + tracksPopup.width <= keyCatcher.width && p.y + tracksPopup.height <= keyCatcher.height })()|+100:quit" "$E1")
+check "fullscreen audio track popup stays below the title bar and inside the window" "$out" "fullscreenAudioPopupFits=true"
+check "fullscreen subtitle track popup stays below the title bar and inside the window" "$out" "fullscreenSubtitlePopupFits=true"
+
 echo "== fullscreen right-side panel clears the floating title bar"
-out=$(run "700:onboarding.close(); Theme.store.autoHideMode='fullscreen'; Theme.store.showControlsFullscreen=false; win.width=1920; win.height=1080; player.openLocation('$E1',true)|+800:win.setFullscreen(true); win.topHot=true; sidePanel.tab='audio'; win.rightPanel='settings'|+300:'fullscreenPanelBelowTopbar=' + (win.fullscreen && win.overlayMode && sidePanel.mapToItem(keyCatcher,0,0).y >= topBar.y + topBar.height - 1 && sidePanel.mapToItem(keyCatcher,0,0).y + sidePanel.height <= keyCatcher.height)|+100:move:400,400|+100:win.topHot=false|+250:'fullscreenPanelReturnsToTop=' + (topBar.y + topBar.height <= 1 && sidePanel.mapToItem(keyCatcher,0,0).y <= 1)|+100:quit" "$E1")
+out=$(run "700:onboarding.close(); Theme.store.autoHideMode='fullscreen'; Theme.store.showControlsFullscreen=false; win.width=1920; win.height=1080; player.openLocation('$E1',true)|+800:win.setFullscreen(true); win.topHot=true; sidePanel.tab='audio'; win.rightPanel='settings'|+300:'fullscreenPanelBelowTopbar=' + (win.fullscreen && win.overlayMode && sidePanel.mapToItem(keyCatcher,0,0).y >= topBar.y + topBar.height - 1 && sidePanel.mapToItem(keyCatcher,0,0).y + sidePanel.height <= keyCatcher.height)|+100:tracksPopup.openFor('audio',controlBar.findControl('audio'))|+150:'fullscreenAudioMenuVisible=' + tracksPopup.visible|+100:tracksPopup.openFor('spu',controlBar.findControl('subtitle'))|+150:'fullscreenSubtitleMenuVisible=' + tracksPopup.visible|+100:tracksPopup.close()|+100:move:700,700|+100:win.topHot=false|+250:'fullscreenPanelReturnsToTop=' + (topBar.y + topBar.height <= 1 && sidePanel.mapToItem(keyCatcher,0,0).y <= 1)|+100:quit" "$E1")
 check "fullscreen right sidebar starts below the visible floating title bar" "$out" "fullscreenPanelBelowTopbar=true"
+check "fullscreen audio picker opens over the right sidebar" "$out" "fullscreenAudioMenuVisible=true"
+check "fullscreen subtitle picker opens over the right sidebar" "$out" "fullscreenSubtitleMenuVisible=true"
 check "fullscreen right sidebar fills the top edge after the title bar hides" "$out" "fullscreenPanelReturnsToTop=true"
 
 echo "== side panel dismissal"
