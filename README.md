@@ -424,8 +424,9 @@ Remaining roadmap work:
   Audio equalizer presets also have preview icons and drive VLC.
 - **VLC media and playback profiles.** Named profiles save theme, accent,
   control layout and a curated set of VLC playback, decoding, buffering, filter
-  and subtitle appearance options. Per-profile capture, device-specific output
-  and stream/transcode settings remain to be implemented.
+  and subtitle appearance options. Profiles also save configured video/audio
+  output modules and the ALSA device when VLC exposes that option. Per-profile
+  capture and stream/transcode settings remain to be implemented.
 - **Conversion profiles and receiver playback.** MP4 (H.264/AAC), MP3 and WebM
   (VP8/Vorbis) conversion run through VLC with Compact, Balanced and High bitrate
   presets. The stream dialog sends MPEG-TS over UDP or RTP, or serves HTTP for a

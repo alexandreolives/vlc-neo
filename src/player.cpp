@@ -22,6 +22,8 @@ const QStringList &profileOptionNames()
 {
     static const QStringList names = {
         QStringLiteral("audio-language"), QStringLiteral("sub-language"),
+        QStringLiteral("aout"), QStringLiteral("vout"),
+        QStringLiteral("alsa-audio-device"),
         QStringLiteral("file-caching"), QStringLiteral("disc-caching"),
         QStringLiteral("network-caching"), QStringLiteral("live-caching"),
         QStringLiteral("avcodec-hw"), QStringLiteral("deinterlace"),
