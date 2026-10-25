@@ -1271,6 +1271,7 @@ Rectangle {
                 objectName: root.sidePanel ? "side-home-mini-player-queue" : "home-mini-player-queue"
                 icon: "list"
                 colorAnimationEnabled: false
+                iconColor: win.rightPanel === "queue" ? Theme.accent : (hovered ? Theme.text : Theme.icon)
                 tip: "Show queue"
                 Accessible.name: "Show queue"
                 iconSize: 18 * homeMiniPlayer.uiScale

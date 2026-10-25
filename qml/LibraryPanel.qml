@@ -1945,6 +1945,7 @@ Rectangle {
                 objectName: "mini-player-queue"
                 icon: "list"
                 colorAnimationEnabled: false
+                iconColor: win.rightPanel === "queue" ? Theme.accent : (hovered ? Theme.text : Theme.icon)
                 tip: "Show queue"
                 Accessible.name: "Show queue"
                 iconSize: 18 * miniPlayer.uiScale
