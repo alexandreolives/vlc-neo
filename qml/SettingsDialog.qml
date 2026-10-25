@@ -374,7 +374,11 @@ Modal {
         player.setConfig(name, value)
         const adjustmentPreviewReady = player.setVideoAdjustment(name, value)
         let filterPreviewReady = true
-        if (value !== ({ hue: 0, brightness: 1, contrast: 1, saturation: 1, gamma: 1 })[name])
+        const defaults = { hue: 0, brightness: 1, contrast: 1, saturation: 1, gamma: 1 }
+        const pictureAtDefaults = Object.keys(defaults).every(key => pictureValues[key] === defaults[key])
+        if (pictureAtDefaults)
+            filterPreviewReady = setVideoFilter("adjust", false)
+        else if (value !== defaults[name])
             filterPreviewReady = setVideoFilter("adjust", true)
         const saved = Math.abs(Number(player.config(name)) - value) < 0.0001
         return saved && (!player.hasVideo || (filterPreviewReady && adjustmentPreviewReady))
