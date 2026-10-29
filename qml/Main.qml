@@ -1188,7 +1188,7 @@ ApplicationWindow {
 
         ControlBar {
             id: controlBar
-            anchors.left: navigationRail.visible ? navigationRail.right : parent.left
+            anchors.left: parent.left
             anchors.right: parent.right
             anchors.leftMargin: onboarding.themePreviewActive ? onboarding.themePreviewInset : 0
             anchors.rightMargin: onboarding.themePreviewActive ? onboarding.themePreviewInset : 0
