@@ -437,6 +437,8 @@ Rectangle {
             acc += "/" + p
             list.push({ name: p, path: acc })
         }
+        if (list.length > 3)
+            return [{ name: "…", path: list[list.length - 3].path }].concat(list.slice(-2))
         return list
     }
 

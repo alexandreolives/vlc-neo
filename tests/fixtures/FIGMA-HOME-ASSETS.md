@@ -18,3 +18,17 @@ The 110-item library probe encodes the three episode stills as short, silent
 video fixtures and crops them to 16:9 to exercise VLC's real thumbnail path.
 The fourth Home card in the Figma reference is black, so its fixture remains a
 black frame. No source video or audio recording is included.
+
+## Player folder-sidebar thumbnail fixtures
+
+`figma-player-sidebar/s01e01.png` through `s01e15.png` are 33 × 33 pixel crops
+of the fifteen episode thumbnails shown in the light Player folder-sidebar
+frame (Figma node `2425:13624`) in the same Juxtopposed Community file. They
+are screenshot-derived visual fixtures, not original-resolution episode
+artwork or episode media. `s01e04-source.png` is the full-resolution 480 × 270
+Figma image export used for the E04 playback frame. `scripts/test-sidebar-density.sh`
+wraps these stills in silent 40-second videos so the real VLC thumbnail decoder
+and sidebar layout are exercised with the imagery visible in that Figma
+reference. The reference crops replace the previous synthetic color bars. The
+original creator is credited above; the Community file's stated CC BY 4.0 terms
+apply.
