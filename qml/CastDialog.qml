@@ -6,7 +6,7 @@ Modal {
     id: root
     objectName: "cast-device-dialog"
     title: "Play on a device"
-    subtitle: "Choose a TV or speaker. VLC Neo will keep playback controls connected to it."
+    subtitle: "Choose a TV or speaker to send the current media to."
     width: Math.min(460, win.width - 32)
     height: Math.min(440, win.height - 32)
     bodyMargin: 18
