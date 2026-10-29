@@ -409,6 +409,10 @@ Rectangle {
              + Math.round(first.thumbnailRect.width) + "/" + Math.round(first.thumbnailRect.height) + "/"
              + Math.round(secondFrame.y) + "/" + Math.round(listing.cellHeight)
     }
+    function folderToolbarSearchGeometry() {
+        const position = librarySearch.mapToItem(win.contentItem, 0, 0)
+        return Math.round(position.x) + "/" + Math.round(librarySearch.width)
+    }
     function videoProgress(name) {
         for (let i = 0; i < files.count; ++i) {
             if (files.get(i, "fileName") !== name) continue
@@ -545,7 +549,9 @@ Rectangle {
                                        || (root.compactMusicSidebar && root.musicSearchOpen)
                                        || (root.compactFolderSidebar && root.folderSearchOpen))
                 objectName: "library-search"
-                Layout.preferredWidth: root.compactFolderSidebar ? 105 : (root.compactMusicSidebar ? 125 : 190)
+                Layout.preferredWidth: root.compactFolderSidebar ? 105
+                                     : (root.compactMusicSidebar ? 125
+                                        : (root.section === "folder" ? 324 : 190))
                 text: root.section === "music" ? mediaLibrary.model.search : root.searchText
                 placeholderText: "Search"
                 onTextEdited: root.section === "music" ? musicSearchTimer.restart() : (root.searchText = text)
