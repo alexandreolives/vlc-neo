@@ -37,7 +37,7 @@ Workflow-dispatch run [`40148039254`](https://github.com/alexandreolives/vlc-neo
 
 ## Remaining work register (2026-10-29)
 
-The latest successful full cross-distro run is CI [`40945069510`](https://github.com/alexandreolives/vlc-neo/actions/runs/40945069510), code commit `38e784f`: Arch and Linux Mint each passed 14/14 CTests and 880/880 real-VLC smoke assertions. The worktree is now at `7386100`; commits after `38e784f` are documentation-only. Overall phase status is **3/5 complete**, **2/5 in progress** (05 and 09), **0/5 unstarted**. The Figma inventory has **11/25 groups implemented and 14/25 partial**. Its **23/57 implemented and 34/57 partial** frame counts inherit each group’s coarse status; 34 is not a count of 34 independent defects.
+The latest successful full cross-distro run is CI [`40945069510`](https://github.com/alexandreolives/vlc-neo/actions/runs/40945069510), code commit `38e784f`: Arch and Linux Mint each passed 14/14 CTests and 880/880 real-VLC smoke assertions. The worktree is now at `3db0990`; subsequent code commits include the live folder-recursion preference fix (`7b65c31`) and the Figma-aligned OpenSubtitles results dialog (`7b94eed`), followed by documentation updates. The latest local validation is 14/14 CTests and 884/884 real-VLC smoke checks; the latest full cross-distro CI result remains `40945069510` with 880/880 checks on Arch and Mint. Overall phase status is **3/5 complete**, **2/5 in progress** (05 and 09), **0/5 unstarted**. The Figma inventory has **11/25 groups implemented and 14/25 partial**. Its **23/57 implemented and 34/57 partial** frame counts inherit each group’s coarse status; 34 is not a count of 34 independent defects.
 
 | Area | What remains | What closes it |
 |---|---|---|
