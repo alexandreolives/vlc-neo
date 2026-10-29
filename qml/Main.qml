@@ -76,7 +76,7 @@ ApplicationWindow {
     property var sidePanelActionAnchor: null
     property bool libraryFullPage: false
     property bool preserveHomeForMiniPlayerTrackChange: false
-    property url lastMediaUrlForResume: player.mediaUrl
+    property url lastMediaUrlForResume: ""
     property bool musicSidebarOpen: false
     property bool folderSidebarOpen: false
     property string sideReturnPage: ""
