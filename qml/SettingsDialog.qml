@@ -2021,7 +2021,7 @@ Modal {
                 // ------------------------------------------------ Library
                 Page_ {
                     id_: "library"
-                    SectionTitle { text: "Opening files" }
+                    SectionTitle { text: "Opening Files" }
                     VlcOption { id: libraryOneInstanceOption; option: "one-instance"; label: "Only allow one VLC window"; info: "Open files in the existing VLC window." }
                     VlcOption {
                         option: "one-instance-when-started-from-file"
@@ -2035,7 +2035,7 @@ Modal {
                         info: "Controls how deeply VLC pre-parses items in subfolders. Neo's folder browser and library index still scan recursively."
                         choices: [{ label: "No subfolders", value: "none" },
                                   { label: "Collapse; expand on play", value: "collapse" },
-                                  { label: "Expand all subfolders", value: "expand" }]
+                                  { label: "Include subfolders", value: "expand" }]
                     }
                     VlcOption {
                         option: "show-hiddenfiles"; label: "Show hidden files"
