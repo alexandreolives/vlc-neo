@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke the asynchronous seek waveform with one-minute CC0 track excerpts from three genres.
+# Smoke the asynchronous seek waveform with full CC0 recordings from three genres.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,20 +12,17 @@ declare -A waveform_hashes
 
 run_sample() {
     local genre="$1" file="$2" sandbox="$WORK/$1-sandbox"
-    local long_file="$WORK/$genre-60s.ogg"
     mkdir -p "$sandbox"
-    ffmpeg -hide_banner -loglevel error -stream_loop -1 -i "$file" -t 60 \
-        -ac 1 -ar 48000 -c:a libvorbis -q:a 3 "$long_file"
     local duration
-    duration="$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$long_file")"
+    duration="$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$file")"
     if ! awk -v d="$duration" 'BEGIN { exit !(d >= 59.5) }'; then
-        echo "FAIL $genre waveform sample is only ${duration}s; expected a one-minute real-audio exercise" >&2
+        echo "FAIL $genre waveform recording is only ${duration}s; expected a full recording of at least one minute" >&2
         return 1
     fi
     local output
-    output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$sandbox" NEO_TIMEOUT=20 \
+    output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$sandbox" NEO_TIMEOUT=40 \
         "$HERE/scripts/run-offscreen.sh" \
-        "500:onboarding.close(); win.width=1120; win.height=680; player.openLocation('$long_file',true)|+1200:'waveformRequest=' + controlBar.findControl('seek').contentItem.requestWaveform()|+4500:'waveformReady=' + controlBar.findControl('seek').contentItem.waveformReady|+150:grab:$ARTIFACTS/$genre.png|+100:Qt.quit()" 2>&1)"
+        "500:onboarding.close(); win.width=1120; win.height=680; player.openLocation('$file',true)|+1200:'waveformRequest=' + controlBar.findControl('seek').contentItem.requestWaveform()|+18000:'waveformReady=' + controlBar.findControl('seek').contentItem.waveformReady|+150:grab:$ARTIFACTS/$genre.png|+100:Qt.quit()" 2>&1)"
     printf '%s\n' "$output" | grep 'neo test:' || true
     if ! grep -q 'waveformRequest=true' <<<"$output" || ! grep -q 'waveformReady=true' <<<"$output"; then
         echo "FAIL $genre waveform did not become ready" >&2
@@ -44,12 +41,12 @@ run_sample() {
         echo "FAIL $genre waveform contrast percentile is $waveform_p95; expected clearly visible gray bars" >&2
         return 1
     fi
-    echo "PASS $genre one-minute waveform ready (${duration}s; contrast p95=$waveform_p95); screenshot: $ARTIFACTS/$genre.png"
+    echo "PASS $genre full-recording waveform ready (${duration}s; contrast p95=$waveform_p95); screenshot: $ARTIFACTS/$genre.png"
 }
 
-run_sample jazz "$HERE/tests/fixtures/waveform-jazz.ogg"
-run_sample classical "$HERE/tests/fixtures/waveform-classical.ogg"
-run_sample electronic "$HERE/tests/fixtures/waveform-electronic.ogg"
+run_sample jazz "$HERE/tests/fixtures/waveform-jazz-full.ogg"
+run_sample classical "$HERE/tests/fixtures/waveform-classical-full.ogg"
+run_sample electronic "$HERE/tests/fixtures/waveform-electronic-full.ogg"
 
 if [[ "${waveform_hashes[jazz]}" == "${waveform_hashes[classical]}" || \
       "${waveform_hashes[jazz]}" == "${waveform_hashes[electronic]}" || \
