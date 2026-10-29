@@ -28,7 +28,9 @@ Item {
     readonly property string fileLabel: {
         const path = player.mediaUrl.toString().split(/[?#]/)[0]
         const name = path.split("/").filter(part => part.length).slice(-1)[0] || ""
-        try { return decodeURIComponent(name) } catch (error) { return name }
+        let decoded = name
+        try { decoded = decodeURIComponent(name) } catch (error) {}
+        return decoded.replace(/\.[^.]+$/, "").replace(/_+/g, " ")
     }
 
     readonly property bool flexible: controlId === "seek" || controlId === "__timeline"

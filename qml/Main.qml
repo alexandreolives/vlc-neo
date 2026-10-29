@@ -145,6 +145,10 @@ ApplicationWindow {
     readonly property bool chromeShown: !overlayMode || topHot || bottomHot || popupsOpen
     readonly property bool topShown: !overlayMode || topHot || mainMenu.visible
     readonly property bool bottomShown: !libraryFullPage && (!overlayMode || bottomHot || tracksPopup.visible || contextMenu.visible)
+    readonly property bool splitTimelineActive: Theme.layoutList().includes("filename")
+                                                && player.hasMedia && player.hasVideo
+                                                && !onboarding.visible && navigationPage !== "home"
+                                                && !libraryFullPage
     readonly property bool sidePanelOpen: libraryOpen || musicSidebarOpen || folderSidebarOpen
     readonly property bool navigationShown: sidePanelOpen || libraryFullPage
                                            || (navigationPage === "home" && !sidePanelOpen)
@@ -960,7 +964,8 @@ ApplicationWindow {
                 const top = win.overlayMode && y < Theme.topHeight + 28
                 if (top) { win.topHot = true; topHide.stop() }
                 else if (win.topHot && !topHide.running) topHide.start()
-                const hot = win.overlayMode && y > win.height - Theme.barHeight - 44
+                const hot = win.overlayMode && y > win.height - Theme.barHeight
+                            - (win.splitTimelineActive ? splitTimeline.height : 0) - 44
                 if (hot) { win.bottomHot = true; bottomHide.stop() }
                 else if (win.bottomHot && !bottomHide.running) bottomHide.start()
             }
@@ -982,7 +987,7 @@ ApplicationWindow {
             anchors.bottomMargin: onboarding.themePreviewActive ? parent.height - controlBar.y
                                  : win.overlayMode || (onboarding.visible && onboarding.step === 2)
                                  || win.navigationPage === "home"
-                                 ? 0 : parent.height - controlBar.y
+                              ? 0 : parent.height - (win.splitTimelineActive ? splitTimeline.y : controlBar.y)
 
             RowLayout {
                 anchors.fill: parent
@@ -1213,6 +1218,8 @@ ApplicationWindow {
 
         ControlBar {
             id: controlBar
+            splitTimeline: win.splitTimelineActive
+            externalTimelineBar: win.splitTimelineActive ? splitTimeline : null
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.leftMargin: onboarding.themePreviewActive ? onboarding.themePreviewInset : 0
@@ -1230,6 +1237,21 @@ ApplicationWindow {
             Behavior on y { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             Behavior on opacity { NumberAnimation { duration: 140 } }
             onAction: (id, source) => win.run(id, source)
+        }
+
+        TimelineBar {
+            id: splitTimeline
+            parent: keyCatcher
+            x: 20
+            width: Math.max(0, parent.width - 40)
+            height: 34
+            wideDesktopLabels: true
+            z: 1
+            visible: win.splitTimelineActive && (!onboarding.visible || onboarding.themePreviewActive)
+            y: win.bottomShown ? controlBar.y - height : parent.height
+            opacity: win.bottomShown ? (win.overlayMode ? 0.96 : 1) : 0
+            Behavior on y { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 140 } }
         }
 
         NavigationRail {

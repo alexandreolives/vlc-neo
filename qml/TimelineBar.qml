@@ -12,6 +12,7 @@ Rectangle {
     property alias durationText: durationText
     property bool compact: width < 720
     property bool tiny: width < 400
+    property bool wideDesktopLabels: false
 
     color: "transparent"
     implicitWidth: tiny ? 48 : compact ? 150 : 250
@@ -25,7 +26,7 @@ Rectangle {
             id: elapsedText
             objectName: "timeline-elapsed"
             visible: !root.tiny
-            Layout.preferredWidth: root.compact ? 48 : 64
+            Layout.preferredWidth: root.compact ? 48 : root.wideDesktopLabels ? 78 : 64
             Layout.minimumWidth: Layout.preferredWidth
             Layout.alignment: Qt.AlignVCenter
             text: player.formatTime(player.time)
@@ -47,7 +48,7 @@ Rectangle {
             id: durationText
             objectName: "timeline-duration"
             visible: !root.tiny
-            Layout.preferredWidth: root.compact ? 48 : 64
+            Layout.preferredWidth: root.compact ? 48 : root.wideDesktopLabels ? 78 : 64
             Layout.minimumWidth: Layout.preferredWidth
             Layout.alignment: Qt.AlignVCenter
             text: player.formatTime(player.length)
