@@ -2232,7 +2232,8 @@ Modal {
                     VlcOption {
                         option: "sout-x264-preset"; kind: "choice"; fieldWidth: 240
                         label: "Encoding preset"
-                        choices: [{ label: "Automatic", value: "" }, { label: "Ultrafast", value: "ultrafast" }, { label: "Superfast", value: "superfast" },
+                        choiceDisplayAliases: ({ "": "medium" })
+                        choices: [{ label: "Ultrafast", value: "ultrafast" }, { label: "Superfast", value: "superfast" },
                                   { label: "Very fast", value: "veryfast" }, { label: "Faster", value: "faster" },
                                   { label: "Fast", value: "fast" }, { label: "Medium", value: "medium" },
                                   { label: "Slow", value: "slow" }, { label: "Slower", value: "slower" },

@@ -10,6 +10,7 @@ SettingRow {
     property string kind: "bool"          // bool | choice | text | number | color | slider | opacityToggle
     property string placeholderText: ""
     property var choices: []              // [{label, value}]
+    property var choiceDisplayAliases: ({}) // maps raw VLC values to equivalent display values
     property int fieldWidth: 160
     property string valueSuffix: ""
     property int minimumDecimalPlaces: 0
@@ -23,6 +24,11 @@ SettingRow {
     property real sliderMax: 100
     property real sliderStep: 1
     property var current: player.config(option)
+    readonly property var choiceDisplayValue: {
+        const key = String(current)
+        return Object.prototype.hasOwnProperty.call(choiceDisplayAliases, key)
+                ? choiceDisplayAliases[key] : current
+    }
     optionDescription: player.configDescription(option)
     readonly property string displayValue: {
         if (hideValueWhenDisabled && !enabled) return ""
@@ -124,7 +130,7 @@ SettingRow {
         NCombo {
             width: root.fieldWidth
             model: root.choices
-            current: root.current
+            current: root.choiceDisplayValue
             onPicked: (v) => root.save(v)
         }
     }
