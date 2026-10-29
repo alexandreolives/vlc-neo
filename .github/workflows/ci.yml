@@ -41,6 +41,8 @@ jobs:
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-mapping.sh"
       - name: Verify alternate VLC preference values survive relaunch
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-alternate-values.sh"
+      - name: Verify authenticated HTTP proxy playback
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_BUILD_DIR='$GITHUB_WORKSPACE/build' python3 scripts/test-http-authenticated-proxy.py"
       - name: Test VLC Web Remote on LAN address
         run: su tester -c "cd '$GITHUB_WORKSPACE' && python3 scripts/test-web-remote-lan.py"
       - name: Verify DLNA relay and DIAL-only discovery
@@ -101,6 +103,7 @@ jobs:
           ctest --test-dir build --output-on-failure --parallel 2
           bash scripts/test-preference-mapping.sh
           bash scripts/test-preference-alternate-values.sh
+          NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" python3 scripts/test-http-authenticated-proxy.py
           python3 scripts/test-web-remote-lan.py
           NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" python3 scripts/test-dlna-local-cast.py
           NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" bash scripts/test-vlc-video-filter-render.sh
