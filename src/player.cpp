@@ -531,6 +531,7 @@ QVariantList Player::tracks(const QString &category) const
 void Player::selectTrack(const QString &category, int id)
 {
     m_backend->selectTrack(category, id);
+    emit tracksChanged();
     if (category == QLatin1String("spu"))
         refreshSubtitleTimeline();
 }

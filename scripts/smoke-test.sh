@@ -1106,6 +1106,30 @@ if [[ "$mp4VideoBitrate" =~ ^[0-9]+$ ]] && (( mp4VideoBitrate > 1900000 )); then
     echo "PASS  High quality preset increased the encoded video bitrate to ${mp4VideoBitrate} b/s"; pass=$((pass + 1))
 else
     echo "FAIL  High quality preset produced an unexpected video bitrate: ${mp4VideoBitrate:-unavailable}"; fail=$((fail + 1)); fi
+out=$(run "900:'selectedSubtitle=' + (() => { const track=player.tracks('spu').find(item => item.id >= 0); if (!track) return -1; player.selectTrack('spu',track.id); return track.id })()|+250:'burnSubtitleAvailable=' + (convertDialog.hasSelectedSubtitles && convertDialog.selectedSubtitleTrackId >= 0)|+100:'plainConvertStarted=' + vlcTasks.convert(player.mediaUrl,platform.fileUrl('$WORK/convert-without-subtitles.mp4'),'mp4',2000,192,false)|+6500:'plainConvertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:convertDialog.open()|+300:convertDialog.format='mp4'; convertDialog.outputFile=platform.fileUrl('$WORK/convert-with-burned-subtitles.mp4')|+100:click-item:convert-burn-subtitles|+100:'burnSwitchEnabled=' + convertDialog.burnSubtitles|+100:click-item:convert-start|+6500:'burnConvertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:quit" "$WORK/recording-subtitle.mkv")
+check "the Convert dialog detects the selected embedded subtitle track" "$out" "burnSubtitleAvailable=true"
+check "MP4 conversion completes without burning the selected subtitles" "$out" "plainConvertDone=true"
+check "the Convert dialog toggles the burn-subtitles option" "$out" "burnSwitchEnabled=true"
+check "MP4 conversion burns the selected subtitle through VLC" "$out" "burnConvertDone=true"
+if [ -s "$WORK/convert-without-subtitles.mp4" ] && [ -s "$WORK/convert-with-burned-subtitles.mp4" ] \
+    && [ -z "$(ffprobe -v error -select_streams s -show_entries stream=index -of csv=p=0 "$WORK/convert-with-burned-subtitles.mp4" 2>/dev/null)" ] \
+    && python3 - "$WORK/convert-without-subtitles.mp4" "$WORK/convert-with-burned-subtitles.mp4" <<'PY'
+import subprocess
+import sys
+
+def frame(path):
+    return subprocess.check_output([
+        "ffmpeg", "-v", "error", "-i", path, "-ss", "10", "-frames:v", "1",
+        "-f", "rawvideo", "-pix_fmt", "rgb24", "-"
+    ])
+
+plain, burned = map(frame, sys.argv[1:])
+raise SystemExit(0 if plain and burned and plain != burned else 1)
+PY
+then
+    echo "PASS  burned subtitles alter MP4 video pixels without adding a separate subtitle stream"; pass=$((pass + 1))
+else
+    echo "FAIL  burned subtitle conversion did not alter the MP4 picture as expected"; fail=$((fail + 1)); fi
 out=$(run "1200:'started=' + vlcTasks.convert(platform.fileUrl('$WORK/convert-video.mkv'), platform.fileUrl('$WORK/converted.webm'), 'webm')|+9000:'convertDone=' + (!vlcTasks.busy && vlcTasks.status.startsWith('Conversion complete'))|+100:quit" "$WORK/audio-only.m4a")
 check "VLC transcodes video to VP8/Vorbis WebM" "$out" "convertDone=true"
 if [ -s "$WORK/converted.webm" ] && command -v ffprobe >/dev/null 2>&1 \

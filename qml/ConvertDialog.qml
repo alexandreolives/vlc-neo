@@ -15,6 +15,11 @@ Modal {
     property url outputFile
     property string errorText: ""
     property string quality: "balanced"
+    property bool burnSubtitles: false
+    readonly property url selectedSubtitleFile: player.activeSubtitleFile
+    readonly property int selectedSubtitleTrackId: player.activeSubtitleTrackId
+    readonly property bool hasSelectedSubtitles: selectedSubtitleFile.toString().length > 0
+                                                  || selectedSubtitleTrackId >= 0
     readonly property var qualityPresets: ({
         compact: { video: 800, audio: 96 },
         balanced: { video: 2000, audio: 192 },
@@ -48,6 +53,7 @@ Modal {
     onOpened: {
         format = "mp4"
         quality = profileQualityAvailable ? "vlc-profile" : "balanced"
+        burnSubtitles = false
         outputFile = ""
         errorText = ""
     }
@@ -66,6 +72,7 @@ Modal {
             current: root.format
             onPicked: (v) => {
                 root.format = v
+                if (v !== "mp4") root.burnSubtitles = false
                 root.outputFile = ""
                 root.errorText = ""
             }
@@ -79,6 +86,17 @@ Modal {
                 model: root.qualityOptions
                 current: root.quality
                 onPicked: (value) => root.quality = value
+            }
+        }
+        SettingRow {
+            visible: root.format === "mp4" && root.hasSelectedSubtitles
+            label: "Subtitles"
+            info: "Burn the selected subtitles into the picture. They will not be a separate selectable track."
+            NSwitch {
+                objectName: "convert-burn-subtitles"
+                accessibleName: "Burn selected subtitles into the video"
+                checked: root.burnSubtitles
+                onToggled: (value) => root.burnSubtitles = value
             }
         }
         NText {
@@ -133,7 +151,9 @@ Modal {
             onClicked: {
                 root.errorText = ""
                 if (!vlcTasks.convert(player.mediaUrl, root.outputFile, root.format,
-                                      root.videoBitrateKbps, root.audioBitrateKbps))
+                                      root.videoBitrateKbps, root.audioBitrateKbps,
+                                      root.burnSubtitles, root.selectedSubtitleFile,
+                                      root.selectedSubtitleTrackId))
                     root.errorText = vlcTasks.status
             }
         }

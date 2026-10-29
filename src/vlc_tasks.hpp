@@ -20,7 +20,9 @@ public:
     QString status() const { return m_status; }
 
     Q_INVOKABLE bool convert(const QUrl &source, const QUrl &destination, const QString &format,
-                             int videoBitrateKbps = 2000, int audioBitrateKbps = 192);
+                             int videoBitrateKbps = 2000, int audioBitrateKbps = 192,
+                             bool burnSubtitles = false, const QUrl &subtitleFile = {},
+                             int subtitleTrackId = -1);
     Q_INVOKABLE bool streamUdp(const QUrl &source, const QString &host, int port,
                                int videoBitrateKbps = 2000, int audioBitrateKbps = 192);
     Q_INVOKABLE bool streamTo(const QUrl &source, const QString &protocol,

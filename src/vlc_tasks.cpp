@@ -85,7 +85,8 @@ QString VlcTasks::quoteSout(const QString &value)
 }
 
 bool VlcTasks::convert(const QUrl &source, const QUrl &destination, const QString &format,
-                       int videoBitrateKbps, int audioBitrateKbps)
+                       int videoBitrateKbps, int audioBitrateKbps, bool burnSubtitles,
+                       const QUrl &subtitleFile, int subtitleTrackId)
 {
     const QString path = destination.toLocalFile();
     if (!destination.isLocalFile() || path.isEmpty()) {
@@ -96,6 +97,10 @@ bool VlcTasks::convert(const QUrl &source, const QUrl &destination, const QStrin
     const QString extension = QFileInfo(path).suffix().toLower();
     if (type != QLatin1String("mp4") && type != QLatin1String("mp3") && type != QLatin1String("webm")) {
         setStatus(tr("Choose MP4, MP3 or WebM"));
+        return false;
+    }
+    if (burnSubtitles && type != QLatin1String("mp4")) {
+        setStatus(tr("Subtitles can only be burned into MP4 video"));
         return false;
     }
     if (extension != type) {
@@ -125,13 +130,28 @@ bool VlcTasks::convert(const QUrl &source, const QUrl &destination, const QStrin
                         .arg(videoBitrateKbps).arg(audioBitrateKbps);
         mux = QStringLiteral("webm");
     } else {
-        transcode = QStringLiteral("vcodec=h264,vb=%1,acodec=mp4a,ab=%2")
-                        .arg(videoBitrateKbps).arg(audioBitrateKbps);
+        transcode = QStringLiteral("vcodec=h264,vb=%1,acodec=mp4a,ab=%2%3")
+                        .arg(videoBitrateKbps).arg(audioBitrateKbps)
+                        .arg(burnSubtitles ? QStringLiteral(",soverlay") : QString());
         mux = QStringLiteral("mp4");
     }
     const QString sout = QStringLiteral("#transcode{%1}:std{access=file,mux=%2,dst=%3}")
                              .arg(transcode, mux, quoteSout(path));
-    return start(source, sout, Mode::Convert, path);
+    QString subtitlePath;
+    int selectedSubtitleTrackId = -1;
+    if (burnSubtitles) {
+        const QFileInfo subtitleInfo(subtitleFile.toLocalFile());
+        if (subtitleFile.isLocalFile() && subtitleInfo.isFile())
+            subtitlePath = subtitleInfo.absoluteFilePath();
+        else if (subtitleTrackId >= 0)
+            selectedSubtitleTrackId = subtitleTrackId;
+        else {
+            setStatus(tr("Select a subtitle track before converting"));
+            return false;
+        }
+    }
+    return start(source, sout, Mode::Convert, path, {}, subtitlePath,
+                 selectedSubtitleTrackId, false);
 }
 
 bool VlcTasks::streamUdp(const QUrl &source, const QString &host, int port,

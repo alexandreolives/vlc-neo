@@ -46,7 +46,7 @@ class Player : public QObject
     Q_PROPERTY(bool presetActive READ presetActive NOTIFY presetChanged)
     Q_PROPERTY(QVariantList subtitleCues READ subtitleCues NOTIFY subtitleTimelineChanged)
     Q_PROPERTY(QUrl activeSubtitleFile READ activeSubtitleFile NOTIFY subtitleTimelineChanged)
-    Q_PROPERTY(int activeSubtitleTrackId READ activeSubtitleTrackId NOTIFY subtitleTimelineChanged)
+    Q_PROPERTY(int activeSubtitleTrackId READ activeSubtitleTrackId NOTIFY tracksChanged)
     Q_PROPERTY(QObject *queue READ queue CONSTANT)
     Q_PROPERTY(QVariantList addons READ addons NOTIFY addonsChanged)
     Q_PROPERTY(bool addonsLoading READ addonsLoading NOTIFY addonsLoadingChanged)
