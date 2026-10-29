@@ -57,7 +57,7 @@ grep -Fq "fileOrder=The_Wand_S01E05.mp4,The_Wand_S01E06.mp4,The_Wand_S01E07.mp4,
     exit 1
 }
 grep -Fq "customizeSidebarLayout=hideui,pip,foldername,filename,spacer,prev,play,next,spacer,volume,visualizer,subtitle,settings,queue,fullscreen/15/true/mode=dark/media=The Wand S01E11/filename=The Wand S01E11/titleVisible=false/splitTimeline=true/true/true/transportCenter=0/frame=1494x984" <<<"$output" || {
-    echo "FAIL: expected Figma's dark custom layout, split video-width timeline, centered transport and active E11 title" >&2
+    echo "FAIL: expected Figma's dark custom layout, full-width split timeline, centered transport and active E11 title" >&2
     exit 1
 }
 grep -Fq "rowGeometry=52/120" <<<"$output" || {
