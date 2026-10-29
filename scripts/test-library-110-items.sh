@@ -9,28 +9,30 @@ ARTIFACTS="${NEO_LIBRARY_OUTPUT_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/neo-library-ar
 mkdir -p "$WORK/show" "$ARTIFACTS"
 trap 'python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" "$WORK"' EXIT
 
-FIGMA_HOME="$HERE/tests/fixtures/figma-home"
+FIGMA_GRID="$HERE/tests/fixtures/figma-player-grid"
+(cd "$FIGMA_GRID" && sha256sum --check --quiet SHA256SUMS)
 mkdir -p "$WORK/posters" "$WORK/music" "$WORK/Films" "$WORK/Anime" "$WORK/Downloads"
-for episode in 05 06 07; do
+for episode in $(seq -w 1 15); do
     ffmpeg -loglevel error -y -loop 1 -framerate 12 \
-        -i "$FIGMA_HOME/the-wand-s01e$episode.png" -t 40 \
-        -vf "scale=320:180:force_original_aspect_ratio=increase,crop=320:180,format=yuv420p" \
+        -i "$FIGMA_GRID/s01e$episode.png" -t 40 \
+        -vf "format=yuv420p" \
         -an -c:v libx264 -preset ultrafast -tune stillimage \
         "$WORK/posters/The_Wand_S01E$episode.mp4"
 done
-ffmpeg -loglevel error -y -f lavfi -i 'color=c=black:s=320x180:r=12' \
-    -t 40 -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
-    "$WORK/posters/The_Wand_S01E08.mp4"
 ffmpeg -loglevel error -y -f lavfi -i 'sine=frequency=660:sample_rate=48000' -t 3 -c:a aac "$WORK/home-track.m4a"
-for number in $(seq 1 110); do
+visible_order=(05 06 07 08 09 10 11 12 13 14 15 01 02 03 04)
+for number in $(seq 16 110); do
     printf -v episode '%02d' "$number"
-    case $((number % 4)) in
-        1) poster=05 ;;
-        2) poster=06 ;;
-        3) poster=07 ;;
-        0) poster=08 ;;
-    esac
-    ln "$WORK/posters/The_Wand_S01E$poster.mp4" "$WORK/show/The_Wand_S01E$episode.mp4"
+    visible_order+=("$episode")
+done
+mtime_base="$(date +%s)"
+for index in "${!visible_order[@]}"; do
+    episode="${visible_order[$index]}"
+    number=$((10#$episode))
+    poster_number=$(((number - 1) % 15 + 1))
+    printf -v poster '%02d' "$poster_number"
+    cp "$WORK/posters/The_Wand_S01E$poster.mp4" "$WORK/show/The_Wand_S01E$episode.mp4"
+    touch -m -d "@$((mtime_base + index))" "$WORK/show/The_Wand_S01E$episode.mp4"
 done
 
 SANDBOX="$WORK/sandbox"
@@ -38,7 +40,7 @@ mkdir -p "$SANDBOX/config/vlc-neo"
 printf '[appearance]\nonboarded=true\n' > "$SANDBOX/config/vlc-neo/neo.conf"
 output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$SANDBOX" NEO_TIMEOUT=60 \
     "$HERE/scripts/run-offscreen.sh" \
-    "500:onboarding.close(); win.width=1920; win.height=1080; mediaLibrary.addFolder(platform.fileUrl('$WORK/show'))|+7000:'index=' + mediaLibrary.indexedCount + '/' + mediaLibrary.scanning|+100:mediaLibrary.model.view='videos'|+700:'videoView=' + mediaLibrary.model.itemCount() + '/' + mediaLibrary.model.loading|+100:player.openLocation('$WORK/show/The_Wand_S01E01.mp4',true)|+1200:win.navigate('videos'); libraryPanel.folder=platform.fileUrl('$WORK/show')|+350:'folderCount=' + libraryPanel.fileCount() + ' grid=' + libraryPanel.folderViewMode + ' mini=' + libraryPanel.miniPlayerItem.visible + ' rail=' + navigationRail.expandedRowCenters()|+100:libraryPanel.searchText='The_Wand_S01E110.mp4'|+200:'lastEpisodeSearch=' + libraryPanel.matchingFiles()|+100:libraryPanel.searchText=''|+500:'resetCount=' + libraryPanel.fileCount()|+6000:'visibleThumbnailReadyCount=' + (() => { let ready=0; for(let i=1;i<=15;i++){ const n='The_Wand_S01E'+String(i).padStart(2,'0')+'.mp4'; if(libraryPanel.videoThumbnailState(n)==='ready') ready++ } return ready })()|+100:'gridGeometry=' + libraryPanel.folderGridGeometry()|+100:'folderSearchGeometry=' + libraryPanel.folderToolbarSearchGeometry()|+100:'folderToolbarGeometry=' + libraryPanel.folderToolbarGeometry()|+100:click-item:library-folder-more-options|+100:'folderMoreMenu=' + sidePanelActionsMenu.visible + '/' + sidePanelActionsMenu.count|+100:sidePanelActionsMenu.close()|+150:grab:$ARTIFACTS/folder-browser-110-grid-1920.png|+100:libraryPanel.folderViewMode='list'|+500:'listCount=' + libraryPanel.fileCount() + ' mode=' + libraryPanel.folderViewMode|+6000:'listThumbnailReadyCount=' + (() => { let ready=0; for(let i=1;i<=15;i++){ const n='The_Wand_S01E'+String(i).padStart(2,'0')+'.mp4'; if(libraryPanel.videoThumbnailState(n)==='ready') ready++ } return ready })()|+100:'listThumbnailSummary=' + libraryPanel.visibleVideoThumbnailSummary()|+18000:'listThumbnailFinalSummary=' + libraryPanel.visibleVideoThumbnailSummary() + ' geometry=' + libraryPanel.folderListGeometry()|+150:grab:$ARTIFACTS/folder-browser-110-list-1920.png|+100:player.stop()|+200:win.navigate('home')|+200:homeView.videoItems=[{url:platform.fileUrl('$WORK/show/The_Wand_S01E05.mp4'),path:'$WORK/show/The_Wand_S01E05.mp4',title:'The_Wand_S01E05.mp4',point:2600,duration:40000,progress:0.065},{url:platform.fileUrl('$WORK/show/The_Wand_S01E06.mp4'),path:'$WORK/show/The_Wand_S01E06.mp4',title:'The_Wand_S01E06.mp4',point:200,duration:40000,progress:0.005},{url:platform.fileUrl('$WORK/show/The_Wand_S01E07.mp4'),path:'$WORK/show/The_Wand_S01E07.mp4',title:'The_Wand_S01E07.mp4',point:19400,duration:40000,progress:0.485},{url:platform.fileUrl('$WORK/show/The_Wand_S01E08.mp4'),path:'$WORK/show/The_Wand_S01E08.mp4',title:\"DON'T BLINK\",point:1000,duration:40000,progress:0.025}]; homeView.musicItems=[{title:'untangle',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/untangle.jpg'},{title:'moonlight',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/moonlight.png'},{title:'black bird',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/moonlight.png'}]; homeView.folderItems=[{path:'$WORK/show',title:'Shows'},{path:'$WORK/Films',title:'Films'},{path:'$WORK/Anime',title:'Anime'},{path:'$WORK/Downloads',title:'Downloads'}]; 'homeReview=' + mediaLibrary.indexedCount + '/' + homeView.videoItems.length + '/' + homeView.musicItems.length + '/' + homeView.folderItems.length|+10000:'homeThumbnailReady=' + [0,1,2,3].map(i => homeView.videoThumbnailReady(i)).join(',')|+100:move:1910,1070|+150:grab:$ARTIFACTS/home-full-layout-review.png|+100:Qt.quit()" 2>&1)"
+    "500:onboarding.close(); win.width=1920; win.height=1080; mediaLibrary.addFolder(platform.fileUrl('$WORK/show'))|+7000:'index=' + mediaLibrary.indexedCount + '/' + mediaLibrary.scanning|+100:mediaLibrary.model.view='videos'|+700:'videoView=' + mediaLibrary.model.itemCount() + '/' + mediaLibrary.model.loading|+100:player.openLocation('$WORK/show/The_Wand_S01E04.mp4',true)|+1200:win.navigate('videos'); libraryPanel.folder=platform.fileUrl('$WORK/show'); libraryPanel.sortBy='date'|+350:'folderCount=' + libraryPanel.fileCount() + ' grid=' + libraryPanel.folderViewMode + ' mini=' + libraryPanel.miniPlayerItem.visible + ' rail=' + navigationRail.expandedRowCenters()|+100:'folderVisualOrder=' + Array.from({length:15},(_,i)=>libraryPanel.folderListing.model.get(i,'fileName')).join(',')|+100:libraryPanel.searchText='The_Wand_S01E110.mp4'|+200:'lastEpisodeSearch=' + libraryPanel.matchingFiles()|+100:libraryPanel.searchText=''|+500:'resetCount=' + libraryPanel.fileCount()|+6000:'visibleThumbnailReadyCount=' + (() => { let ready=0; for(let i=1;i<=15;i++){ const n='The_Wand_S01E'+String(i).padStart(2,'0')+'.mp4'; if(libraryPanel.videoThumbnailState(n)==='ready') ready++ } return ready })()|+100:'gridGeometry=' + libraryPanel.folderGridGeometry()|+100:'folderSearchGeometry=' + libraryPanel.folderToolbarSearchGeometry()|+100:'folderToolbarGeometry=' + libraryPanel.folderToolbarGeometry()|+100:click-item:library-folder-more-options|+100:'folderMoreMenu=' + sidePanelActionsMenu.visible + '/' + sidePanelActionsMenu.count|+100:sidePanelActionsMenu.close()|+150:grab:$ARTIFACTS/folder-browser-110-grid-1920.png|+100:libraryPanel.folderViewMode='list'|+500:'listCount=' + libraryPanel.fileCount() + ' mode=' + libraryPanel.folderViewMode|+6000:'listThumbnailReadyCount=' + (() => { let ready=0; for(let i=1;i<=15;i++){ const n='The_Wand_S01E'+String(i).padStart(2,'0')+'.mp4'; if(libraryPanel.videoThumbnailState(n)==='ready') ready++ } return ready })()|+100:'listThumbnailSummary=' + libraryPanel.visibleVideoThumbnailSummary()|+18000:'listThumbnailFinalSummary=' + libraryPanel.visibleVideoThumbnailSummary() + ' geometry=' + libraryPanel.folderListGeometry()|+150:grab:$ARTIFACTS/folder-browser-110-list-1920.png|+100:player.stop()|+200:win.navigate('home')|+200:homeView.videoItems=[{url:platform.fileUrl('$WORK/show/The_Wand_S01E05.mp4'),path:'$WORK/show/The_Wand_S01E05.mp4',title:'The_Wand_S01E05.mp4',point:2600,duration:40000,progress:0.065},{url:platform.fileUrl('$WORK/show/The_Wand_S01E06.mp4'),path:'$WORK/show/The_Wand_S01E06.mp4',title:'The_Wand_S01E06.mp4',point:200,duration:40000,progress:0.005},{url:platform.fileUrl('$WORK/show/The_Wand_S01E07.mp4'),path:'$WORK/show/The_Wand_S01E07.mp4',title:'The_Wand_S01E07.mp4',point:19400,duration:40000,progress:0.485},{url:platform.fileUrl('$WORK/show/The_Wand_S01E08.mp4'),path:'$WORK/show/The_Wand_S01E08.mp4',title:\"DON'T BLINK\",point:1000,duration:40000,progress:0.025}]; homeView.musicItems=[{title:'untangle',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/untangle.jpg'},{title:'moonlight',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/moonlight.png'},{title:'black bird',artist:'juxtopposed',path:'$WORK/home-track.m4a',artwork:'$HERE/tests/fixtures/figma-home/moonlight.png'}]; homeView.folderItems=[{path:'$WORK/show',title:'Shows'},{path:'$WORK/Films',title:'Films'},{path:'$WORK/Anime',title:'Anime'},{path:'$WORK/Downloads',title:'Downloads'}]; 'homeReview=' + mediaLibrary.indexedCount + '/' + homeView.videoItems.length + '/' + homeView.musicItems.length + '/' + homeView.folderItems.length|+10000:'homeThumbnailReady=' + [0,1,2,3].map(i => homeView.videoThumbnailReady(i)).join(',')|+100:move:1910,1070|+150:grab:$ARTIFACTS/home-full-layout-review.png|+100:Qt.quit()" 2>&1)"
 printf '%s\n' "$output" | grep -E 'neo test(:| step failed)' || true
 python3 - "$SANDBOX/data" <<'PY'
 import sqlite3
@@ -63,6 +65,7 @@ if [[ ! -s "$ARTIFACTS/home-full-layout-review.png" ]]; then
     exit 1
 fi
 for expected in 'index=110/false' 'videoView=110/false' 'folderCount=110 grid=grid mini=true' \
+                'folderVisualOrder=The_Wand_S01E05.mp4,The_Wand_S01E06.mp4,The_Wand_S01E07.mp4,The_Wand_S01E08.mp4,The_Wand_S01E09.mp4,The_Wand_S01E10.mp4,The_Wand_S01E11.mp4,The_Wand_S01E12.mp4,The_Wand_S01E13.mp4,The_Wand_S01E14.mp4,The_Wand_S01E15.mp4,The_Wand_S01E01.mp4,The_Wand_S01E02.mp4,The_Wand_S01E03.mp4,The_Wand_S01E04.mp4' \
                 'gridGeometry=237/131/316/178/388/257' \
                 'folderSearchGeometry=1494/324' \
                 'folderMoreMenu=true/6' \

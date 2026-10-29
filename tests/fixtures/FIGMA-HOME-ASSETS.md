@@ -19,6 +19,18 @@ video fixtures and crops them to 16:9 to exercise VLC's real thumbnail path.
 The fourth Home card in the Figma reference is black, so its fixture remains a
 black frame. No source video or audio recording is included.
 
+## Player folder-grid video thumbnails
+
+`figma-player-grid/s01e01.png` through `s01e15.png` are crops of the first
+fifteen episode thumbnails shown in Figma node `970:4028`, exported from the
+1920×1080 frame at 4×. Each 316×178 thumbnail at `x=237+336*column`,
+`y=131+257*row` was resized to 320×180 for VLC's video-thumbnail path. These
+are the exact visible Figma stills, including the rounded card edges. The
+110-item browser test creates silent videos from these stills and cycles the
+fifteen images for the remaining episode names because the Figma reference
+shows only fifteen poster assets. `SHA256SUMS` pins the exact crops. They are
+test visuals, not source videos.
+
 ## Player folder-sidebar thumbnail fixtures
 
 `figma-player-sidebar/s01e01.png` through `s01e15.png` are 33 × 33 pixel crops
