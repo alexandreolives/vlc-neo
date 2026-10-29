@@ -30,7 +30,7 @@ Modal {
     ]
     readonly property var sourceChoices: [
         { label: "From Computer", value: "computer" },
-        { label: "Search OpenSubtitles", value: "opensubtitles" }
+        { label: "From OpenSubtitles", value: "opensubtitles" }
     ]
     readonly property var onlineLanguages: [
         { label: "Any language", value: "all" }, { label: "English", value: "en" },
@@ -90,7 +90,17 @@ Modal {
         onlineApplyError = ""
         onlineQuery = player.title.replace(/\.[^.]+$/, "")
         selectedOnlineFileId = 0
-        openSubtitles.search(onlineQuery, onlineLanguage, player.mediaUrl)
+        searchOpenSubtitles()
+    }
+    function scheduleOnlineSearch() {
+        onlineApplyError = ""
+        if (visible && sourceMode === "opensubtitles" && onlineQuery.trim().length)
+            onlineSearchTimer.restart()
+    }
+    function searchOpenSubtitles() {
+        onlineSearchTimer.stop()
+        if (onlineQuery.trim().length)
+            openSubtitles.search(onlineQuery, onlineLanguage, player.mediaUrl)
     }
     function toggleSubtitle(path) {
         const updated = selectedSubtitlePaths.slice()
@@ -113,6 +123,12 @@ Modal {
     onSourcePathChanged: {
         selectedSubtitlePaths = []
         refreshMatches()
+    }
+    Timer {
+        id: onlineSearchTimer
+        interval: 500
+        repeat: false
+        onTriggered: root.searchOpenSubtitles()
     }
     Connections {
         target: openSubtitles
@@ -173,42 +189,32 @@ Modal {
                 }
                 Accessible.name: "Subtitle source path"
             }
-        }
-
-        RowLayout {
-            visible: root.sourceMode === "opensubtitles"
-            Layout.fillWidth: true
-            spacing: 8
             NField {
                 id: onlineQueryField
+                objectName: "opensubtitles-query"
+                visible: root.sourceMode === "opensubtitles"
                 Layout.fillWidth: true
                 text: root.onlineQuery
                 placeholderText: "Movie or episode title"
                 onTextEdited: {
                     root.onlineQuery = text
-                    root.onlineApplyError = ""
+                    root.scheduleOnlineSearch()
                 }
-                onAccepted: {
-                    root.onlineApplyError = ""
-                    openSubtitles.search(root.onlineQuery, root.onlineLanguage, player.mediaUrl)
-                }
+                onAccepted: root.searchOpenSubtitles()
                 Accessible.name: "OpenSubtitles search"
             }
             NCombo {
-                Layout.preferredWidth: 145
+                id: onlineLanguageCombo
+                objectName: "opensubtitles-language"
+                visible: root.sourceMode === "opensubtitles"
+                Layout.preferredWidth: 180
                 model: root.onlineLanguages
                 current: root.onlineLanguage
-                onPicked: (value) => root.onlineLanguage = value
-                Accessible.name: "Subtitle language"
-            }
-            NButton {
-                text: openSubtitles.searching ? "Searching…" : "Search"
-                primary: true
-                enabledState: !openSubtitles.searching && root.onlineQuery.trim().length > 0
-                onClicked: {
-                    root.onlineApplyError = ""
-                    openSubtitles.search(root.onlineQuery, root.onlineLanguage, player.mediaUrl)
+                onPicked: (value) => {
+                    root.onlineLanguage = value
+                    root.scheduleOnlineSearch()
                 }
+                Accessible.name: "Subtitle language"
             }
         }
 

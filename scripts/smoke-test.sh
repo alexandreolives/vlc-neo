@@ -316,17 +316,22 @@ import pathlib
 import sys
 
 work = pathlib.Path(sys.argv[1])
-response = {"data": [{"attributes": {
-    "feature_details": {"movie_name": "Interstellar"},
-    "release": "Interstellar.2014.1080p.BluRay",
-    "language": "en",
-    "hearing_impaired": True,
-    "download_count": 1234,
-    "ratings": 9.2,
-    "moviehash_match": True,
-    "url": "https://www.opensubtitles.com/en/subtitles/987654",
-    "files": [{"file_id": 987654}]
-}}]}
+def result(release, file_id, exact_match, downloads):
+    return {"attributes": {
+        "feature_details": {"movie_name": "The_Wand_S01E01"},
+        "release": release,
+        "language": "en",
+        "hearing_impaired": False,
+        "download_count": downloads,
+        "ratings": 9.2,
+        "moviehash_match": exact_match,
+        "url": f"https://www.opensubtitles.com/en/subtitles/{file_id}",
+        "files": [{"file_id": file_id}]
+    }}
+response = {"data": [
+    result("The_Wand_S01E01_English.srt", 987654, True, 1234),
+    result("The_Wand_S01E01_EN.srt", 987655, False, 876)
+]}
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -352,10 +357,10 @@ for _ in {1..40}; do
 done
 if [ -s "$WORK/opensubtitles-port" ]; then
     opensubtitlesApi="http://127.0.0.1:$(cat "$WORK/opensubtitles-port")/api/v1/"
-    out=$(NEO_TEST_OPENSUBTITLES_API_URL="$opensubtitlesApi" run "1000:onboarding.close(); win.width=1080; win.height=832; player.openLocation('$E1',true)|+900:openSubtitles.setApiKey('local-smoke-key'); subtitleDialog.target='file'; subtitleDialog.open()|+250:subtitleDialog.onlineLanguage='en'; subtitleDialog.onlineSourceSelector.picked('opensubtitles')|+300:subtitleDialog.onlineQuery='Interstellar'; openSubtitles.search(subtitleDialog.onlineQuery,subtitleDialog.onlineLanguage,player.mediaUrl)|+800:'onlineSubtitleResults=' + openSubtitles.results.length + '/' + subtitleDialog.resultList.count + '/' + (subtitleDialog.resultList.itemAtIndex(0).displayTitle === 'Interstellar.2014.1080p.BluRay') + '/' + (subtitleDialog.resultList.itemAtIndex(0).modelData.movieHashMatch)|+100:grab:$WORK/opensubtitles-results.png|+100:move-item:opensubtitles-result-987654|+100:click-item:opensubtitles-result-987654|+100:'onlineSubtitleSelected=' + (subtitleDialog.selectedOnlineFileId === 987654 && subtitleDialog.resultList.itemAtIndex(0).onlineChosen)|+100:openSubtitles.clearApiKey()|+100:quit" "$E1")
+    out=$(NEO_TEST_OPENSUBTITLES_API_URL="$opensubtitlesApi" run "1000:onboarding.close(); win.width=1080; win.height=832; player.openLocation('$E1',true)|+900:openSubtitles.setApiKey('local-smoke-key'); subtitleDialog.target='file'; subtitleDialog.open()|+250:subtitleDialog.onlineLanguage='en'; subtitleDialog.onlineSourceSelector.picked('opensubtitles')|+300:subtitleDialog.onlineQuery='The_Wand S01E01'; openSubtitles.search(subtitleDialog.onlineQuery,subtitleDialog.onlineLanguage,player.mediaUrl)|+800:'onlineSubtitleResults=' + openSubtitles.results.length + '/' + subtitleDialog.resultList.count + '/' + (subtitleDialog.resultList.itemAtIndex(0).displayTitle === 'The_Wand_S01E01_English.srt') + '/' + (subtitleDialog.resultList.itemAtIndex(1).displayTitle === 'The_Wand_S01E01_EN.srt') + '/' + subtitleDialog.resultList.itemAtIndex(0).modelData.movieHashMatch + '/' + (() => { const pending=[subtitleDialog.contentItem]; let query=null, language=null; while(pending.length){ const item=pending.pop(); if(item.objectName==='opensubtitles-query') query=item; if(item.objectName==='opensubtitles-language') language=item; for(let i=0;i<(item.children?item.children.length:0);i++) pending.push(item.children[i]); } return !!query && !!language && query.parent===language.parent })()|+100:move-item:opensubtitles-result-987654|+100:click-item:opensubtitles-result-987654|+100:'onlineSubtitleSelected=' + (subtitleDialog.selectedOnlineFileId === 987654 && subtitleDialog.resultList.itemAtIndex(0).onlineChosen)|+100:grab:$WORK/opensubtitles-results.png|+100:openSubtitles.clearApiKey()|+100:quit" "$E1")
     kill "$opensubtitlesFixturePid" 2>/dev/null || true
     wait "$opensubtitlesFixturePid" 2>/dev/null || true
-    check "OpenSubtitles populated results render in the Figma-sized dialog" "$out" "onlineSubtitleResults=1/1/true/true"
+    check "OpenSubtitles populated results render in the Figma-sized dialog" "$out" "onlineSubtitleResults=2/2/true/true/true/true"
     check "the OpenSubtitles row selects its online file id for the current-file target" "$out" "onlineSubtitleSelected=true"
     if grep -qF "Api-Key: local-smoke-key" "$WORK/opensubtitles-request.txt"; then
         echo "PASS  local OpenSubtitles results request used the fixture API key"; pass=$((pass + 1))
