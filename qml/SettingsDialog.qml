@@ -1894,6 +1894,34 @@ Modal {
                                   { label: "Title with extra characters", value: 3 },
                                   { label: "Exact video name only", value: 4 }]
                     }
+                    SectionTitle { text: "Appearance"; Layout.topMargin: 8 }
+                    VlcOption { option: "freetype-font"; kind: "text"; fieldWidth: 310; label: "Font"; info: "Font family used to draw subtitles." }
+                    SettingRow {
+                        label: "Size values"
+                        info: "Choose a size relative to the video or a fixed pixel size."
+                        Chips {
+                            chipWidth: 153
+                            model: [{ label: "Relative", value: "relative" }, { label: "Pixels", value: "pixels" }]
+                            current: root.subtitleSizeMode
+                            onPicked: (value) => root.setSubtitleSizeMode(value)
+                        }
+                    }
+                    VlcOption {
+                        option: "freetype-rel-fontsize"; kind: "choice"; fieldWidth: 310; label: "Font size"; info: "Relative size scales with the video dimensions."
+                        visible: root.subtitleSizeMode === "relative"
+                        choices: [{ label: "Automatic", value: 0 }, { label: "Smaller", value: 20 }, { label: "Small", value: 18 },
+                                  { label: "Normal", value: 16 }, { label: "Large", value: 12 }, { label: "Larger", value: 6 }]
+                    }
+                    VlcOption { option: "freetype-bold"; label: "Bold"; info: "Use a heavier font weight for subtitle text." }
+                    VlcOption { option: "freetype-color"; kind: "color"; fieldWidth: 279; label: "Text color"; info: "Hexadecimal RGB color, for example #FFFFFF." }
+                    VlcOption { option: "freetype-opacity"; kind: "slider"; fieldWidth: 310; sliderMax: 255; showScale: true; label: "Text opacity"; info: "Adjust how transparent the subtitle text appears." }
+                    VlcOption {
+                        option: "freetype-outline-thickness"; kind: "choice"; fieldWidth: 310; label: "Outline thickness"; info: "A text outline can improve readability over bright video."; Layout.topMargin: 5
+                        choices: [{ label: "None", value: 0 }, { label: "Thin", value: 2 },
+                                  { label: "Normal", value: 4 }, { label: "Thick", value: 6 }]
+                    }
+                    VlcOption { option: "freetype-outline-color"; kind: "color"; fieldWidth: 279; label: "Outline color"; info: "Hexadecimal RGB color for the text outline." }
+                    VlcOption { option: "freetype-shadow-opacity"; kind: "opacityToggle"; sliderMax: 255; label: "Shadow"; info: "Turn the subtitle shadow on or off."; Layout.topMargin: -9 }
                     SectionTitle { text: "Online Subtitles"; Layout.topMargin: 11 }
                     SettingRow {
                         objectName: "opensubtitles-api-key-row"
@@ -1978,34 +2006,6 @@ Modal {
                             onClicked: Qt.openUrlExternally("https://www.opensubtitles.com/consumers")
                         }
                     }
-                    SectionTitle { text: "Appearance"; Layout.topMargin: 8 }
-                    VlcOption { option: "freetype-font"; kind: "text"; fieldWidth: 310; label: "Font"; info: "Font family used to draw subtitles." }
-                    SettingRow {
-                        label: "Size values"
-                        info: "Choose a size relative to the video or a fixed pixel size."
-                        Chips {
-                            chipWidth: 153
-                            model: [{ label: "Relative", value: "relative" }, { label: "Pixels", value: "pixels" }]
-                            current: root.subtitleSizeMode
-                            onPicked: (value) => root.setSubtitleSizeMode(value)
-                        }
-                    }
-                    VlcOption {
-                        option: "freetype-rel-fontsize"; kind: "choice"; fieldWidth: 310; label: "Font size"; info: "Relative size scales with the video dimensions."
-                        visible: root.subtitleSizeMode === "relative"
-                        choices: [{ label: "Automatic", value: 0 }, { label: "Smaller", value: 20 }, { label: "Small", value: 18 },
-                                  { label: "Normal", value: 16 }, { label: "Large", value: 12 }, { label: "Larger", value: 6 }]
-                    }
-                    VlcOption { option: "freetype-bold"; label: "Bold"; info: "Use a heavier font weight for subtitle text." }
-                    VlcOption { option: "freetype-color"; kind: "color"; fieldWidth: 279; label: "Text color"; info: "Hexadecimal RGB color, for example #FFFFFF." }
-                    VlcOption { option: "freetype-opacity"; kind: "slider"; fieldWidth: 310; sliderMax: 255; showScale: true; label: "Text opacity"; info: "Adjust how transparent the subtitle text appears." }
-                    VlcOption {
-                        option: "freetype-outline-thickness"; kind: "choice"; fieldWidth: 310; label: "Outline thickness"; info: "A text outline can improve readability over bright video."; Layout.topMargin: 5
-                        choices: [{ label: "None", value: 0 }, { label: "Thin", value: 2 },
-                                  { label: "Normal", value: 4 }, { label: "Thick", value: 6 }]
-                    }
-                    VlcOption { option: "freetype-outline-color"; kind: "color"; fieldWidth: 279; label: "Outline color"; info: "Hexadecimal RGB color for the text outline." }
-                    VlcOption { option: "freetype-shadow-opacity"; kind: "opacityToggle"; sliderMax: 255; label: "Shadow"; info: "Turn the subtitle shadow on or off."; Layout.topMargin: -9 }
                     SectionTitle { text: "Advanced"; advanced: true }
                     VlcOption { option: "freetype-fontsize"; kind: "number"; fieldWidth: 80; label: "Font size (px)"; visible: root.subtitleSizeMode === "pixels" }
                     VlcOption { option: "sub-margin"; kind: "number"; fieldWidth: 80; label: "Distance from the bottom (px)"; advanced: true }
