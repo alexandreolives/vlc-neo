@@ -374,6 +374,7 @@ Rectangle {
     }
     function matchingFiles() { return filteredCount }
     function fileCount() { return files.count }
+    function fileNameAt(index) { return index >= 0 && index < files.count ? files.get(index, "fileName") : "" }
     function extension(name) { return name.slice(name.lastIndexOf(".") + 1).toLowerCase() }
     function hasFileName(name) {
         for (let i = 0; i < files.count; ++i)
