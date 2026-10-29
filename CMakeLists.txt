@@ -197,7 +197,7 @@ if(BUILD_TESTING)
 
   add_executable(platform_pip_test tests/platform_pip_test.cpp src/platform.hpp)
   target_include_directories(platform_pip_test PRIVATE src)
-  target_link_libraries(platform_pip_test PRIVATE Qt6::Core Qt6::Gui)
+  target_link_libraries(platform_pip_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui)
   add_test(NAME platform_pip COMMAND platform_pip_test)
 
   add_executable(bounded_image_cache_test

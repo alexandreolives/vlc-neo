@@ -1896,17 +1896,19 @@ Modal {
                     }
                     SectionTitle { text: "Online Subtitles"; Layout.topMargin: 11 }
                     SettingRow {
+                        objectName: "opensubtitles-api-key-row"
+                        labelTopAligned: true
                         visible: root.width >= 800
                         label: "OpenSubtitles API key"
                         info: "Use your own free API key. VLC Neo stores it in your local app settings and sends it only to OpenSubtitles."
-                        RowLayout {
-                            spacing: 8
+                        ColumnLayout {
+                            spacing: 6
                             NField {
                                 id: openSubtitlesApiKeyInput
                                 objectName: "opensubtitles-api-key"
                                 Accessible.name: "OpenSubtitles API key"
                                 Layout.minimumWidth: 220
-                                Layout.preferredWidth: 280
+                                Layout.preferredWidth: 320
                                 Layout.fillWidth: true
                                 placeholderText: openSubtitles.apiKeyConfigured ? "Key saved" : "Paste your API key"
                                 echoMode: TextInput.Password
@@ -1915,23 +1917,28 @@ Modal {
                                     clear()
                                 }
                             }
-                            NButton {
-                                id: openSubtitlesApiKeySaveButton
-                                objectName: "opensubtitles-api-key-save"
-                                text: "Save"
-                                onClicked: {
-                                    openSubtitles.setApiKey(openSubtitlesApiKeyInput.text)
-                                    openSubtitlesApiKeyInput.clear()
+                            RowLayout {
+                                Layout.alignment: Qt.AlignRight
+                                spacing: 8
+                                NButton {
+                                    id: openSubtitlesApiKeySaveButton
+                                    objectName: "opensubtitles-api-key-save"
+                                    text: "Save key"
+                                    primary: true
+                                    onClicked: {
+                                        openSubtitles.setApiKey(openSubtitlesApiKeyInput.text)
+                                        openSubtitlesApiKeyInput.clear()
+                                    }
+                                    enabledState: openSubtitlesApiKeyInput.text.trim().length > 0
                                 }
-                                enabledState: openSubtitlesApiKeyInput.text.trim().length > 0
-                            }
-                            NButton {
-                                id: openSubtitlesApiKeyRemoveButton
-                                objectName: "opensubtitles-api-key-remove"
-                                text: "Remove"
-                                flat: true
-                                enabledState: openSubtitles.apiKeyConfigured
-                                onClicked: openSubtitles.clearApiKey()
+                                NButton {
+                                    id: openSubtitlesApiKeyRemoveButton
+                                    objectName: "opensubtitles-api-key-remove"
+                                    text: "Remove key"
+                                    flat: true
+                                    enabledState: openSubtitles.apiKeyConfigured
+                                    onClicked: openSubtitles.clearApiKey()
+                                }
                             }
                         }
                     }
@@ -1944,6 +1951,7 @@ Modal {
                         NField {
                             id: compactOpenSubtitlesApiKeyInput
                             objectName: "opensubtitles-api-key-compact"
+                            Accessible.name: "OpenSubtitles API key"
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                             placeholderText: openSubtitles.apiKeyConfigured ? "Key saved" : "Paste your API key"
@@ -1952,11 +1960,13 @@ Modal {
                         }
                         RowLayout {
                             NButton {
-                                text: "Save"
+                                objectName: "opensubtitles-api-key-save-compact"
+                                text: "Save key"
+                                primary: true
                                 enabledState: compactOpenSubtitlesApiKeyInput.text.trim().length > 0
                                 onClicked: { openSubtitles.setApiKey(compactOpenSubtitlesApiKeyInput.text); compactOpenSubtitlesApiKeyInput.clear() }
                             }
-                            NButton { text: "Remove"; flat: true; enabledState: openSubtitles.apiKeyConfigured; onClicked: openSubtitles.clearApiKey() }
+                            NButton { objectName: "opensubtitles-api-key-remove-compact"; text: "Remove key"; flat: true; enabledState: openSubtitles.apiKeyConfigured; onClicked: openSubtitles.clearApiKey() }
                         }
                     }
                     SettingRow {

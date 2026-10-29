@@ -9,6 +9,7 @@ RowLayout {
     property string label
     property string info
     property string optionDescription
+    property bool labelTopAligned: false
     readonly property string effectiveInfo: info.length ? info : optionDescription
     default property alias control: holder.data
     spacing: 8
@@ -19,6 +20,7 @@ RowLayout {
     Item {
         id: labelBox
         Layout.fillWidth: true
+        Layout.alignment: root.labelTopAligned ? Qt.AlignTop : Qt.AlignVCenter
         implicitHeight: 30
         NText {
             id: labelText
