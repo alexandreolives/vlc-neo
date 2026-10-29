@@ -20,6 +20,7 @@ Modal {
     property string onlineApplyError: ""
     property alias resultList: matchList
     property alias onlineSourceSelector: sourceModeCombo
+    property alias actionButton: saveActionButton
     property var matches: []
     property var candidateFiles: []
     property var selectedSubtitlePaths: []
@@ -379,9 +380,9 @@ Modal {
     footer: RowLayout {
         NButton { text: "Cancel"; flat: true; onClicked: root.close() }
         NButton {
-            text: root.sourceMode === "opensubtitles"
-                  ? openSubtitles.downloading ? "Downloading…" : "Download and add"
-                  : "Save"
+            id: saveActionButton
+            text: root.sourceMode === "opensubtitles" && openSubtitles.downloading
+                  ? "Downloading…" : "Save"
             primary: true
             enabledState: root.sourceMode === "opensubtitles"
                           ? root.selectedOnlineFileId > 0 && !openSubtitles.downloading
