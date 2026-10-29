@@ -29,7 +29,7 @@ convert -size 320x180 xc:'#e02010' -fill '#00e0f0' \
     -draw 'rectangle 180,50 290,150' -fill '#1020e0' \
     -draw 'rectangle 135,0 165,179' "$WORK/effect-pattern.png"
 ffmpeg -hide_banner -loglevel error -y -loop 1 -framerate 25 -i "$WORK/effect-pattern.png" \
-    -t 5 -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$WORK/effects.mkv"
+    -t 12 -an -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$WORK/effects.mkv"
 mkdir -p "$WORK/sandbox/config/vlc-neo"
 printf '[appearance]\nonboarded=true\n' > "$WORK/sandbox/config/vlc-neo/neo.conf"
 
@@ -120,7 +120,8 @@ printf '[appearance]\nonboarded=true\n' > "$WORK/effects-sandbox/config/vlc-neo/
 effects=(sepia invert posterize oldmovie gaussianblur sharpen vhs grain)
 actions="700:player.openLocation('$WORK/effects.mkv',true)|+1200:grab:$WORK/effect-original.png"
 for effect in "${effects[@]}"; do
-    actions+="|+100:player.setVideoFilterChain('$effect')|+250:grab:$WORK/effect-$effect.png"
+    # Give VLC time to apply each filter and render a fresh frame on slow CI.
+    actions+="|+100:player.setVideoFilterChain('$effect')|+500:grab:$WORK/effect-$effect.png"
 done
 actions+="|+100:quit"
 effect_output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$WORK/effects-sandbox" NEO_TIMEOUT=30 \
