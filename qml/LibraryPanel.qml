@@ -38,6 +38,10 @@ Rectangle {
     property alias compactFolderToolbar: compactFolderToolbarItem
     property alias folderListing: listing
     property alias folderActionsRow: folderActionsRowItem
+    readonly property bool figmaFolderHeaderControlsMatch: root.figmaSidePanel && root.compactFolderSidebar
+        && root.section === "folder" && sidepanelBackGeneric.visible && sidepanelForwardGeneric.visible
+        && genericSideMoreButton.visible && sidepanelOpenFullPage.visible
+        && !sidepanelCloseGeneric.visible && !compactFolderPinButton.visible
     property alias musicItemCountText: musicItemCountLabel.text
     property alias figmaMusicItemCountText: musicSidePanelCount.text
     property url folder: StandardPaths.writableLocation(StandardPaths.MoviesLocation)
@@ -113,6 +117,8 @@ Rectangle {
             return "Songs  ▸  " + [root.musicSideRootLabel(rootPath || currentPath)].concat(nestedPaths).join("  ▸  ")
         }
         if (win.navigationPage === "recent") return "Recent"
+        if (win.navigationPage === "folder" && root.section === "folder")
+            return root.crumbs().map(c => c.name).join("  ›  ")
         if (win.navigationPage === "videos") {
             const currentPath = platform.localPath(root.folder)
             const videosPath = platform.localPath(StandardPaths.writableLocation(StandardPaths.MoviesLocation))
@@ -159,6 +165,12 @@ Rectangle {
         if (win.navigationPage === "music" && (musicSideFolderRoot.length || root.section === "folder"
                                                  || mediaLibrary.model.grouped || musicSideHistory.length))
             return true
+        if (win.folderSidebarOpen && root.section === "folder") {
+            if (sideFolderHistory.length) return true
+            const currentPath = platform.localPath(root.folder)
+            const parentPath = platform.localPath(files.parentFolder)
+            return parentPath.length > 0 && parentPath !== currentPath
+        }
         return sideFolderHistory.length > 0 || win.sidePanelRouteHistory.length > 0
     }
     function goForwardFromSidePanel() {
@@ -227,6 +239,18 @@ Rectangle {
                 mediaLibrary.model.view = musicSidePage
             else
                 mediaLibrary.model.view = "tracks"
+            return
+        }
+        if (win.folderSidebarOpen && root.section === "folder" && !sideFolderHistory.length) {
+            const parentFolder = files.parentFolder
+            const currentPath = platform.localPath(root.folder)
+            const parentPath = platform.localPath(parentFolder)
+            if (parentPath.length && parentPath !== currentPath) {
+                sidePanelForwardHistory = sidePanelForwardHistory.concat([
+                    { kind: "folder", folder: root.folder, section: root.section, mediaType: root.mediaType }
+                ])
+                root.folder = parentFolder
+            }
             return
         }
         if (sideFolderHistory.length) {
@@ -505,6 +529,7 @@ Rectangle {
                 onClicked: win.goForward()
             }
             IconButton {
+                id: sidepanelBackGeneric
                 objectName: "sidepanel-back-generic"
                 icon: root.figmaSidePanel ? "arrow-left" : "chevron-left"
                 iconSize: root.figmaSidePanel ? 24 : 18
@@ -514,7 +539,7 @@ Rectangle {
                 enabled: root.figmaSidePanel ? root.canGoBackFromSidePanel() : root.section === "folder"
                 onClicked: root.figmaSidePanel ? root.goBackFromSidePanel() : root.openFolder(files.parentFolder)
             }
-            IconButton { objectName: "sidepanel-forward-generic"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
+            IconButton { id: sidepanelForwardGeneric; objectName: "sidepanel-forward-generic"; icon: "arrow-right"; iconSize: 24; iconOffsetX: -2; tip: "Forward"; visible: root.figmaSidePanel; enabled: root.canGoForwardFromSidePanel(); onClicked: root.goForwardFromSidePanel() }
             Chips {
                 visible: !root.wide
                 model: [{ label: "Home", value: "home" }, { label: "Browse", value: "folder" }, { label: "Recent", value: "recent" }]
@@ -592,8 +617,8 @@ Rectangle {
                 tip: "More options"
                 onClicked: root.showMoreOptions(folderMoreButton)
             }
-            IconButton { objectName: "sidepanel-open-full-page"; visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.expandLibrarySidePanel() }
-            IconButton { visible: !root.figmaSidePanel && !(root.wide && root.section === "folder" && !root.compactFolderSidebar); icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
+            IconButton { id: sidepanelOpenFullPage; objectName: "sidepanel-open-full-page"; visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.expandLibrarySidePanel() }
+            IconButton { id: sidepanelCloseGeneric; objectName: "sidepanel-close-generic"; visible: !root.figmaSidePanel && !(root.wide && root.section === "folder" && !root.compactFolderSidebar); icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
         }
 
         RowLayout {

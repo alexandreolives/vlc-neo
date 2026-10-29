@@ -727,6 +727,9 @@ ApplicationWindow {
                 libraryPanel.section = "folder"
                 libraryPanel.mediaType = "video"
                 libraryPanel.folder = currentMediaFolder()
+                libraryPanel.folderViewMode = "list"
+                libraryPanel.sideFolderHistory = []
+                libraryPanel.sidePanelForwardHistory = []
                 folderSidebarOpen = true
                 rightPanel = ""
             }
@@ -1007,7 +1010,8 @@ ApplicationWindow {
                     miniPlayerDockParent: win.miniPlayerDockedToQueue && win.libraryFullPage
                                             ? queuePanel : null
                     wide: true
-                    figmaSidePanel: win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist"
+                    figmaSidePanel: (win.libraryOpen && win.navigationPage !== "home" && win.navigationPage !== "playlist")
+                                    || win.folderSidebarOpen
                     compactMusicSidebar: (win.musicSidebarOpen && !win.libraryOpen)
                                          || (win.libraryOpen && win.navigationPage === "music")
                     compactFolderSidebar: win.folderSidebarOpen && !win.libraryOpen
