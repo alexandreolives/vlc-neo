@@ -87,10 +87,17 @@ Rectangle {
         videoEffectPreviewSecond = Math.max(0, Math.floor(player.time / 1000))
     }
     function videoEffectPreviewSource(effect) {
-        if (!player.hasVideo || !player.mediaUrl.toString().startsWith("file:")) return ""
-        const path = platform.localPath(player.mediaUrl)
-        if (!path.length) return ""
-        return "image://thumbnail/filter?path=" + encodeURIComponent(path)
+        if (!player.hasVideo) return ""
+        const mediaUrl = player.mediaUrl
+        const urlString = mediaUrl.toString()
+        let source = ""
+        if (urlString.startsWith("file:")) {
+            source = platform.localPath(mediaUrl)
+        } else if (urlString.startsWith("http://") || urlString.startsWith("https://")) {
+            source = urlString
+        }
+        if (!source.length) return ""
+        return "image://thumbnail/filter?path=" + encodeURIComponent(source)
                 + "&t=" + videoEffectPreviewSecond + "&effect=preview-set"
     }
     function videoEffectPreviewLoaded(effect) {

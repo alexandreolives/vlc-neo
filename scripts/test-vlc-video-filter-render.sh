@@ -92,10 +92,12 @@ mkdir -p "$WORK/http-sandbox/config/vlc-neo"
 printf '[appearance]\nonboarded=true\n' > "$WORK/http-sandbox/config/vlc-neo/neo.conf"
 http_output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$WORK/http-sandbox" NEO_TIMEOUT=15 \
     "$HERE/scripts/run-offscreen.sh" \
-    "700:networkDialog.open()|+150:networkDialog.sourceText='$HTTP_URL'|+150:networkDialog.go(true)|+1800:'httpPlayback=' + (player.hasVideo && player.state===2 && player.mediaUrl.toString()==='$HTTP_URL')|+100:grab:$WORK/http-playback.png|+100:quit" 2>&1)"
+    "700:networkDialog.open()|+150:networkDialog.sourceText='$HTTP_URL'|+150:networkDialog.go(true)|+1800:'httpPlayback=' + (player.hasVideo && player.state===2 && player.mediaUrl.toString()==='$HTTP_URL')|+100:grab:$WORK/http-playback.png|+100:sidePanel.tab='video';win.rightPanel='settings'|+1500:'httpEffectPreview=' + sidePanel.videoEffectPreviewLoaded('sepia')|+100:quit" 2>&1)"
 printf '%s\n' "$http_output" | grep 'neo test:' || true
-if ! grep -qF 'httpPlayback=true' <<<"$http_output"; then
-    echo "FAIL VLC did not play the HTTP video from the Network Stream dialog" >&2
+if ! grep -qF 'httpPlayback=true' <<<"$http_output" \
+    || ! grep -qF 'httpEffectPreview=true' <<<"$http_output"; then
+    printf '%s\n' "$http_output" >&2
+    echo "FAIL VLC did not play the HTTP video or decode its effect preview from the Network Stream dialog" >&2
     exit 1
 fi
 read -r http_r http_g http_b <<<"$(sample_rgb "$WORK/http-playback.png")"

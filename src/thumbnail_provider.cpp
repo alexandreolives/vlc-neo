@@ -14,6 +14,8 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QThreadPool>
+#include <QStringList>
+#include <QUrl>
 #include <QUrlQuery>
 #include <QtEndian>
 #include <QtConcurrent/QtConcurrentRun>
@@ -37,6 +39,16 @@ constexpr int kWaveformSampleRate = 8000;
 QString cacheKey(const QString &path, qint64 timeMs, qint64 durationSeconds,
                  const QString &effect, const QSize &size)
 {
+    const QUrl url(path);
+    const bool remote = url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https");
+    if (remote) {
+        return QStringLiteral("remote:%1\n%2")
+            .arg(url.toString(QUrl::FullyEncoded),
+                 durationSeconds > 0 ? QStringLiteral("wave:%1").arg(durationSeconds)
+                 : !effect.isEmpty() ? QStringLiteral("effect:%1:%2").arg(effect).arg(timeMs)
+                                     : QStringLiteral("frame:%1:%2x%3").arg(timeMs).arg(size.width())
+                                           .arg(size.height()));
+    }
     const QFileInfo file(path);
     return QStringLiteral("%1\n%2\n%3\n%4")
         .arg(file.canonicalFilePath(), QString::number(file.size()),
@@ -226,9 +238,15 @@ public:
             || (!waveform && timeMs < 0))
             return {};
 
+        const QUrl sourceUrl(path);
+        const bool remote = sourceUrl.isValid() && !sourceUrl.host().isEmpty()
+            && (sourceUrl.scheme() == QLatin1String("http") || sourceUrl.scheme() == QLatin1String("https"));
         const QFileInfo info(path);
-        if (!info.isFile() || !info.isReadable())
+        if (remote && waveform)
             return {};
+        if (!remote && (!info.isFile() || !info.isReadable()))
+            return {};
+        const QString inputSource = remote ? sourceUrl.toString(QUrl::FullyEncoded) : info.absoluteFilePath();
 
         QSize outputSize(kOutputWidth, kOutputHeight);
         if (durationSeconds <= 0 && effect.isEmpty() && requestedSize.isValid()
@@ -271,15 +289,18 @@ public:
             environment.remove(QStringLiteral("VLC_PLUGIN_PATH"));
             process.setProcessEnvironment(environment);
             process.setProgram(m_ffmpeg);
-            process.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"),
+            QStringList arguments{QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"),
                                   QStringLiteral("error"), QStringLiteral("-ss"),
-                                  QString::number(timeMs / 1000.0, 'f', 3),
-                                  QStringLiteral("-i"), info.absoluteFilePath(), QStringLiteral("-frames:v"),
-                                  QStringLiteral("1"), QStringLiteral("-vf"),
-                                  QStringLiteral("scale=%1:%2:force_original_aspect_ratio=decrease")
-                                      .arg(outputSize.width()).arg(outputSize.height()),
-                                  QStringLiteral("-f"), QStringLiteral("image2pipe"),
-                                  QStringLiteral("-vcodec"), QStringLiteral("mjpeg"), QStringLiteral("pipe:1")});
+                                  QString::number(timeMs / 1000.0, 'f', 3)};
+            if (remote)
+                arguments << QStringLiteral("-rw_timeout") << QStringLiteral("5000000");
+            arguments << QStringLiteral("-i") << inputSource << QStringLiteral("-frames:v")
+                      << QStringLiteral("1") << QStringLiteral("-vf")
+                      << QStringLiteral("scale=%1:%2:force_original_aspect_ratio=decrease")
+                             .arg(outputSize.width()).arg(outputSize.height())
+                      << QStringLiteral("-f") << QStringLiteral("image2pipe")
+                      << QStringLiteral("-vcodec") << QStringLiteral("mjpeg") << QStringLiteral("pipe:1");
+            process.setArguments(arguments);
             process.setProcessChannelMode(QProcess::SeparateChannels);
             process.start();
             if (process.waitForStarted(1500)) {
@@ -338,7 +359,7 @@ public:
                               QStringLiteral("--scene-format=jpg"),
                               QStringLiteral("--start-time=%1").arg(QString::number(timeMs / 1000.0, 'f', 3)),
                               QStringLiteral("--stop-time=%1").arg(QString::number((timeMs + 200) / 1000.0, 'f', 3)),
-                              QStringLiteral("--run-time=2"), info.absoluteFilePath()});
+                              QStringLiteral("--run-time=2"), inputSource});
         process.setProcessChannelMode(QProcess::SeparateChannels);
         process.start();
         if (!process.waitForStarted(1500))
