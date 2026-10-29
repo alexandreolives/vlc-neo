@@ -255,6 +255,10 @@ ApplicationWindow {
         }
         player.setFullscreenState(on)
     }
+    function syncPlaybackInhibition() {
+        platform.setPlaybackInhibition(player.playing, player.hasVideo,
+                                       !!player.config("disable-screensaver"))
+    }
     function applyFullscreenPreference() {
         if (player.hasMedia && !!player.config("fullscreen") && !fullscreen)
             setFullscreen(true)
@@ -842,12 +846,16 @@ ApplicationWindow {
     Connections {
         target: player
         function onNotify(message) { win.toast("", message) }
+        function onStateChanged() { win.syncPlaybackInhibition() }
+        function onTracksChanged() { win.syncPlaybackInhibition() }
+        function onConfigRevisionChanged() { win.syncPlaybackInhibition() }
         function onFullscreenRequested(fs) { win.setFullscreen(fs) }
         function onResumeAvailable(ms) {
             if (Theme.store.resumeMode === "always") player.resume()
             else if (Theme.store.resumeMode === "ask") resumePill.offer(ms)
         }
         function onMediaChanged() {
+            win.syncPlaybackInhibition()
             if (win.navigationPage === "home" && player.hasMedia) {
                 if (win.preserveHomeForMiniPlayerTrackChange)
                     miniPlayerNavigationReset.restart()
@@ -878,6 +886,7 @@ ApplicationWindow {
         }
     }
     Component.onCompleted: {
+        syncPlaybackInhibition()
         systemTray.setVisible(showSystemTray)
         Qt.callLater(() => checkForUpdates(false))
         if (Theme.store.rememberWindowGeometry && Theme.store.hasWindowGeometry && !Theme.store.compactAtStart) {

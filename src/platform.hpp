@@ -2,6 +2,10 @@
 #pragma once
 
 #include <QClipboard>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusInterface>
+#include <QDBusMessage>
 #include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -28,11 +32,96 @@ class Platform : public QObject
 public:
     using QObject::QObject;
 
+    ~Platform() override { setPlaybackInhibition(false, false, false); }
+
     bool hyprland() const { return qEnvironmentVariableIsSet("HYPRLAND_INSTANCE_SIGNATURE"); }
     QString applicationVersion() const { return QCoreApplication::applicationVersion(); }
     QString platformName() const { return QGuiApplication::platformName(); }
 
     Q_INVOKABLE QString clipboardText() const { return QGuiApplication::clipboard()->text().trimmed(); }
+
+    // Match VLC's inhibition policy: audio keeps the computer awake, while
+    // video can also inhibit display idle when the VLC preference allows it.
+    Q_INVOKABLE void setPlaybackInhibition(bool playing, bool hasVideo, bool disableScreensaver)
+    {
+        const QDBusConnection bus = QDBusConnection::sessionBus();
+        if (!bus.isConnected())
+            return;
+
+        const bool inhibitSuspend = playing;
+        const bool inhibitDisplay = playing && hasVideo && disableScreensaver;
+        const uint gnomeFlags = inhibitSuspend ? (4u | (inhibitDisplay ? 8u : 0u)) : 0u;
+
+        const auto cookieCall = [&bus](const QString &service, const QString &path,
+                                       const QString &interface, const QString &method,
+                                       const QVariantList &arguments) -> uint {
+            const auto *busInterface = bus.interface();
+            if (!busInterface || !busInterface->isServiceRegistered(service).value())
+                return 0;
+            QDBusInterface target(service, path, interface, bus);
+            const QDBusMessage reply = target.callWithArgumentList(QDBus::Block, method, arguments);
+            if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().isEmpty())
+                return 0;
+            return reply.arguments().constFirst().toUInt();
+        };
+        const auto releaseCookie = [&bus](const QString &service, const QString &path,
+                                          const QString &interface, const QString &method,
+                                          uint cookie) {
+            if (!cookie)
+                return;
+            const auto *busInterface = bus.interface();
+            if (!busInterface || !busInterface->isServiceRegistered(service).value())
+                return;
+            QDBusInterface target(service, path, interface, bus);
+            target.callWithArgumentList(QDBus::Block, method, {QVariant::fromValue(cookie)});
+        };
+
+        if (gnomeFlags != m_gnomeInhibitFlags) {
+            releaseCookie(QStringLiteral("org.gnome.SessionManager"),
+                          QStringLiteral("/org/gnome/SessionManager"),
+                          QStringLiteral("org.gnome.SessionManager"), QStringLiteral("Uninhibit"),
+                          m_gnomeInhibitCookie);
+            m_gnomeInhibitCookie = 0;
+            m_gnomeInhibitFlags = 0;
+            if (gnomeFlags) {
+                m_gnomeInhibitCookie = cookieCall(
+                    QStringLiteral("org.gnome.SessionManager"),
+                    QStringLiteral("/org/gnome/SessionManager"),
+                    QStringLiteral("org.gnome.SessionManager"), QStringLiteral("Inhibit"),
+                    {QStringLiteral("org.VideoLAN.VLC"), 0u,
+                     QStringLiteral("Playing media"), gnomeFlags});
+                if (m_gnomeInhibitCookie)
+                    m_gnomeInhibitFlags = gnomeFlags;
+            }
+        }
+
+        if (inhibitDisplay && !m_screenSaverInhibitCookie) {
+            m_screenSaverInhibitCookie = cookieCall(
+                QStringLiteral("org.freedesktop.ScreenSaver"), QStringLiteral("/ScreenSaver"),
+                QStringLiteral("org.freedesktop.ScreenSaver"), QStringLiteral("Inhibit"),
+                {QStringLiteral("VLC Neo"), QStringLiteral("Playing video")});
+        } else if (!inhibitDisplay && m_screenSaverInhibitCookie) {
+            releaseCookie(QStringLiteral("org.freedesktop.ScreenSaver"), QStringLiteral("/ScreenSaver"),
+                          QStringLiteral("org.freedesktop.ScreenSaver"), QStringLiteral("UnInhibit"),
+                          m_screenSaverInhibitCookie);
+            m_screenSaverInhibitCookie = 0;
+        }
+
+        if (inhibitSuspend && !m_kdeInhibitCookie) {
+            const QString reason = QStringLiteral("Media playback");
+            m_kdeInhibitCookie = cookieCall(
+                QStringLiteral("org.freedesktop.PowerManagement"),
+                QStringLiteral("/org/freedesktop/PowerManagement/Inhibit"),
+                QStringLiteral("org.freedesktop.PowerManagement.Inhibit"), QStringLiteral("Inhibit"),
+                {QStringLiteral("VLC Neo"), reason});
+        } else if (!inhibitSuspend && m_kdeInhibitCookie) {
+            releaseCookie(QStringLiteral("org.freedesktop.PowerManagement"),
+                          QStringLiteral("/org/freedesktop/PowerManagement/Inhibit"),
+                          QStringLiteral("org.freedesktop.PowerManagement.Inhibit"), QStringLiteral("UnInhibit"),
+                          m_kdeInhibitCookie);
+            m_kdeInhibitCookie = 0;
+        }
+    }
 
     Q_INVOKABLE QVariantList fullscreenScreenChoices() const
     {
@@ -179,6 +268,10 @@ public:
     Q_INVOKABLE QUrl fileUrl(const QString &path) const { return QUrl::fromLocalFile(path); }
 
 private:
+    uint m_gnomeInhibitCookie = 0;
+    uint m_gnomeInhibitFlags = 0;
+    uint m_screenSaverInhibitCookie = 0;
+    uint m_kdeInhibitCookie = 0;
     bool m_hyprlandPipStateCaptured = false;
     bool m_hyprlandWasFloating = false;
     bool m_hyprlandWasPinned = false;
