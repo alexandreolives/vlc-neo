@@ -9,6 +9,7 @@ Modal {
     id: root
     signal topEdgeHoverChanged(bool hovered)
     property alias chromeLayer: onboardingChromeLayer
+    property alias accentPickerControl: accentPicker
     closable: false
     bodyMargin: 0
     width: parent ? parent.width : 1090

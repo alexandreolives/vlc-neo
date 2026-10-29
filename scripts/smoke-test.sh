@@ -476,6 +476,9 @@ check "Developer mode controls VLC verbose logging and log paths stay editable" 
 check "advanced global controls map warning, extra-interface, log-format and statistics options to VLC" "$out" "globalAdvancedOptions=true"
 if [ -s "$WORK/settings-global.png" ]; then echo "PASS  global settings screenshot written"; pass=$((pass + 1))
 else echo "FAIL  global settings screenshot missing"; fail=$((fail + 1)); fi
+out=$(run "500:settingsDialog.open(); settingsDialog.page='general'|+200:'settingsAccentSquares=' + Theme.accents.every(color => { const suffix=color.slice(1), swatch=settingsDialog.preferenceControl('accent-swatch-settings-'+suffix), outline=settingsDialog.preferenceControl('accent-outline-settings-'+suffix); return swatch && outline && swatch.radius===3 && outline.radius===3 }) + '/' + Theme.accents.length|+100:'onboardingAccentsRemainRound=' + Theme.accents.every(color => { const swatch=onboarding.accentPickerControl.swatchForColor(color); return swatch && Math.abs(swatch.radius-swatch.width/2)<0.1 })|+100:quit")
+check "General settings use square Figma accent swatches" "$out" "settingsAccentSquares=true/9"
+check "onboarding accent swatches remain circular" "$out" "onboardingAccentsRemainRound=true"
 out=$(run "1000:Theme.store.mode='dark'; 'darkHoverToken=' + Theme.hover + '/' + (Theme.hover !== Theme.surface)|+100:Theme.store.mode='light'; 'lightHoverToken=' + Theme.hover + '/' + (Theme.hover !== Theme.surface)|+100:quit" "$E1")
 check "dark buttons use a distinct Figma hover color" "$out" "darkHoverToken=#191919/true"
 check "light buttons use a distinct Figma hover color" "$out" "lightHoverToken=#b3b3b3/true"

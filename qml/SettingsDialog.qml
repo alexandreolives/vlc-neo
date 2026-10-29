@@ -891,7 +891,7 @@ Modal {
                     SettingRow {
                         label: "Accent color"
                         info: "Replaces VLC orange everywhere in the interface."
-                        AccentPicker { compact: true; spacing: 10 }
+                        AccentPicker { compact: true; square: true; spacing: 10 }
                     }
                     SectionTitle { text: "Startup" }
                     VlcOption { option: "qt-error-dialogs"; label: "Show confirmation and error dialogs"; info: "Let VLC display confirmation and error dialogs." }
