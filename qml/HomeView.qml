@@ -159,7 +159,7 @@ Rectangle {
             if (supportedVideo.indexOf(extension) < 0) continue
             const resume = player.resumePointFor(url)
             const duration = player.resumeDurationFor(url)
-            videos.push({ url: url, path: path, title: decodeURIComponent(name), point: resume,
+            videos.push({ url: url, path: path, title: name, point: resume,
                           duration: duration, progress: duration > 0 ? Math.min(1, resume / duration) : 0 })
         }
         if (sortByName) videos.sort((a, b) => a.title.localeCompare(b.title))
