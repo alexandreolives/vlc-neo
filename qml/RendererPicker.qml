@@ -45,8 +45,11 @@ ColumnLayout {
             Layout.fillWidth: true
             implicitHeight: 54
             padding: 9
+            enabled: modelData.available !== false
+            opacity: modelData.available === false ? 0.62 : 1
             activeFocusOnTab: true
             Accessible.name: modelData.name + ", " + modelData.protocol
+                               + (modelData.available === false ? ", direct playback unavailable" : "")
             onClicked: root.selected(modelData.id)
 
             background: Rectangle {
@@ -65,9 +68,11 @@ ColumnLayout {
                     spacing: 2
                     NText { Layout.fillWidth: true; text: modelData.name; font.weight: Font.Medium }
                     NText {
-                        text: modelData.protocol + (modelData.selected && modelData.status.length ? " · " + modelData.status : "")
+                        text: modelData.protocol + (modelData.status.length ? " · " + modelData.status : "")
                         dim: true
                         font.pixelSize: 10
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
                 }
                 Icon {

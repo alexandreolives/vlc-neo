@@ -59,6 +59,11 @@ struct DlnaRenderer {
     QUrl renderingControl;
 };
 
+struct DialDevice {
+    QString id;
+    QString name;
+};
+
 QHash<QString, QString> soapFields(const QByteArray &xml)
 {
     QHash<QString, QString> fields;
@@ -1047,7 +1052,7 @@ public:
     {
         QMutexLocker locker(&m_rendererMutex);
         QVariantList devices;
-        devices.reserve(m_renderers.size() + m_dlnaRenderers.size());
+        devices.reserve(m_renderers.size() + m_dlnaRenderers.size() + m_dialDevices.size());
         for (auto it = m_renderers.cbegin(); it != m_renderers.cend(); ++it) {
             devices.append(QVariantMap{
                 {QStringLiteral("id"), it.key()},
@@ -1068,6 +1073,16 @@ public:
                     : m_remoteInputState.state == 0 ? QStringLiteral("Stopped")
                     : QStringLiteral("Connecting")},
                 {QStringLiteral("selected"), it.key() == m_activeDlnaId}
+            });
+        }
+        for (auto it = m_dialDevices.cbegin(); it != m_dialDevices.cend(); ++it) {
+            devices.append(QVariantMap{
+                {QStringLiteral("id"), it.key()},
+                {QStringLiteral("name"), it->name},
+                {QStringLiteral("protocol"), QStringLiteral("DIAL")},
+                {QStringLiteral("status"), QStringLiteral("App launch only · no direct VLC playback")},
+                {QStringLiteral("selected"), false},
+                {QStringLiteral("available"), false}
             });
         }
         std::sort(devices.begin(), devices.end(), [](const QVariant &a, const QVariant &b) {
@@ -1093,7 +1108,10 @@ public:
                     else
                         ++it;
                 }
+                m_dialDevices.clear();
             }
+            m_dlnaLocations.clear();
+            emit rendererDevicesChanged();
             QList<vlc_renderer_discovery_t *> discoveries;
             discoveries.swap(m_rendererDiscoveries);
             for (vlc_renderer_discovery_t *discovery : discoveries)
@@ -1392,6 +1410,7 @@ private:
         QXmlStreamReader xml(description);
         QString name, udn, baseUrl, serviceType, controlPath;
         QUrl avTransport, renderingControl;
+        bool hasDialService = false;
         bool inService = false;
         while (!xml.atEnd()) {
             xml.readNext();
@@ -1419,16 +1438,30 @@ private:
                     avTransport = control;
                 else if (serviceType.contains(QStringLiteral(":RenderingControl:")))
                     renderingControl = control;
+                else if (serviceType.contains(QStringLiteral(":dial:1"), Qt::CaseInsensitive))
+                    hasDialService = true;
                 inService = false;
             }
         }
-        if (xml.hasError() || udn.isEmpty() || !avTransport.isValid())
+        if (xml.hasError() || udn.isEmpty())
             return;
         if (name.isEmpty() || name.compare(QStringLiteral("hisens"), Qt::CaseInsensitive) == 0)
             name = QStringLiteral("Hisense TV");
+        if (!avTransport.isValid()) {
+            if (!hasDialService)
+                return;
+            const QString id = QStringLiteral("dial:") + udn;
+            {
+                QMutexLocker locker(&m_rendererMutex);
+                m_dialDevices.insert(id, DialDevice{id, name});
+            }
+            emit rendererDevicesChanged();
+            return;
+        }
         const QString id = QStringLiteral("dlna:") + udn;
         {
             QMutexLocker locker(&m_rendererMutex);
+            m_dialDevices.remove(QStringLiteral("dial:") + udn);
             m_dlnaRenderers.insert(id, DlnaRenderer{id, udn, name, avTransport, renderingControl});
         }
         emit rendererDevicesChanged();
@@ -1913,6 +1946,7 @@ private:
     mutable QMutex m_rendererMutex;
     QHash<QString, vlc_renderer_item_t *> m_renderers;
     QHash<QString, DlnaRenderer> m_dlnaRenderers;
+    QHash<QString, DialDevice> m_dialDevices;
     QSet<QString> m_dlnaLocations;
     QNetworkAccessManager *m_network = nullptr;
     LocalMediaHttpServer *m_localMediaServer = nullptr;

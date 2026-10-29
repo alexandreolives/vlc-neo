@@ -61,6 +61,7 @@ class FakeRenderer:
         self.http_thread.start()
         self.http_port = self.http.server_address[1]
         self.location = f"http://{interface}:{self.http_port}/device.xml"
+        self.dial_location = f"http://{interface}:{self.http_port}/dial.xml"
         self.ssdp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.ssdp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
@@ -92,6 +93,20 @@ class FakeRenderer:
                 self.wfile.write(body)
 
             def do_GET(self):
+                if self.path == "/dial.xml":
+                    body = b'''<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <device><deviceType>urn:schemas-upnp-org:device:tvdevice:1</deviceType>
+    <friendlyName>Neo Integration DIAL TV</friendlyName><UDN>uuid:neo-integration-test-dial</UDN>
+    <serviceList><service>
+      <serviceType>urn:dial-multiscreen-org:service:dial:1</serviceType>
+      <serviceId>urn:dial-multiscreen-org:serviceId:dial</serviceId>
+      <controlURL>/apps</controlURL>
+    </service></serviceList>
+  </device>
+</root>'''
+                    self._send(200, body)
+                    return
                 if self.path != "/device.xml":
                     self._send(404, b"", "text/plain")
                     return
@@ -173,7 +188,8 @@ class FakeRenderer:
                 return
             if b"M-SEARCH" not in packet or b"ssdp:discover" not in packet.lower():
                 continue
-            response = (
+            responses = (
+                (
                 "HTTP/1.1 200 OK\r\n"
                 "CACHE-CONTROL: max-age=120\r\n"
                 "EXT:\r\n"
@@ -181,8 +197,19 @@ class FakeRenderer:
                 "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
                 "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n"
                 "USN: uuid:neo-integration-test-renderer::urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n"
-            ).encode()
-            self.ssdp.sendto(response, source)
+                ),
+                (
+                "HTTP/1.1 200 OK\r\n"
+                "CACHE-CONTROL: max-age=120\r\n"
+                "EXT:\r\n"
+                f"LOCATION: {self.dial_location}\r\n"
+                "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
+                "ST: urn:dial-multiscreen-org:service:dial:1\r\n"
+                "USN: uuid:neo-integration-test-dial::urn:dial-multiscreen-org:service:dial:1\r\n\r\n"
+                ),
+            )
+            for response in responses:
+                self.ssdp.sendto(response.encode(), source)
 
     def _fetch_media(self, uri: str):
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -240,6 +267,8 @@ def main() -> int:
             "|+1400:'localMediaReady=' + (player.hasVideo && String(player.mediaUrl).includes('local-cast-fixture.mp4'))"
             "|+200:castDialog.open()"
             "|+2200:'fakeRendererVisible=' + player.rendererDevices.some(device => device.name === 'Neo Integration Test TV')"
+            "|+100:'fakeDialVisible=' + player.rendererDevices.some(device => device.id === 'dial:uuid:neo-integration-test-dial' && device.protocol === 'DIAL')"
+            "|+100:'dialHasNoDirectPlayback=' + (() => { const d=player.rendererDevices.find(device => device.id === 'dial:uuid:neo-integration-test-dial'); return !!d && d.available === false && !d.selected })()"
             "|+100:'fakeRendererSelected=' + (() => { const d=player.rendererDevices.find(device => device.name === 'Neo Integration Test TV'); return !!d && player.setRenderer(d.id) })()"
             "|+1400:'remoteVideoPlaying=' + (player.playing && player.hasVideo)"
             "|+100:player.seek(0.5)"
@@ -250,6 +279,10 @@ def main() -> int:
             "|+500:'remoteResumed=' + player.playing"
             "|+100:player.setRenderer('')"
             "|+300:'rendererDisconnected=' + !player.rendererDevices.some(device => device.selected)"
+            "|+100:castDialog.close()"
+            "|+100:castDialog.open()"
+            "|+700:'dialRediscoveredAfterDialogReopen=' + player.rendererDevices.some(device => device.id === 'dial:uuid:neo-integration-test-dial')"
+            "|+100:castDialog.close()"
             "|+100:quit"
         )
         environment = os.environ.copy()
@@ -285,12 +318,15 @@ def main() -> int:
         required_output = (
             "localMediaReady=true",
             "fakeRendererVisible=true",
+            "fakeDialVisible=true",
+            "dialHasNoDirectPlayback=true",
             "fakeRendererSelected=true",
             "remoteVideoPlaying=true",
             "remoteSeekState=true",
             "remotePaused=true",
             "remoteResumed=true",
             "rendererDisconnected=true",
+            "dialRediscoveredAfterDialogReopen=true",
         )
         failures.extend(label for label in required_output if label not in output)
         expected_action_counts = {
