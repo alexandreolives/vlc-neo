@@ -413,6 +413,11 @@ Rectangle {
         const position = librarySearch.mapToItem(win.contentItem, 0, 0)
         return Math.round(position.x) + "/" + Math.round(librarySearch.width)
     }
+    function folderToolbarGeometry() {
+        const x = (item) => Math.round(item.mapToItem(win.contentItem, 0, 0).x)
+        return [x(folderItemCountLabel), x(folderSortButton), x(folderViewToggleButton),
+                x(librarySearch), x(folderAddMediaButton), x(folderMoreButton)].join("/")
+    }
     function videoProgress(name) {
         for (let i = 0; i < files.count; ++i) {
             if (files.get(i, "fileName") !== name) continue
@@ -473,7 +478,8 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: root.figmaSidePanel ? 0 : (root.compactFolderSidebar ? 12 : (root.wide && root.section === "folder" ? 8 : 0))
             Layout.leftMargin: root.figmaSidePanel ? 18 : 8
-            Layout.rightMargin: root.figmaSidePanel ? 17 : 8
+            Layout.rightMargin: root.figmaSidePanel ? 17
+                              : (root.section === "folder" && root.wide && root.width >= 1400 && !root.compactFolderSidebar ? 22 : 8)
             Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
             spacing: root.figmaSidePanel ? 6 : 2
             IconButton {
@@ -524,14 +530,16 @@ Rectangle {
                 Layout.fillWidth: true
             }
             Item { Layout.fillWidth: true }
-            NText { visible: root.wide && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
+            NText { id: folderItemCountLabel; visible: root.wide && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel; text: root.matchingFiles() + " items"; dim: true; font.pixelSize: 11 }
             NText { id: musicItemCountLabel; visible: root.wide && root.section === "music" && !root.figmaSidePanel; text: mediaLibrary.model.count + " items" + (mediaLibrary.scanning ? " · Indexing…" : ""); dim: true; font.pixelSize: 11 }
             IconButton { objectName: "library-index-folder"; visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "folder"; tip: "Add folder to library"; onClicked: root.indexFolder() }
             IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "refresh"; tip: "Rescan library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.refresh() }
             IconButton { visible: root.wide && root.section === "music" && !root.compactMusicSidebar; icon: "trash-2"; tip: "Clear indexed library"; enabled: !mediaLibrary.scanning; onClicked: mediaLibrary.clearLibrary() }
             IconButton {
+                id: folderSortButton
                 icon: "arrow-up"; tip: "Sort: " + root.sortBy
                 visible: root.section !== "music" && !root.compactFolderSidebar && !root.figmaSidePanel
+                Layout.leftMargin: root.section === "folder" && root.wide && root.width >= 1400 ? 16 : 0
                 onClicked: root.sortBy = root.sortBy === "name" ? "date" : (root.sortBy === "date" ? "size" : "name")
             }
             IconButton {
@@ -541,6 +549,7 @@ Rectangle {
                 icon: root.folderViewMode === "grid" ? "list" : "grid"
                 tip: root.folderViewMode === "grid" ? "List view" : "Grid view"
                 Accessible.name: tip
+                Layout.leftMargin: root.width >= 1400 ? 16 : 0
                 onClicked: root.folderViewMode = root.folderViewMode === "grid" ? "list" : "grid"
             }
             NField {
@@ -549,16 +558,22 @@ Rectangle {
                                        || (root.compactMusicSidebar && root.musicSearchOpen)
                                        || (root.compactFolderSidebar && root.folderSearchOpen))
                 objectName: "library-search"
+                Layout.leftMargin: root.section === "folder" && root.wide && root.width >= 1400 && !root.compactFolderSidebar ? 16 : 0
                 Layout.preferredWidth: root.compactFolderSidebar ? 105
                                      : (root.compactMusicSidebar ? 125
-                                        : (root.section === "folder" ? 324 : 190))
+                                        : (root.section === "folder" ? (root.width >= 1400 ? 324 : 190) : 190))
                 text: root.section === "music" ? mediaLibrary.model.search : root.searchText
                 placeholderText: "Search"
                 onTextEdited: root.section === "music" ? musicSearchTimer.restart() : (root.searchText = text)
             }
+            Item {
+                visible: root.wide && root.width >= 1400 && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel
+                Layout.preferredWidth: 14
+                Layout.preferredHeight: 1
+            }
             IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && !root.musicSearchOpen; icon: "search"; tip: "Search songs"; onClicked: root.musicSearchOpen = true }
             IconButton { visible: root.compactMusicSidebar && !root.figmaSidePanel && root.musicSearchOpen; icon: "x"; tip: "Close search"; onClicked: { root.musicSearchOpen = false; mediaLibrary.model.search = "" } }
-            IconButton { visible: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
+            IconButton { id: folderAddMediaButton; visible: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel; icon: "plus"; tip: "Add media"; onClicked: root.openFiles() }
             IconButton {
                 id: genericSideMoreButton
                 objectName: "sidepanel-more-button-generic"
@@ -567,8 +582,16 @@ Rectangle {
                 tip: "More options"
                 onClicked: root.showMoreOptions(genericSideMoreButton)
             }
+            IconButton {
+                id: folderMoreButton
+                objectName: "library-folder-more-options"
+                visible: root.wide && root.section === "folder" && !root.compactFolderSidebar && !root.figmaSidePanel
+                icon: "more"
+                tip: "More options"
+                onClicked: root.showMoreOptions(folderMoreButton)
+            }
             IconButton { objectName: "sidepanel-open-full-page"; visible: root.figmaSidePanel; icon: "open"; tip: "Open full page"; onClicked: win.expandLibrarySidePanel() }
-            IconButton { visible: !root.figmaSidePanel; icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
+            IconButton { visible: !root.figmaSidePanel && !(root.wide && root.section === "folder" && !root.compactFolderSidebar); icon: "x"; tip: "Close side panel"; onClicked: win.closeSidePanel() }
         }
 
         RowLayout {
