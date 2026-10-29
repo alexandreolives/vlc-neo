@@ -132,8 +132,6 @@ void Player::onBackendInputChanged()
         m_lastActiveLengthMs = 0;
     }
     saveResumePoint();
-    const QString equalizer = m_stateStore.equalizerPreset();
-    m_backend->setEqualizerEnabled(equalizer, !equalizer.isEmpty() && equalizer != QLatin1String("off"));
     m_presetPending = true;
     m_subsLinkedApplied = false;
     m_linkedSubtitleFile.clear();

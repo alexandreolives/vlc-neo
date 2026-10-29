@@ -35,10 +35,14 @@ run_capture() {
     output="$(NEO_BUILD_DIR="$BUILD_DIR" NEO_SANDBOX="$sandbox" \
         NEO_TEST_AOUT=afile NEO_TIMEOUT=15 \
         "$HERE/scripts/run-offscreen.sh" \
-        "700:player.setConfig('audiofile-file','$output_file'); player.setConfig('audiofile-format','s16'); player.setEqualizerPreset('flat'); player.setConfig('equalizer-preamp',$preamp); player.openLocation('$WORK/tone.wav',true)|+1000:'equalizerCapture=' + player.equalizerPreset() + '/' + player.config('equalizer-preamp') + '/' + (player.state===2)|+1400:quit" 2>&1)"
+        "700:player.setConfig('audiofile-file','$output_file'); player.setConfig('audiofile-format','s16'); player.setEqualizerPreset('flat'); player.setConfig('equalizer-preamp',$preamp); player.openLocation('$WORK/tone.wav',true)|+1000:'equalizerCapture=' + player.equalizerPreset() + '/' + player.config('equalizer-preamp') + '/' + (player.state===2)|+100:player.openLocation('$WORK/tone.wav',true)|+1200:'equalizerRestartCapture=' + player.equalizerPreset() + '/' + player.config('equalizer-preamp') + '/' + (player.state===2)|+100:quit" 2>&1)"
     printf '%s\n' "$output" | grep 'neo test:' || true
     if ! grep -qF "equalizerCapture=flat/$preamp/true" <<<"$output"; then
         echo "FAIL VLC did not start the requested equalizer capture" >&2
+        return 1
+    fi
+    if ! grep -qF "equalizerRestartCapture=flat/$preamp/true" <<<"$output"; then
+        echo "FAIL VLC did not preserve the selected equalizer when opening another input" >&2
         return 1
     fi
     if [ ! -s "$output_file" ]; then
