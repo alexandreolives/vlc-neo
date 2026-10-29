@@ -309,6 +309,13 @@ check "folder subtitle matches use the Figma column layout and file path" "$out"
 if [ -s "$WORK/subtitle-folder-figma.png" ]; then echo "PASS  Figma folder-match screenshot written"; pass=$((pass + 1))
 else echo "FAIL  Figma folder-match screenshot missing"; fail=$((fail + 1)); fi
 echo "== OpenSubtitles populated results"
+mkdir -p "$NEO_SANDBOX/data/vlc-neo/neo/Subtitles/OpenSubtitles"
+cat >"$NEO_SANDBOX/data/vlc-neo/neo/Subtitles/OpenSubtitles/opensubtitles-987654.srt" <<'SRT'
+1
+00:00:00,000 --> 00:00:30,000
+VLC Neo OpenSubtitles activation fixture
+
+SRT
 python3 - "$WORK" >"$WORK/opensubtitles-fixture.log" 2>&1 <<'PY' &
 import http.server
 import json
@@ -359,11 +366,12 @@ for _ in {1..40}; do
 done
 if [ -s "$WORK/opensubtitles-port" ]; then
     opensubtitlesApi="http://127.0.0.1:$(cat "$WORK/opensubtitles-port")/api/v1/"
-    out=$(NEO_TEST_OPENSUBTITLES_API_URL="$opensubtitlesApi" run "1000:onboarding.close(); win.width=1080; win.height=832; player.openLocation('$E1',true)|+900:openSubtitles.setApiKey('local-smoke-key'); subtitleDialog.target='file'; subtitleDialog.open()|+250:subtitleDialog.onlineLanguage='en'; subtitleDialog.onlineSourceSelector.picked('opensubtitles')|+300:subtitleDialog.onlineQuery='The_Wand'; subtitleDialog.scheduleOnlineSearch()|+200:subtitleDialog.onlineQuery='The_Wand S01E01'; subtitleDialog.scheduleOnlineSearch()|+650:'onlineSubtitleResults=' + openSubtitles.results.length + '/' + subtitleDialog.resultList.count + '/' + (subtitleDialog.resultList.itemAtIndex(0).displayTitle === 'The_Wand_S01E01_English.srt') + '/' + (subtitleDialog.resultList.itemAtIndex(1).displayTitle === 'The_Wand_S01E01_EN.srt') + '/' + subtitleDialog.resultList.itemAtIndex(0).modelData.movieHashMatch + '/' + (() => { const pending=[subtitleDialog.contentItem]; let query=null, language=null; while(pending.length){ const item=pending.pop(); if(item.objectName==='opensubtitles-query') query=item; if(item.objectName==='opensubtitles-language') language=item; for(let i=0;i<(item.children?item.children.length:0);i++) pending.push(item.children[i]); } return !!query && !!language && query.parent===language.parent })()|+100:move-item:opensubtitles-result-987654|+100:click-item:opensubtitles-result-987654|+100:'onlineSubtitleSelected=' + (subtitleDialog.selectedOnlineFileId === 987654 && subtitleDialog.resultList.itemAtIndex(0).onlineChosen)|+100:grab:$WORK/opensubtitles-results.png|+100:openSubtitles.clearApiKey()|+100:quit" "$E1")
+    out=$(NEO_TEST_OPENSUBTITLES_API_URL="$opensubtitlesApi" run "1000:onboarding.close(); win.width=1080; win.height=832; player.openLocation('$E1',true)|+900:openSubtitles.setApiKey('local-smoke-key'); subtitleDialog.target='file'; subtitleDialog.open()|+250:subtitleDialog.onlineLanguage='en'; subtitleDialog.onlineSourceSelector.picked('opensubtitles')|+300:subtitleDialog.onlineQuery='The_Wand'; subtitleDialog.scheduleOnlineSearch()|+200:subtitleDialog.onlineQuery='The_Wand S01E01'; subtitleDialog.scheduleOnlineSearch()|+650:'onlineSubtitleResults=' + openSubtitles.results.length + '/' + subtitleDialog.resultList.count + '/' + (subtitleDialog.resultList.itemAtIndex(0).displayTitle === 'The_Wand_S01E01_English.srt') + '/' + (subtitleDialog.resultList.itemAtIndex(1).displayTitle === 'The_Wand_S01E01_EN.srt') + '/' + subtitleDialog.resultList.itemAtIndex(0).modelData.movieHashMatch + '/' + (() => { const pending=[subtitleDialog.contentItem]; let query=null, language=null; while(pending.length){ const item=pending.pop(); if(item.objectName==='opensubtitles-query') query=item; if(item.objectName==='opensubtitles-language') language=item; for(let i=0;i<(item.children?item.children.length:0);i++) pending.push(item.children[i]); } return !!query && !!language && query.parent===language.parent })()|+100:move-item:opensubtitles-result-987654|+100:click-item:opensubtitles-result-987654|+100:'onlineSubtitleSelected=' + (subtitleDialog.selectedOnlineFileId === 987654 && subtitleDialog.resultList.itemAtIndex(0).onlineChosen)|+100:grab:$WORK/opensubtitles-results.png|+100:openSubtitles.download(987654)|+900:'onlineSubtitleApplied=' + (!subtitleDialog.visible && player.tracks('spu').some(track => track.selected))|+100:openSubtitles.clearApiKey()|+100:quit" "$E1")
     kill "$opensubtitlesFixturePid" 2>/dev/null || true
     wait "$opensubtitlesFixturePid" 2>/dev/null || true
     check "OpenSubtitles populated results render in the Figma-sized dialog" "$out" "onlineSubtitleResults=2/2/true/true/true/true"
     check "the OpenSubtitles row selects its online file id for the current-file target" "$out" "onlineSubtitleSelected=true"
+    check "a downloaded OpenSubtitles result loads as a selected track in VLC" "$out" "onlineSubtitleApplied=true"
     if grep -qF "Api-Key: local-smoke-key" "$WORK/opensubtitles-request.txt"; then
         echo "PASS  local OpenSubtitles results request used the fixture API key"; pass=$((pass + 1))
     else echo "FAIL  local OpenSubtitles results request used the fixture API key"; fail=$((fail + 1)); fi
