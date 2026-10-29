@@ -2,6 +2,15 @@
 # Verify VLC's equalizer changes real decoded audio, not only saved settings.
 set -euo pipefail
 
+if [[ "${NEO_EQUALIZER_TEST_PRIVATE_DBUS:-}" != "1" ]]; then
+    if ! command -v dbus-run-session >/dev/null 2>&1; then
+        echo "dbus-run-session is required to isolate the VLC audio output test." >&2
+        exit 2
+    fi
+    export NEO_EQUALIZER_TEST_PRIVATE_DBUS=1
+    exec dbus-run-session -- "$0" "$@"
+fi
+
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${NEO_BUILD_DIR:-$HERE/build}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/neo-audio-equalizer.XXXXXX")"
