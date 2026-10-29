@@ -76,22 +76,44 @@ public:
             target.callWithArgumentList(QDBus::Block, method, {QVariant::fromValue(cookie)});
         };
 
-        if (gnomeFlags != m_gnomeInhibitFlags) {
-            releaseCookie(QStringLiteral("org.gnome.SessionManager"),
-                          QStringLiteral("/org/gnome/SessionManager"),
-                          QStringLiteral("org.gnome.SessionManager"), QStringLiteral("Uninhibit"),
-                          m_gnomeInhibitCookie);
-            m_gnomeInhibitCookie = 0;
-            m_gnomeInhibitFlags = 0;
-            if (gnomeFlags) {
-                m_gnomeInhibitCookie = cookieCall(
-                    QStringLiteral("org.gnome.SessionManager"),
-                    QStringLiteral("/org/gnome/SessionManager"),
-                    QStringLiteral("org.gnome.SessionManager"), QStringLiteral("Inhibit"),
+        QString sessionManagerService;
+        QString sessionManagerPath;
+        QString sessionManagerInterface;
+        const auto *busInterface = bus.interface();
+        if (busInterface
+            && busInterface->isServiceRegistered(QStringLiteral("org.gnome.SessionManager")).value()) {
+            sessionManagerService = QStringLiteral("org.gnome.SessionManager");
+            sessionManagerPath = QStringLiteral("/org/gnome/SessionManager");
+            sessionManagerInterface = QStringLiteral("org.gnome.SessionManager");
+        } else if (busInterface
+                   && busInterface->isServiceRegistered(QStringLiteral("org.mate.SessionManager")).value()) {
+            // VLC's D-Bus inhibitor supports MATE's session manager as well as GNOME.
+            sessionManagerService = QStringLiteral("org.mate.SessionManager");
+            sessionManagerPath = QStringLiteral("/org/mate/SessionManager");
+            sessionManagerInterface = QStringLiteral("org.mate.SessionManager");
+        }
+
+        if (gnomeFlags != m_sessionManagerInhibitFlags
+            || sessionManagerService != m_sessionManagerService) {
+            releaseCookie(m_sessionManagerService, m_sessionManagerPath, m_sessionManagerInterface,
+                          QStringLiteral("Uninhibit"), m_sessionManagerInhibitCookie);
+            m_sessionManagerInhibitCookie = 0;
+            m_sessionManagerInhibitFlags = 0;
+            m_sessionManagerService.clear();
+            m_sessionManagerPath.clear();
+            m_sessionManagerInterface.clear();
+            if (gnomeFlags && !sessionManagerService.isEmpty()) {
+                m_sessionManagerInhibitCookie = cookieCall(
+                    sessionManagerService, sessionManagerPath, sessionManagerInterface,
+                    QStringLiteral("Inhibit"),
                     {QStringLiteral("org.VideoLAN.VLC"), 0u,
                      QStringLiteral("Playing media"), gnomeFlags});
-                if (m_gnomeInhibitCookie)
-                    m_gnomeInhibitFlags = gnomeFlags;
+                if (m_sessionManagerInhibitCookie) {
+                    m_sessionManagerInhibitFlags = gnomeFlags;
+                    m_sessionManagerService = sessionManagerService;
+                    m_sessionManagerPath = sessionManagerPath;
+                    m_sessionManagerInterface = sessionManagerInterface;
+                }
             }
         }
 
@@ -268,8 +290,11 @@ public:
     Q_INVOKABLE QUrl fileUrl(const QString &path) const { return QUrl::fromLocalFile(path); }
 
 private:
-    uint m_gnomeInhibitCookie = 0;
-    uint m_gnomeInhibitFlags = 0;
+    uint m_sessionManagerInhibitCookie = 0;
+    uint m_sessionManagerInhibitFlags = 0;
+    QString m_sessionManagerService;
+    QString m_sessionManagerPath;
+    QString m_sessionManagerInterface;
     uint m_screenSaverInhibitCookie = 0;
     uint m_kdeInhibitCookie = 0;
     bool m_hyprlandPipStateCaptured = false;
