@@ -6,7 +6,6 @@ from __future__ import annotations
 import base64
 import os
 import pathlib
-import re
 import socket
 import subprocess
 import tempfile
@@ -21,16 +20,17 @@ PASSWORD = "vlc-neo-lan-test"
 
 
 def lan_ipv4() -> str:
-    route = subprocess.run(
-        ["ip", "-o", "-4", "route", "get", "1.1.1.1"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    match = re.search(r"\bsrc\s+(\d+\.\d+\.\d+\.\d+)", route.stdout)
-    if match:
-        return match.group(1)
-    raise RuntimeError("No IPv4 address is available on the default network route")
+    # UDP connect only asks the kernel which source address it would route from;
+    # it does not send a packet to the external address.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route_probe:
+            route_probe.connect(("1.1.1.1", 80))
+            address = route_probe.getsockname()[0]
+    except OSError as error:
+        raise RuntimeError("No IPv4 address is available on the default network route") from error
+    if not address or address == "0.0.0.0":
+        raise RuntimeError("No IPv4 address is available on the default network route")
+    return address
 
 
 def request(opener: urllib.request.OpenerDirector, url: str, password: str | None) -> tuple[int, bytes]:
