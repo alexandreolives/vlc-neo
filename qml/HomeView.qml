@@ -23,6 +23,7 @@ Rectangle {
     property alias miniPlayerTransportControls: homeMiniPlayerTransportControls
     property alias miniPlayerQueueButton: homeMiniPlayerQueueButton
     property alias miniPlayerTitle: homeMiniPlayerTitle
+    property alias fullPageSearchField: homeFullPageSearch
     property Item miniPlayerDockParent: null
     property real savedMiniPlayerDragOffsetX: 0
     property real savedMiniPlayerDragOffsetY: 0
@@ -716,8 +717,9 @@ Rectangle {
                 IconButton { objectName: "home-sort"; icon: "sort"; tip: root.sortByName ? "Sort by recent" : "Sort by name"; onClicked: { root.sortByName = !root.sortByName; root.refreshContent() } }
                 IconButton { objectName: "home-view"; icon: root.compactCards ? "list" : "grid"; tip: root.compactCards ? "Use comfortable cards" : "Use compact cards"; checked: root.compactCards; onClicked: root.compactCards = !root.compactCards }
                 NField {
+                    id: homeFullPageSearch
                     objectName: "home-search"
-                    Layout.preferredWidth: Math.min(230, pageScroll.availableWidth * 0.22)
+                    Layout.preferredWidth: Math.min(324, pageScroll.availableWidth * 0.22)
                     placeholderText: "Search"
                     text: root.searchText
                     onTextEdited: { root.searchText = text; root.refreshContent() }
