@@ -1111,6 +1111,7 @@ public:
                 m_dialDevices.clear();
             }
             m_dlnaLocations.clear();
+            m_dialLocations.clear();
             emit rendererDevicesChanged();
             QList<vlc_renderer_discovery_t *> discoveries;
             discoveries.swap(m_rendererDiscoveries);
@@ -1364,13 +1365,21 @@ private:
     {
         if (!m_ssdpSocket || m_ssdpSocket->state() != QAbstractSocket::BoundState)
             return;
-        static const QByteArray search =
+        static const QByteArray searchAll =
             "M-SEARCH * HTTP/1.1\r\n"
             "HOST: 239.255.255.250:1900\r\n"
             "MAN: \"ssdp:discover\"\r\n"
             "MX: 2\r\n"
             "ST: ssdp:all\r\n\r\n";
-        m_ssdpSocket->writeDatagram(search, QHostAddress(QStringLiteral("239.255.255.250")), 1900);
+        static const QByteArray searchDial =
+            "M-SEARCH * HTTP/1.1\r\n"
+            "HOST: 239.255.255.250:1900\r\n"
+            "MAN: \"ssdp:discover\"\r\n"
+            "MX: 2\r\n"
+            "ST: urn:dial-multiscreen-org:service:dial:1\r\n\r\n";
+        const QHostAddress discoveryGroup(QStringLiteral("239.255.255.250"));
+        m_ssdpSocket->writeDatagram(searchAll, discoveryGroup, 1900);
+        m_ssdpSocket->writeDatagram(searchDial, discoveryGroup, 1900);
     }
 
     void readSsdpResponses()
@@ -1380,37 +1389,47 @@ private:
             datagram.resize(qsizetype(m_ssdpSocket->pendingDatagramSize()));
             m_ssdpSocket->readDatagram(datagram.data(), datagram.size());
             const QList<QByteArray> lines = datagram.split('\n');
+            QUrl location;
+            QByteArray searchTarget;
             for (const QByteArray &line : lines) {
                 const QByteArray trimmed = line.trimmed();
-                if (trimmed.left(9).compare("LOCATION:", Qt::CaseInsensitive) != 0)
-                    continue;
-                const QUrl location(QString::fromUtf8(trimmed.mid(9).trimmed()));
-                if (!location.isValid() || location.scheme() != QLatin1String("http"))
-                    continue;
-                const QString key = location.toString(QUrl::FullyEncoded);
-                if (m_dlnaLocations.contains(key))
-                    continue;
-                m_dlnaLocations.insert(key);
-                QNetworkReply *reply = m_network->get(QNetworkRequest(location));
-                connect(reply, &QNetworkReply::finished, this, [this, reply, location] {
-                    const QByteArray payload = reply->readAll();
-                    const bool success = reply->error() == QNetworkReply::NoError;
-                    reply->deleteLater();
-                    if (!success)
-                        return;
-                    parseDlnaDescription(location, payload);
-                });
-                break;
+                if (trimmed.left(9).compare("LOCATION:", Qt::CaseInsensitive) == 0)
+                    location = QUrl(QString::fromUtf8(trimmed.mid(9).trimmed()));
+                else if (trimmed.left(3).compare("ST:", Qt::CaseInsensitive) == 0)
+                    searchTarget = trimmed.mid(3).trimmed();
             }
+            if (!location.isValid() || location.scheme() != QLatin1String("http"))
+                continue;
+            const QString key = location.toString(QUrl::FullyEncoded);
+            const bool dialAdvertised = searchTarget.compare(
+                QByteArrayLiteral("urn:dial-multiscreen-org:service:dial:1"), Qt::CaseInsensitive) == 0;
+            const bool alreadyFetched = m_dlnaLocations.contains(key);
+            if (dialAdvertised) {
+                if (m_dialLocations.contains(key))
+                    continue;
+                m_dialLocations.insert(key);
+            } else if (alreadyFetched) {
+                continue;
+            }
+            m_dlnaLocations.insert(key);
+            QNetworkReply *reply = m_network->get(QNetworkRequest(location));
+            connect(reply, &QNetworkReply::finished, this, [this, reply, location, dialAdvertised] {
+                const QByteArray payload = reply->readAll();
+                const bool success = reply->error() == QNetworkReply::NoError;
+                reply->deleteLater();
+                if (!success)
+                    return;
+                parseDlnaDescription(location, payload, dialAdvertised);
+            });
         }
     }
 
-    void parseDlnaDescription(const QUrl &location, const QByteArray &description)
+    void parseDlnaDescription(const QUrl &location, const QByteArray &description, bool dialAdvertised)
     {
         QXmlStreamReader xml(description);
         QString name, udn, baseUrl, serviceType, controlPath;
         QUrl avTransport, renderingControl;
-        bool hasDialService = false;
+        bool hasDialService = dialAdvertised;
         bool inService = false;
         while (!xml.atEnd()) {
             xml.readNext();
@@ -1948,6 +1967,7 @@ private:
     QHash<QString, DlnaRenderer> m_dlnaRenderers;
     QHash<QString, DialDevice> m_dialDevices;
     QSet<QString> m_dlnaLocations;
+    QSet<QString> m_dialLocations;
     QNetworkAccessManager *m_network = nullptr;
     LocalMediaHttpServer *m_localMediaServer = nullptr;
     QUdpSocket *m_ssdpSocket = nullptr;

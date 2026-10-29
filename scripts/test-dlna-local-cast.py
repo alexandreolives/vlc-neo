@@ -27,6 +27,7 @@ from pathlib import Path
 GROUP = "239.255.255.250"
 SSDP_PORT = 1900
 SERVICE = "urn:schemas-upnp-org:service:AVTransport:1"
+DIAL_SERVICE = "urn:dial-multiscreen-org:service:dial:1"
 
 
 def route_ipv4() -> str:
@@ -98,11 +99,6 @@ class FakeRenderer:
 <root xmlns="urn:schemas-upnp-org:device-1-0">
   <device><deviceType>urn:schemas-upnp-org:device:tvdevice:1</deviceType>
     <friendlyName>Neo Integration DIAL TV</friendlyName><UDN>uuid:neo-integration-test-dial</UDN>
-    <serviceList><service>
-      <serviceType>urn:dial-multiscreen-org:service:dial:1</serviceType>
-      <serviceId>urn:dial-multiscreen-org:serviceId:dial</serviceId>
-      <controlURL>/apps</controlURL>
-    </service></serviceList>
   </device>
 </root>'''
                     self._send(200, body)
@@ -188,26 +184,33 @@ class FakeRenderer:
                 return
             if b"M-SEARCH" not in packet or b"ssdp:discover" not in packet.lower():
                 continue
-            responses = (
-                (
-                "HTTP/1.1 200 OK\r\n"
-                "CACHE-CONTROL: max-age=120\r\n"
-                "EXT:\r\n"
-                f"LOCATION: {self.location}\r\n"
-                "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
-                "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n"
-                "USN: uuid:neo-integration-test-renderer::urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n"
-                ),
-                (
-                "HTTP/1.1 200 OK\r\n"
-                "CACHE-CONTROL: max-age=120\r\n"
-                "EXT:\r\n"
-                f"LOCATION: {self.dial_location}\r\n"
-                "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
-                "ST: urn:dial-multiscreen-org:service:dial:1\r\n"
-                "USN: uuid:neo-integration-test-dial::urn:dial-multiscreen-org:service:dial:1\r\n\r\n"
-                ),
+            requested_target = next(
+                (line.partition(b":")[2].strip().decode("ascii", "ignore").lower()
+                 for line in packet.splitlines() if line.lower().startswith(b"st:")),
+                "",
             )
+            if requested_target == "ssdp:all":
+                responses = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "CACHE-CONTROL: max-age=120\r\n"
+                    "EXT:\r\n"
+                    f"LOCATION: {self.location}\r\n"
+                    "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
+                    "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n"
+                    "USN: uuid:neo-integration-test-renderer::urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n",
+                )
+            elif requested_target == DIAL_SERVICE:
+                responses = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "CACHE-CONTROL: max-age=120\r\n"
+                    "EXT:\r\n"
+                    f"LOCATION: {self.dial_location}\r\n"
+                    "SERVER: VLC Neo Test/1.0 UPnP/1.0\r\n"
+                    f"ST: {DIAL_SERVICE}\r\n"
+                    f"USN: uuid:neo-integration-test-dial::{DIAL_SERVICE}\r\n\r\n",
+                )
+            else:
+                continue
             for response in responses:
                 self.ssdp.sendto(response.encode(), source)
 
