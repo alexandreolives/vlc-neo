@@ -807,6 +807,15 @@ ApplicationWindow {
         else if (action === "bookmark") { player.addBookmark(); return true }
         else if (action === "hideUi") { run("hideui"); return true }
         else if (action === "settingsPanel") { togglePanel("settings"); return true }
+        else if (action === "pinFolder") {
+            if (libraryPanel.section !== "folder"
+                || !(libraryOpen || folderSidebarOpen || libraryFullPage)
+                || !libraryPanel.folder.toString().length) return true
+            const path = platform.localPath(libraryPanel.folder)
+            const wasPinned = libraryPanel.pinnedList().includes(path)
+            libraryPanel.togglePin(path)
+            label = chord; text = wasPinned ? "Folder unpinned" : "Folder pinned"
+        }
         else if (action === "quit") { close(); return true }
         else if (action === "snapshot") { player.snapshot(); return true }
         else if (action === "record") { label = chord; text = player.recording ? "Recording stopped" : "Recording"; player.toggleRecord() }
@@ -1325,20 +1334,6 @@ ApplicationWindow {
             text: "Add Folder"
             iconName: "new-folder-two-tone"
             onTriggered: openFolderDialog.open()
-        }
-        NMenuSeparator { visible: libraryPanel.section === "folder" }
-        NMenuItem {
-            objectName: "sidepanel-action-pin-folder"
-            visible: libraryPanel.section === "folder"
-            checkable: true
-            checked: libraryPanel.pinnedList().includes(platform.localPath(libraryPanel.folder))
-            implicitHeight: 48
-            leftPadding: 18
-            iconSize: 18
-            labelSize: 16
-            text: checked ? "Unpin folder" : "Pin folder"
-            iconName: "bookmark"
-            onTriggered: libraryPanel.togglePin(platform.localPath(libraryPanel.folder))
         }
         NMenuItem {
             objectName: "sidepanel-action-edit-subtitles"

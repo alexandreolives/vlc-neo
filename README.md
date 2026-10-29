@@ -412,11 +412,13 @@ design tokens and every screen are plain QML files under `qml/`.
 ## Roadmap
 
 Remaining roadmap work:
-- **Figma closeout.** The parity matrix records the remaining mini-player drag
-  motion comparison, the Hyprland always-on-top check, and visual matching of
-  sample media. The authenticated prototype embeds reference stills, but no source
-  video or separate media-rights statement; public sample artwork needs a clear
-  redistribution license.
+- **Figma closeout.** The mini-player follows pointer drag as requested; Figma
+  defines hover and Queue states but no drag transition or easing to compare.
+  Remaining checks include always-on-top under Hyprland and reviewing generated
+  sample-video playback against the available stills. The Community file states
+  CC BY 4.0 for its artwork, which is attributed in
+  [`FIGMA-HOME-ASSETS.md`](tests/fixtures/FIGMA-HOME-ASSETS.md); it includes no
+  source video files.
 - **Physical receiver verification.** VLC Neo implements renderer discovery
   and DLNA transport control; a reachable Chromecast or other receiver is still
   needed to verify the complete device-level experience.

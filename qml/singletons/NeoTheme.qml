@@ -129,7 +129,7 @@ QtObject {
         longBack: "Ctrl+Left", longForward: "Ctrl+Right", previous: ["<", "P"], next: [">", "N"], mute: "M",
         subtitles: "V", audio: "B", subtitleEarlier: "G", subtitleLater: "H", audioEarlier: "J", audioLater: "K",
         speedDown: "-", speedUp: ["+", "]"], speedNormal: "=", previousFrame: ",", nextFrame: [".", "E"],
-        queue: "Q", library: "L", settingsPanel: "Ctrl+E", hideUi: "Ctrl+H", bookmark: "Ctrl+B",
+        queue: "Q", library: "L", pinFolder: "Shift+L", settingsPanel: "Ctrl+E", hideUi: "Ctrl+H", bookmark: "Ctrl+B",
         snapshot: "Shift+S", record: "Shift+R", stop: "S", openFile: "Ctrl+O", openNetwork: "Ctrl+N",
         openClipboard: "Ctrl+V", preferences: "Ctrl+P", quit: "Ctrl+Q", shortcuts: "?"
     })
