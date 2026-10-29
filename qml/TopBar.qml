@@ -103,7 +103,7 @@ Rectangle {
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width * 0.42)
         horizontalAlignment: Text.AlignHCenter
-        text: win.showMediaTitle && player.hasMedia && player.title.length ? player.title : "VLC Media Player"
+        text: win.showMediaTitle && player.hasMedia && win.displayMediaTitle.length ? win.displayMediaTitle : "VLC Media Player"
         font.pixelSize: root.compactPreview ? 9 : 12
         dim: true
     }

@@ -17,8 +17,16 @@ ApplicationWindow {
     color: Theme.videoBg
     property bool showMediaTitle: player.config("qt-name-in-title") !== false
     property bool showSystemTray: player.config("qt-system-tray") !== false
+    readonly property string displayMediaTitle: {
+        const title = player.title
+        const mediaUrl = player.mediaUrl.toString()
+        if (!title.length || !mediaUrl.startsWith("file:")) return title
+        const fileName = platform.localPath(player.mediaUrl).split(/[\\/]/).pop()
+        if (title !== fileName) return title
+        return fileName.replace(/\.[^.]+$/, "").replace(/_+/g, " ")
+    }
     title: showMediaTitle && player.title.length
-           ? player.title + " - VLC media player" : "VLC media player"
+           ? displayMediaTitle + " - VLC media player" : "VLC media player"
     font.pixelSize: Theme.fontBody
 
     // ---------------------------------------------------------------- state
