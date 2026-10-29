@@ -893,7 +893,7 @@ Modal {
                         info: "Replaces VLC orange everywhere in the interface."
                         AccentPicker { compact: true; square: true; spacing: 10 }
                     }
-                    SectionTitle { text: "Startup" }
+                    SectionTitle { text: "Startup"; Layout.topMargin: 20 }
                     VlcOption { option: "qt-error-dialogs"; label: "Show confirmation and error dialogs"; info: "Let VLC display confirmation and error dialogs." }
                     SettingRow {
                         label: "Check for updates automatically"
@@ -987,7 +987,6 @@ Modal {
                         ToolTip.visible: hovered
                         ToolTip.text: "Show " + (Theme.store.advancedOptions ? "basic" : "advanced") + " VLC settings"
                     }
-                    SectionTitle { text: "Advanced"; advanced: true }
                     SettingRow {
                         objectName: "vlc-option-quiet"
                         visible: Theme.store.advancedOptions
