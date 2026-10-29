@@ -470,7 +470,7 @@ public:
         waveform.fill(Qt::transparent);
         QPainter painter(&waveform);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QPen(QColor(160, 150, 136, 175), 0.5, Qt::SolidLine, Qt::RoundCap));
+        painter.setPen(QPen(QColor(160, 160, 160, 230), 0.5, Qt::SolidLine, Qt::RoundCap));
         const qreal center = kWaveformHeight / 2.0;
         QVector<quint16> sortedPeaks = peaks;
         std::sort(sortedPeaks.begin(), sortedPeaks.end());

@@ -37,7 +37,14 @@ run_sample() {
     fi
     waveform_hashes["$genre"]="$(ffmpeg -loglevel error -i "$ARTIFACTS/$genre.png" \
         -vf 'crop=612:28:231:640,format=gray' -frames:v 1 -f rawvideo - | sha256sum | cut -d' ' -f1)"
-    echo "PASS $genre one-minute waveform ready (${duration}s); screenshot: $ARTIFACTS/$genre.png"
+    waveform_p95="$(ffmpeg -loglevel error -i "$ARTIFACTS/$genre.png" \
+        -vf 'crop=500:28:307:640,format=gray' -frames:v 1 -f rawvideo - \
+        | python3 -c 'import sys; data=sorted(sys.stdin.buffer.read()); print(data[int(len(data)*0.95)])')"
+    if (( waveform_p95 < 56 || waveform_p95 > 80 )); then
+        echo "FAIL $genre waveform contrast percentile is $waveform_p95; expected readable gray bars without clipping" >&2
+        return 1
+    fi
+    echo "PASS $genre one-minute waveform ready (${duration}s; contrast p95=$waveform_p95); screenshot: $ARTIFACTS/$genre.png"
 }
 
 run_sample jazz "$HERE/tests/fixtures/waveform-jazz.ogg"

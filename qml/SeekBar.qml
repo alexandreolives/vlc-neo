@@ -207,7 +207,7 @@ FocusScope {
             smooth: false
             cache: false
             asynchronous: true
-            opacity: 0.72
+            opacity: 0.82
             visible: status === Image.Ready
         }
         Canvas {
