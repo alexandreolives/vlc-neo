@@ -126,7 +126,7 @@ ApplicationWindow {
     property bool bottomHot: false
     readonly property real playlistPaneWidth: Math.max(220, Math.min(375, width * 0.222 - navigationRail.width))
     property real libraryPaneLayoutWidth: libraryOpen ? Math.max(220, Math.min(410, Math.ceil(width * 0.19635)))
-        : (folderSidebarOpen ? Math.max(220, Math.min(500, width * 0.20))
+        : (folderSidebarOpen ? Math.max(220, Math.min(500, Math.ceil(width * 0.19635)))
            : (musicSidebarOpen ? Math.max(280, Math.min(380, Math.round(width * 0.19635))) : 0))
     Behavior on libraryPaneLayoutWidth {
         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
