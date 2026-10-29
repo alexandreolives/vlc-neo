@@ -1326,6 +1326,20 @@ ApplicationWindow {
             iconName: "new-folder-two-tone"
             onTriggered: openFolderDialog.open()
         }
+        NMenuSeparator { visible: libraryPanel.section === "folder" }
+        NMenuItem {
+            objectName: "sidepanel-action-pin-folder"
+            visible: libraryPanel.section === "folder"
+            checkable: true
+            checked: libraryPanel.pinnedList().includes(platform.localPath(libraryPanel.folder))
+            implicitHeight: 48
+            leftPadding: 18
+            iconSize: 18
+            labelSize: 16
+            text: checked ? "Unpin folder" : "Pin folder"
+            iconName: "bookmark"
+            onTriggered: libraryPanel.togglePin(platform.localPath(libraryPanel.folder))
+        }
         NMenuItem {
             objectName: "sidepanel-action-edit-subtitles"
             implicitHeight: 48

@@ -2063,7 +2063,7 @@ Modal {
                             }
                         }
                     }
-                    NText { visible: Theme.store.advancedOptions && Theme.store.pinned.length === 0; text: "Pin folders from the library panel (L)."; dim: true }
+                    NText { visible: Theme.store.advancedOptions && Theme.store.pinned.length === 0; text: "Pin folders from the folder panel’s More menu."; dim: true }
                     SectionTitle { text: "Playlists"; advanced: true }
                     VlcOption { option: "playlist-tree"; kind: "choice"; label: "Show folders inside playlists"; advanced: true
                         choices: [{ label: "Default", value: 0 }, { label: "Always", value: 1 }, { label: "Never", value: 2 }] }
