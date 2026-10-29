@@ -100,6 +100,9 @@ Rectangle {
 
     NText {
         id: appTitle
+        // The Figma custom-player state puts the media filename in the bottom
+        // control bar. Hide the duplicate centered title in that layout.
+        visible: !Theme.layoutList().includes("filename")
         anchors.centerIn: parent
         width: Math.min(implicitWidth, parent.width * 0.42)
         horizontalAlignment: Text.AlignHCenter
