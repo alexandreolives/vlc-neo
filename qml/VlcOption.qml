@@ -17,6 +17,7 @@ SettingRow {
     property bool allowDecimal: false
     property bool showScale: false
     property bool secret: false
+    property bool hideValueWhenDisabled: false
     signal optionSaved(var value)
     property real sliderMin: 0
     property real sliderMax: 100
@@ -24,6 +25,7 @@ SettingRow {
     property var current: player.config(option)
     optionDescription: player.configDescription(option)
     readonly property string displayValue: {
+        if (hideValueWhenDisabled && !enabled) return ""
         if (current === undefined) return ""
         let value = String(current)
         if (kind === "number" && allowDecimal) {

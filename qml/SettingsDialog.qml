@@ -2083,10 +2083,10 @@ Modal {
                             onPicked: (value) => root.setBufferingProfile(value)
                         }
                     }
-                    VlcOption { option: "file-caching"; kind: "number"; fieldWidth: 320; label: "Local files"; enabled: root.bufferingProfile === "Custom"; onOptionSaved: root.markCustomBuffering() }
-                    VlcOption { option: "disc-caching"; kind: "number"; fieldWidth: 320; label: "Discs"; enabled: root.bufferingProfile === "Custom"; onOptionSaved: root.markCustomBuffering() }
-                    VlcOption { option: "network-caching"; kind: "number"; fieldWidth: 320; label: "Network streams"; enabled: root.bufferingProfile === "Custom"; onOptionSaved: root.markCustomBuffering() }
-                    VlcOption { option: "live-caching"; kind: "number"; fieldWidth: 320; label: "Live capture"; enabled: root.bufferingProfile === "Custom"; onOptionSaved: root.markCustomBuffering() }
+                    VlcOption { option: "file-caching"; kind: "number"; fieldWidth: 320; label: "Local files"; enabled: root.bufferingProfile === "Custom"; hideValueWhenDisabled: true; onOptionSaved: root.markCustomBuffering() }
+                    VlcOption { option: "disc-caching"; kind: "number"; fieldWidth: 320; label: "Discs"; enabled: root.bufferingProfile === "Custom"; hideValueWhenDisabled: true; onOptionSaved: root.markCustomBuffering() }
+                    VlcOption { option: "network-caching"; kind: "number"; fieldWidth: 320; label: "Network streams"; enabled: root.bufferingProfile === "Custom"; hideValueWhenDisabled: true; onOptionSaved: root.markCustomBuffering() }
+                    VlcOption { option: "live-caching"; kind: "number"; fieldWidth: 320; label: "Live capture"; enabled: root.bufferingProfile === "Custom"; hideValueWhenDisabled: true; onOptionSaved: root.markCustomBuffering() }
                     SectionTitle { text: "Proxy" }
                     VlcOption { option: "http-proxy"; kind: "text"; fieldWidth: 320; label: "HTTP proxy"; placeholderText: "System proxy"; info: "Enter http://host:port or host:port. For authentication, include the username here and enter its password below. Leave blank to use the system proxy." }
                     VlcOption { option: "http-proxy-pwd"; kind: "text"; fieldWidth: 320; label: "HTTP proxy password"; info: "Password used to authenticate with the HTTP proxy. Enter the matching username in the HTTP proxy address field."; secret: true }
