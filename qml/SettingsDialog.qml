@@ -2217,10 +2217,10 @@ Modal {
                     }
                     VlcOption {
                         option: "sout-chromecast-conversion-quality"; kind: "choice"; fieldWidth: 240
-                        label: "Chromecast stream quality"
-                        info: "Choose the quality and bandwidth trade-off used by VLC when streaming to a Chromecast."
-                        choices: [{ label: "High quality, high bandwidth", value: 0 },
-                                  { label: "Medium quality", value: 1 },
+                        label: "Cast quality"
+                        info: "Automatic uses VLC's built-in desktop default (Medium on supported x86 Linux builds); the other choices select specific Chromecast conversion modes."
+                        choices: [{ label: "Automatic", value: 1 },
+                                  { label: "High quality, high bandwidth", value: 0 },
                                   { label: "Low quality, low bandwidth", value: 2 },
                                   { label: "Low CPU, high bandwidth", value: 3 }]
                     }
