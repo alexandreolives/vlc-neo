@@ -43,6 +43,8 @@ jobs:
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-alternate-values.sh"
       - name: Verify embedded VLC filters and HTTP video rendering
         run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_BUILD_DIR='$GITHUB_WORKSPACE/build' bash scripts/test-vlc-video-filter-render.sh"
+      - name: Verify VLC audio equalizer changes decoded output
+        run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_BUILD_DIR='$GITHUB_WORKSPACE/build' bash scripts/test-audio-equalizer-output.sh"
       - name: Verify waveforms on real audio from three genres
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-waveform-variety.sh"
       - name: Verify the 110-item media library browser
@@ -94,6 +96,7 @@ jobs:
           bash scripts/test-preference-mapping.sh
           bash scripts/test-preference-alternate-values.sh
           NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" bash scripts/test-vlc-video-filter-render.sh
+          NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" bash scripts/test-audio-equalizer-output.sh
           bash scripts/test-waveform-variety.sh
           bash scripts/test-library-110-items.sh
           NEO_BUILD_DIR="$GITHUB_WORKSPACE/build" python3 tests/library_catalog_scale_probe.py
