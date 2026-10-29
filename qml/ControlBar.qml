@@ -7,6 +7,14 @@ Rectangle {
     property var items: Theme.layoutList()
     property var renderedItems: {
         const result = items.slice()
+        if (player.hasMedia && !player.hasVideo) {
+            const previousIndex = result.indexOf("prev")
+            if (previousIndex >= 0 && result.indexOf("back15") < 0)
+                result.splice(previousIndex + 1, 0, "back15")
+            const playIndex = result.indexOf("play")
+            if (playIndex >= 0 && result.indexOf("fwd15") < 0)
+                result.splice(playIndex + 1, 0, "fwd15")
+        }
         let insertAt = result.indexOf("next")
         if (insertAt >= 0) insertAt += 1
         else insertAt = result.indexOf("play") >= 0 ? result.indexOf("play") + 1 : 0
