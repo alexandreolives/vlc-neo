@@ -153,7 +153,8 @@ episodes. A shortcut to search OpenSubtitles for the current title is included.
 > trailer, © Blender Foundation, licensed CC BY 3.0. The current
 > `player.webp`, `customize.webp` and `video-effects-flower.webp` use the public [MDN CC0 flower video](https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4).
 > `home.webp`, `home-sidebar.png` and `home-full-layout-review.webp` use generated color-bar video fixtures and tagged demo audio; their media artwork is test content, not a Figma export.
-> `playlists-sidebar.png` uses a generated color-bar video fixture.
+> `playlists-sidebar.png` uses the exact cat-and-background video frame crop
+> from Figma Player node `187:328`, encoded losslessly as a test video.
 > `scripts/screenshots.sh` regenerates captures with Sintel; the preference
 > screens come from `scripts/smoke-test.sh`.
 

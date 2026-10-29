@@ -32,3 +32,14 @@ and sidebar layout are exercised with the imagery visible in that Figma
 reference. The reference crops replace the previous synthetic color bars. The
 original creator is credited above; the Community file's stated CC BY 4.0 terms
 apply.
+
+## Player Playlists video fixture
+
+`figma-playlists/player-video-surface.png` is an exact crop from a 4× PNG
+export of the Player frame (node `187:328`) in the same Figma Community file.
+The selected frame's video image fill is named `video` and measures 1920 × 1080;
+the crop uses the video viewport at `(427, 42)` with a size of `1493 × 984`.
+The smoke test encodes this still losslessly as a 40-second FFV1 clip in the
+`Videos` folder. It reproduces the pixel-art cat visible in Figma while keeping
+the playback itself in real VLC. This is a visual test fixture, not source
+video media; the Figma Community file's CC BY 4.0 attribution above applies.
