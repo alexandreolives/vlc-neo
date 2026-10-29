@@ -763,6 +763,8 @@ public:
     {
         const QByteArray key = name.toUtf8();
         vlc_object_t *object = VLC_OBJECT(m_intf);
+        if (name == QLatin1String("recursive") && var_Type(m_playlist, key.constData()) != 0)
+            return takeString(var_GetString(m_playlist, key.constData()));
         if (name == QLatin1String("equalizer-bands")
             || name == QLatin1String("equalizer-preamp")) {
             if (audio_output_t *aout = playlist_GetAout(m_playlist)) {
@@ -851,6 +853,12 @@ public:
         case VLC_VAR_FLOAT: config_PutFloat(object, key.constData(), value.toFloat()); break;
         case VLC_VAR_STRING: config_PutPsz(object, key.constData(), value.toString().toUtf8().constData()); break;
         default: return;
+        }
+        if (name == QLatin1String("recursive")) {
+            // VLC's input constructor inherits this from the playlist object.
+            if (var_Type(m_playlist, key.constData()) == 0)
+                var_Create(m_playlist, key.constData(), VLC_VAR_STRING | VLC_VAR_DOINHERIT);
+            var_SetString(m_playlist, key.constData(), value.toString().toUtf8().constData());
         }
         if (name == QLatin1String("audio-filter")) {
             const auto filterNames = [](const QString &chain) {
