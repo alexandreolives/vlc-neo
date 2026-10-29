@@ -200,6 +200,14 @@ if(BUILD_TESTING)
   target_link_libraries(platform_pip_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui)
   add_test(NAME platform_pip COMMAND platform_pip_test)
 
+  add_executable(platform_inhibit_test tests/platform_inhibit_test.cpp src/platform.hpp)
+  target_include_directories(platform_inhibit_test PRIVATE src)
+  target_link_libraries(platform_inhibit_test PRIVATE Qt6::Core Qt6::DBus Qt6::Gui)
+  find_program(DBUS_RUN_SESSION_EXECUTABLE dbus-run-session)
+  if(DBUS_RUN_SESSION_EXECUTABLE)
+    add_test(NAME platform_inhibit COMMAND ${DBUS_RUN_SESSION_EXECUTABLE} -- $<TARGET_FILE:platform_inhibit_test>)
+  endif()
+
   add_executable(bounded_image_cache_test
     tests/bounded_image_cache_test.cpp
     src/bounded_image_cache.hpp
