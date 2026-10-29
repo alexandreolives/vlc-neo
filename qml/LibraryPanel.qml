@@ -930,6 +930,7 @@ Rectangle {
                 required property url fileUrl
                 required property bool fileIsDir
                 required property string fileSuffix
+                required property int index
                 width: listing.cellWidth - (gridCard ? 4 : (root.wide && !root.figmaSidePanel ? 8 : 0))
                 height: listing.cellHeight - 2
                 visible: root.matches(fileName)
@@ -944,6 +945,7 @@ Rectangle {
                     ? (player.length > 0 ? Math.max(0, Math.min(1, player.time / player.length)) : 0)
                     : (savedDuration > 0 ? Math.max(0, Math.min(1, savedPoint / savedDuration)) : 0)
                 property bool videoThumbnailReady: videoThumbnail.status === Image.Ready
+                property int videoThumbnailRetryToken: 0
                 property rect thumbnailRect: Qt.rect(thumbnailFrame.x, thumbnailFrame.y,
                                                       thumbnailFrame.width, thumbnailFrame.height)
                 property string videoThumbnailState: videoThumbnail.status === Image.Null ? "null" :
@@ -981,11 +983,25 @@ Rectangle {
                         anchors.fill: parent
                         source: root.wide && mediaCell.videoFile
                                 ? "image://thumbnail/frame?path=" + encodeURIComponent(platform.localPath(mediaCell.fileUrl)) + "&t=0"
+                                  + (mediaCell.videoThumbnailRetryToken > 0 ? "&retry=" + mediaCell.videoThumbnailRetryToken : "")
                                 : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
                         visible: status === Image.Ready
+                        onStatusChanged: {
+                            if (status === Image.Error && mediaCell.videoThumbnailRetryToken < 4)
+                                thumbnailRetryTimer.start()
+                        }
+                        Timer {
+                            id: thumbnailRetryTimer
+                            interval: 250 + (mediaCell.index % 12) * 75
+                            repeat: false
+                            onTriggered: {
+                                if (videoThumbnail.status === Image.Error && mediaCell.videoThumbnailRetryToken < 4)
+                                    mediaCell.videoThumbnailRetryToken += 1
+                            }
+                        }
                     }
                     Icon {
                         anchors.centerIn: parent

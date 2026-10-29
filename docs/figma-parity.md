@@ -277,3 +277,6 @@ Web Remote LAN follow-up (2026-10-29): added `scripts/test-web-remote-lan.py` to
 
 
 Waveform contrast follow-up (2026-10-29): compared the music player against Figma node `4767:23726` in the authenticated browser. The bars now use a neutral gray with stronger visibility, while their shapes remain derived from the playing audio. The waveform variety check now also enforces a readable grayscale contrast range for jazz, classical and electronic fixtures. The refreshed [`music.webp`](screenshots/music.webp) shows the current 1920×1080 player capture.
+
+
+Thumbnail saturation recovery follow-up (2026-10-29): CI run [`40914589077`](https://github.com/alexandreolives/vlc-neo/actions/runs/40914589077) reproduced seven failed thumbnails in the 88-row compact-list viewport when the bounded image provider rejected a burst of requests. Folder video cells now retry transient image-provider errors up to four times with staggered delays; the response cap and two decode workers are unchanged. A focused real-VLC run now passes the complete 110-item flow and reaches `88/88/0/0` (visible/ready/loading/error) within the existing 24-second window. Cross-distro CI still needs to confirm the recovery.
