@@ -16,7 +16,7 @@ Modal {
 
     function rendererReadyForPlayback(device) {
         return !!device && device.selected
-                && ["Connected", "Playing", "Paused"].includes(device.status)
+                && ["Selected", "Playing", "Paused"].includes(device.status)
     }
 
     onOpened: {
@@ -55,7 +55,7 @@ Modal {
             const device = player.rendererDevices.find(item => item.id === root.requestedRendererId)
             if (root.rendererReadyForPlayback(device)) {
                 root.requestedRendererId = ""
-                win.toast("Casting", "Playback controls are connected to " + device.name + ".")
+                win.toast("Playback device selected", "VLC selected " + device.name + " for playback.")
                 root.close()
             } else if (Date.now() - root.connectStartedAt > 1500 && (!device || !device.selected)) {
                 root.requestedRendererId = ""

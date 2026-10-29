@@ -599,8 +599,8 @@ out=$(run "200:onboarding.close(); castDialog.open()|+150:'castDiscoveryLease=' 
 check "Cast and Settings dialogs acquire independent renderer-discovery leases" "$out" "overlappingDiscoveryLeases=cast-dialog/settings-dialog"
 check "closing the Cast dialog keeps discovery active for Settings" "$out" "settingsKeepsDiscovery=true"
 check "renderer discovery stops after its final dialog closes" "$out" "discoveryStopsAfterLastDialog=true"
-out=$(run "200:'castRendererReadyStates=' + [castDialog.rendererReadyForPlayback({selected:true,status:'Connected'}),castDialog.rendererReadyForPlayback({selected:true,status:'Playing'}),castDialog.rendererReadyForPlayback({selected:true,status:'Paused'}),castDialog.rendererReadyForPlayback({selected:true,status:'Connecting'}),castDialog.rendererReadyForPlayback({selected:true,status:'Stopped'}),castDialog.rendererReadyForPlayback({selected:false,status:'Connected'})].join('/')|+100:quit")
-check "the cast dialog accepts VLC's connected Chromecast state and active DLNA states" "$out" "castRendererReadyStates=true/true/true/false/false/false"
+out=$(run "200:'castRendererReadyStates=' + [castDialog.rendererReadyForPlayback({selected:true,status:'Selected'}),castDialog.rendererReadyForPlayback({selected:true,status:'Playing'}),castDialog.rendererReadyForPlayback({selected:true,status:'Paused'}),castDialog.rendererReadyForPlayback({selected:true,status:'Connecting'}),castDialog.rendererReadyForPlayback({selected:true,status:'Stopped'}),castDialog.rendererReadyForPlayback({selected:false,status:'Selected'})].join('/')|+100:quit")
+check "the cast dialog accepts selected VLC renderers and active DLNA states without claiming receiver confirmation" "$out" "castRendererReadyStates=true/true/true/false/false/false"
 echo "== VLC records the playing audio and video"
 mkdir -p "$WORK/recordings"
 out=$(run "6000:player.setConfig('input-record-path','$WORK/recordings'); player.toggleRecord()|+5000:'recordingActive=' + player.recording + '/' + (player.time > 7000)|+100:player.toggleRecord()|+2500:'recordingStopped=' + !player.recording|+100:quit" --avcodec-hw=none "$WORK/recording-test.mkv")

@@ -1053,7 +1053,7 @@ public:
                 {QStringLiteral("id"), it.key()},
                 {QStringLiteral("name"), QString::fromUtf8(vlc_renderer_item_name(it.value()))},
                 {QStringLiteral("protocol"), QStringLiteral("Chromecast")},
-                {QStringLiteral("status"), it.key() == m_activeRendererId ? QStringLiteral("Connected") : QString()},
+                {QStringLiteral("status"), it.key() == m_activeRendererId ? QStringLiteral("Selected") : QString()},
                 {QStringLiteral("selected"), it.key() == m_activeRendererId}
             });
         }
