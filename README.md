@@ -411,10 +411,11 @@ design tokens and every screen are plain QML files under `qml/`.
 ## Roadmap
 
 Remaining roadmap work:
-- **Figma closeout.** The current parity matrix records the remaining mini-player
-  state comparisons, the Hyprland always-on-top check, and visual matching of
-  sample media. The pinned design exports contain no source posters or video
-  files, so matching artwork needs redistributable media supplied for the work.
+- **Figma closeout.** The parity matrix records the remaining mini-player drag
+  motion comparison, the Hyprland always-on-top check, and visual matching of
+  sample media. The authenticated prototype embeds reference stills, but no source
+  video or separate media-rights statement; public sample artwork needs a clear
+  redistribution license.
 - **Physical receiver verification.** VLC Neo implements renderer discovery
   and DLNA transport control; a reachable Chromecast or other receiver is still
   needed to verify the complete device-level experience.
