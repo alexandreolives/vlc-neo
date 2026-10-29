@@ -76,6 +76,7 @@ ApplicationWindow {
     property var sidePanelActionAnchor: null
     property bool libraryFullPage: false
     property bool preserveHomeForMiniPlayerTrackChange: false
+    property url lastMediaUrlForResume: player.mediaUrl
     property bool musicSidebarOpen: false
     property bool folderSidebarOpen: false
     property string sideReturnPage: ""
@@ -856,6 +857,9 @@ ApplicationWindow {
         }
         function onMediaChanged() {
             win.syncPlaybackInhibition()
+            if (player.mediaUrl !== win.lastMediaUrlForResume)
+                resumePill.dismiss()
+            win.lastMediaUrlForResume = player.mediaUrl
             if (win.navigationPage === "home" && player.hasMedia) {
                 if (win.preserveHomeForMiniPlayerTrackChange)
                     miniPlayerNavigationReset.restart()
