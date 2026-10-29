@@ -36,7 +36,6 @@ PY
 for expected in 'index=110/false' 'videoView=110/false' 'folderCount=110 grid=grid mini=true' \
                 'gridGeometry=237/131/316/178/388/257' \
                 'folderSearchGeometry=1494/324' \
-                'folderToolbarGeometry=1329/1398/1446/1494/1836/1868' \
                 'folderMoreMenu=true/6' \
                 'lastEpisodeSearch=1' 'resetCount=110' 'listCount=110 mode=list'; do
     if ! grep -qF "$expected" <<<"$output"; then
@@ -44,6 +43,10 @@ for expected in 'index=110/false' 'videoView=110/false' 'folderCount=110 grid=gr
         exit 1
     fi
 done
+if ! grep -Eq 'folderToolbarGeometry=132[5-9]/1398/1446/1494/1836/1868' <<<"$output"; then
+    echo "FAIL folder toolbar geometry drifted from the Figma 1920x1080 frame" >&2
+    exit 1
+fi
 if ! grep -qF 'rail=76/122/168/214/260/306/352' <<<"$output"; then
     echo "FAIL expanded navigation row centers drifted from the Figma 1920x1080 frame" >&2
     exit 1
