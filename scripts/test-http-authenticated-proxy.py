@@ -52,7 +52,7 @@ def main() -> int:
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-f", "lavfi", "-i", "color=c=red:s=160x90:r=10",
             "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-t", "3", "-c:v", "mpeg4", "-q:v", "6", "-c:a", "aac",
+            "-t", "12", "-c:v", "mpeg4", "-q:v", "6", "-c:a", "aac",
             "-movflags", "+faststart", str(media_path),
         ], check=True)
         media = media_path.read_bytes()
