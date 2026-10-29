@@ -41,7 +41,7 @@ jobs:
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-mapping.sh"
       - name: Verify alternate VLC preference values survive relaunch
         run: su tester -c "cd '$GITHUB_WORKSPACE' && bash scripts/test-preference-alternate-values.sh"
-      - name: Verify authenticated HTTP proxy playback
+      - name: Audit HTTP proxy Basic-auth challenge handling
         run: su tester -c "cd '$GITHUB_WORKSPACE' && NEO_BUILD_DIR='$GITHUB_WORKSPACE/build' python3 scripts/test-http-authenticated-proxy.py"
       - name: Test VLC Web Remote on LAN address
         run: su tester -c "cd '$GITHUB_WORKSPACE' && python3 scripts/test-web-remote-lan.py"

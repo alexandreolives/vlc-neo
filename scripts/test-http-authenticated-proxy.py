@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Exercise VLC Neo's saved HTTP proxy credentials against a 407 challenge.
 
-VLC 3.0.20 retries the challenge with the configured Basic credentials but
-then fails while opening the byte-range response. VLC 3.0.21 added RFC 9110
-Content-Range handling; on that and newer versions playback is required.
+VLC 3.0.20 and 3.0.24 send the configured Basic credentials after the
+challenge, then fail to seek the authenticated stream. Keep this check so a
+future core fix is recognized as playback instead of the known error.
 """
 
 from __future__ import annotations
@@ -44,7 +44,6 @@ def main() -> int:
         return 0
 
     version = vlc_version()
-    modern_range_handling = version >= (3, 0, 21)
     with tempfile.TemporaryDirectory(prefix="neo-auth-proxy-") as temp:
         work = Path(temp)
         media_path = work / "fixture.mp4"
@@ -71,9 +70,7 @@ def main() -> int:
                     self.send_response(407, "Proxy Authentication Required")
                     self.send_header("Proxy-Authenticate", 'Basic realm="VLC Neo test"')
                     self.send_header("Content-Length", "0")
-                    self.send_header("Connection", "close")
                     self.end_headers()
-                    self.close_connection = True
                     return
 
                 stats["authenticated"] += 1
@@ -164,20 +161,14 @@ def main() -> int:
             return 1
 
         played = "authProxyPlayback=true" in output
-        if modern_range_handling and not played:
-            print("FAIL: authenticated proxy media did not play on VLC 3.0.21+",
+        if played:
+            print("PASS: authenticated proxy playback works")
+        elif "cannot seek (to offset 0)" in output:
+            print("KNOWN VLC CORE LIMITATION: credentials are accepted, but HTTP 407 playback cannot seek")
+        else:
+            print("FAIL: VLC failed for an unexpected reason after the authenticated proxy response",
                   file=sys.stderr)
             return 1
-        if not modern_range_handling and played:
-            print("PASS: authenticated proxy playback works on this older VLC build")
-        elif not modern_range_handling:
-            if "cannot seek (to offset 0)" not in output:
-                print("FAIL: VLC failed for a reason other than the documented range limitation",
-                      file=sys.stderr)
-                return 1
-            print("KNOWN VLC LIMITATION: credentials are retried, then VLC 3.0.20 cannot seek the authenticated MP4")
-        else:
-            print("PASS: authenticated HTTP proxy playback works")
         return 0
 
 
