@@ -185,7 +185,7 @@ PACKAGE_MISSING=1 "$HERE/scripts/install.sh" --default --yes
 if [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *debian* || "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *ubuntu* ]]; then
     grep -qx 'update' "$PACKAGE_LOG"
     grep -q '^install -y .*ninja-build.*libvlccore-dev.*libtag1-dev.*libsqlite3-dev' "$PACKAGE_LOG"
-    ! grep -q 'qml6-module-qtquick-effects' "$PACKAGE_LOG"
+    ! grep -Eq 'qml6-module-qtquick|qml6-module-qtcore' "$PACKAGE_LOG"
 elif [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *arch* ]]; then
     grep -q '^-S --needed .*ninja.*libvlc.*taglib.*sqlite' "$PACKAGE_LOG"
 elif [[ "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *fedora* || "$(. /etc/os-release; echo "$ID $ID_LIKE")" == *rhel* ]]; then

@@ -4,7 +4,7 @@ VLC Neo targets Linux Mint 22.x on x86-64. Mint 22.x uses the Ubuntu 24.04 packa
 
 ## Build
 
-The installer checks system build dependencies, VLC 3 development headers, TagLib and SQLite. It asks before installing missing apt packages. When system Qt is too old, it uses `aqtinstall` to provision Qt 6.8.3 in the user's home directory and tries the configured Qt mirrors in sequence.
+The installer checks system build dependencies, VLC 3 development headers, TagLib and SQLite. It asks before installing missing apt packages. When system Qt is too old, it uses `aqtinstall` to provision Qt 6.8.3 in the user's home directory and tries the configured Qt mirrors in sequence. If that per-user Qt already contains every required QML import, the installer does not also propose the split system `qml6-module-*` packages.
 
 ```bash
 scripts/install.sh

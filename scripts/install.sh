@@ -75,20 +75,25 @@ package_is_installed() {
 }
 
 install_system_dependencies() {
-    local package missing=()
+    local package missing=() install_system_qml=1
+    if has_usable_user_qt; then
+        install_system_qml=0
+    fi
     case " ${ID:-} ${ID_LIKE:-} " in
         *debian*|*ubuntu*)
             PACKAGE_MANAGER="apt"
             SYSTEM_PACKAGES=(build-essential cmake ninja-build pkg-config python3-venv libgl1-mesa-dev vlc libvlccore-dev libtag1-dev libsqlite3-dev)
             # QML modules are split into packages on Debian-family systems.
-            for package in qml6-module-qtquick qml6-module-qtquick-controls \
-                qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
-                qml6-module-qtquick-window qml6-module-qt-labs-folderlistmodel \
-                qml6-module-qtcore qml6-module-qtquick-shapes qml6-module-qtquick-effects; do
-                if apt-cache show "$package" >/dev/null 2>&1; then
-                    SYSTEM_PACKAGES+=("$package")
-                fi
-            done
+            if [ "$install_system_qml" -eq 1 ]; then
+                for package in qml6-module-qtquick qml6-module-qtquick-controls \
+                    qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
+                    qml6-module-qtquick-window qml6-module-qt-labs-folderlistmodel \
+                    qml6-module-qtcore qml6-module-qtquick-shapes qml6-module-qtquick-effects; do
+                    if apt-cache show "$package" >/dev/null 2>&1; then
+                        SYSTEM_PACKAGES+=("$package")
+                    fi
+                done
+            fi
             ;;
         *arch*)
             PACKAGE_MANAGER="pacman"
@@ -164,6 +169,24 @@ qt_qml_imports_ok() {
             return 1
         fi
     done
+}
+
+has_usable_user_qt() {
+    local root pkg_path
+    local roots=()
+    if [ -n "$QT_ROOT" ]; then
+        roots+=("$QT_ROOT")
+    elif [ -d "$HOME/Qt" ]; then
+        while IFS= read -r root; do roots+=("$root"); done \
+            < <(printf '%s\n' "$HOME"/Qt/*/gcc_64 | sort -rV)
+    fi
+
+    for root in "${roots[@]}"; do
+        [ -f "$root/lib/cmake/Qt6/Qt6Config.cmake" ] || continue
+        pkg_path="$root/lib/pkgconfig:$root/lib64/pkgconfig:${PKG_CONFIG_PATH:-}"
+        qt_pkgconfig_ok "$pkg_path" && qt_qml_imports_ok "$root" && return 0
+    done
+    return 1
 }
 
 use_qt_root() {
