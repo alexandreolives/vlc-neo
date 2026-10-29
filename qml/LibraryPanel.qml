@@ -399,6 +399,16 @@ Rectangle {
              + Math.round(miniPlayer.width) + "/" + Math.round(miniPlayer.height) + "/"
              + (miniPlayer.parent === win.contentItem && miniPlayer.z > navigationRail.z)
     }
+    function folderGridGeometry() {
+        const first = listing.itemAtIndex(0)
+        const secondRow = listing.itemAtIndex(5)
+        if (!first || !secondRow) return "missing"
+        const firstFrame = first.mapToItem(win.contentItem, first.thumbnailRect.x, first.thumbnailRect.y)
+        const secondFrame = secondRow.mapToItem(win.contentItem, secondRow.thumbnailRect.x, secondRow.thumbnailRect.y)
+        return Math.round(firstFrame.x) + "/" + Math.round(firstFrame.y) + "/"
+             + Math.round(first.thumbnailRect.width) + "/" + Math.round(first.thumbnailRect.height) + "/"
+             + Math.round(secondFrame.y) + "/" + Math.round(listing.cellHeight)
+    }
     function videoProgress(name) {
         for (let i = 0; i < files.count; ++i) {
             if (files.get(i, "fileName") !== name) continue
@@ -843,16 +853,18 @@ Rectangle {
             visible: root.section === "folder"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
-            Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? 12 : 0)
-            Layout.topMargin: root.figmaSidePanel ? (root.isVideosRootSidePanel() ? 4 : 15) : (root.wide && !root.compactFolderSidebar ? 22 : 0)
+            Layout.leftMargin: root.figmaSidePanel ? 0 : (root.wide ? (root.folderViewMode === "grid" ? 15 : 12) : 0)
+            Layout.rightMargin: root.figmaSidePanel ? 0 : (root.wide ? (root.folderViewMode === "grid" ? 15 : 12) : 0)
+            Layout.topMargin: root.figmaSidePanel ? (root.isVideosRootSidePanel() ? 4 : 15)
+                              : (root.wide && !root.compactFolderSidebar
+                                 ? (root.folderViewMode === "grid" ? 10 : 22) : 0)
             clip: true
             model: files
             boundsBehavior: Flickable.StopAtBounds
             cellWidth: root.wide && !root.compactFolderSidebar && !root.figmaSidePanel
                        ? Math.max(180, Math.floor(width / (root.folderViewMode === "grid" ? 5 : 4))) : width
             cellHeight: root.figmaSidePanel ? 42 : root.compactFolderSidebar ? 38 : (root.wide
-                ? (root.folderViewMode === "grid" ? Math.max(154, Math.min(244, Math.round(cellWidth * 0.72))) : 44)
+                ? (root.folderViewMode === "grid" ? Math.max(154, Math.min(260, Math.round(cellWidth * 0.765))) : 44)
                 : 34)
             ScrollBar.vertical: ScrollBar {}
             delegate: Rectangle {
@@ -862,7 +874,7 @@ Rectangle {
                 required property url fileUrl
                 required property bool fileIsDir
                 required property string fileSuffix
-                width: listing.cellWidth - (root.wide && !root.figmaSidePanel ? 8 : 0)
+                width: listing.cellWidth - (gridCard ? 4 : (root.wide && !root.figmaSidePanel ? 8 : 0))
                 height: listing.cellHeight - 2
                 visible: root.matches(fileName)
                 radius: Theme.radiusSmall
@@ -903,7 +915,7 @@ Rectangle {
 
                 Item {
                     id: thumbnailFrame
-                    x: mediaCell.gridCard ? 8 : (root.figmaSidePanel && mediaCell.fileIsDir ? 26 : root.figmaSidePanel ? 20 : root.wide ? 15 : 12)
+                    x: mediaCell.gridCard ? 12 : (root.figmaSidePanel && mediaCell.fileIsDir ? 26 : root.figmaSidePanel ? 20 : root.wide ? 15 : 12)
                     y: mediaCell.gridCard ? 8 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : (root.figmaSidePanel && mediaCell.fileIsDir ? 20 : root.wide && mediaCell.videoFile ? 32 : 16)
                     height: mediaCell.gridCard ? Math.round(width * 9 / 16) : (root.figmaSidePanel && mediaCell.fileIsDir ? 20 : root.wide ? 32 : 18)
@@ -938,7 +950,7 @@ Rectangle {
                 NText {
                     text: mediaCell.fileName
                     x: mediaCell.gridCard ? 8 : (root.figmaSidePanel ? 62 : thumbnailFrame.x + thumbnailFrame.width + (root.wide ? 7 : 10))
-                    y: mediaCell.gridCard ? thumbnailFrame.y + thumbnailFrame.height + 8 : Math.round((parent.height - height) / 2)
+                    y: mediaCell.gridCard ? thumbnailFrame.y + thumbnailFrame.height + 18 : Math.round((parent.height - height) / 2)
                     width: mediaCell.gridCard ? parent.width - 16 : Math.max(20, parent.width - x - 36)
                     font.pixelSize: root.figmaSidePanel ? 13 : root.wide ? (mediaCell.gridCard ? 13 : 11) : Theme.fontBody
                     color: root.folderViewMode === "list" && mediaCell.playing ? Theme.accent
