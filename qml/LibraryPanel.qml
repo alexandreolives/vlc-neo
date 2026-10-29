@@ -36,6 +36,7 @@ Rectangle {
     property alias folderSearchButton: compactFolderSearchButton
     property alias folderPinButton: compactFolderPinButton
     property alias compactFolderToolbar: compactFolderToolbarItem
+    property alias folderListing: listing
     property alias folderActionsRow: folderActionsRowItem
     property alias musicItemCountText: musicItemCountLabel.text
     property alias figmaMusicItemCountText: musicSidePanelCount.text
@@ -456,7 +457,7 @@ Rectangle {
         // Header: navigation, breadcrumbs and local search.
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: root.figmaSidePanel ? 0 : (root.compactFolderSidebar ? 18 : (root.wide && root.section === "folder" ? 8 : 0))
+            Layout.topMargin: root.figmaSidePanel ? 0 : (root.compactFolderSidebar ? 12 : (root.wide && root.section === "folder" ? 8 : 0))
             Layout.leftMargin: root.figmaSidePanel ? 18 : 8
             Layout.rightMargin: root.figmaSidePanel ? 17 : 8
             Layout.preferredHeight: root.figmaSidePanel ? 52 : (root.wide && root.section === "folder" && !root.compactFolderSidebar ? 64 : 42)
@@ -588,10 +589,10 @@ Rectangle {
             objectName: "library-compact-folder-toolbar"
             visible: (root.compactFolderSidebar || root.figmaSidePanel) && root.section === "folder"
             Layout.fillWidth: true
-            Layout.topMargin: visible && !root.figmaSidePanel ? 15 : 0
+            Layout.topMargin: visible && !root.figmaSidePanel ? 9 : 0
             Layout.leftMargin: visible ? (root.figmaSidePanel ? 20 : 10) : 0
             Layout.rightMargin: visible ? (root.figmaSidePanel ? 17 : 10) : 0
-            Layout.bottomMargin: visible && !root.figmaSidePanel ? 35 : 0
+            Layout.bottomMargin: visible && !root.figmaSidePanel ? 33 : 0
             Layout.preferredHeight: root.figmaSidePanel ? 52 : 28
             spacing: root.figmaSidePanel ? 5 : 4
             NText {
