@@ -1004,15 +1004,18 @@ Rectangle {
                         cache: true
                         visible: status === Image.Ready
                         onStatusChanged: {
-                            if (status === Image.Error && mediaCell.videoThumbnailRetryToken < 4)
+                            if (status === Image.Error && mediaCell.videoThumbnailRetryToken < 8)
                                 thumbnailRetryTimer.start()
                         }
                         Timer {
                             id: thumbnailRetryTimer
-                            interval: 250 + (mediaCell.index % 12) * 75
+                            // Spread retries across the folder instead of creating
+                            // synchronized bursts when the bounded provider is full.
+                            interval: 250 + mediaCell.videoThumbnailRetryToken * 400
+                                      + ((mediaCell.index * 137) % 900)
                             repeat: false
                             onTriggered: {
-                                if (videoThumbnail.status === Image.Error && mediaCell.videoThumbnailRetryToken < 4)
+                                if (videoThumbnail.status === Image.Error && mediaCell.videoThumbnailRetryToken < 8)
                                     mediaCell.videoThumbnailRetryToken += 1
                             }
                         }
