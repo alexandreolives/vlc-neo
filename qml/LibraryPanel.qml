@@ -1747,7 +1747,7 @@ Rectangle {
                                          ? Math.max(0, (parent.width - width) / 2)
                                          : root.folderViewMode === "list"
                                            ? minimumX
-                                           : Math.max(minimumX, maximumX - 6)
+                                           : Math.max(minimumX, maximumX)
         readonly property real minimumY: root.miniPlayerDockParent ? 0 : root.miniPlayerWindowTopInset + 6
         readonly property real maximumY: root.miniPlayerDockParent
                                          ? Math.max(0, parent.height - height - 16)
