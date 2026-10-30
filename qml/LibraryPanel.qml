@@ -55,6 +55,7 @@ Rectangle {
     property alias miniVideoHost: miniVideoSurface
     property alias miniPlayerDragTarget: miniVideoDrag
     property alias miniPlayerItem: miniPlayer
+    property alias miniPlayerBackground: miniPlayerBackgroundRect
     property alias miniPlayerOverlay: miniPlayerHoverOverlay
     property alias miniPlayerHovered: miniPlayer.hoveringVideo
     property alias miniPlayerCloseButton: libraryMiniPlayerCloseButton
@@ -1774,8 +1775,10 @@ Rectangle {
         }
 
         Rectangle {
+            id: miniPlayerBackgroundRect
+            objectName: "mini-player-background"
             anchors.fill: parent
-            radius: 12 * miniPlayer.uiScale
+            radius: 14 * miniPlayer.uiScale
             color: Theme.bar
             border.color: Theme.border
         }
