@@ -187,6 +187,10 @@ Rectangle {
         const card = videoRepeater.itemAt(index)
         return !!card && card.thumbnailReady
     }
+    function musicArtworkReady(index) {
+        const card = musicRepeater.itemAt(index)
+        return !!card && card.artworkReady
+    }
 
     Component.onCompleted: refreshContent()
     onVisibleChanged: if (visible) refreshContent()
@@ -857,11 +861,13 @@ Rectangle {
                             id: musicCards
                             spacing: root.compactCards ? 14 : 20
                             Repeater {
+                                id: musicRepeater
                                 model: root.musicItems
                                 delegate: Item {
                                     objectName: "home-music-card-" + index
                                     required property int index
                                     required property var modelData
+                                    readonly property bool artworkReady: musicCover.status === Image.Ready
                                     width: root.musicCardWidth()
                                     height: root.musicCardWidth() + 48
                                     Rectangle {

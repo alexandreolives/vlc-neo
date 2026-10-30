@@ -413,6 +413,18 @@ Rectangle {
         }
         return visible + "/" + ready + "/" + loading + "/" + error
     }
+    function visibleVideoThumbnailErrors() {
+        const errors = []
+        const viewportTop = listing.contentY
+        const viewportBottom = viewportTop + listing.height
+        for (let i = 0; i < files.count; ++i) {
+            const cell = listing.itemAtIndex(i)
+            if (cell && cell.visible && cell.y + cell.height > viewportTop && cell.y < viewportBottom
+                    && cell.videoThumbnailState === "error")
+                errors.push(cell.fileName)
+        }
+        return errors.join(",")
+    }
     function folderListGeometry() {
         const cell = listing.itemAtIndex(0)
         if (!cell) return "missing"
